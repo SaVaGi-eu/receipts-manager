@@ -23,9 +23,9 @@ jobs:
 
       - name: Create branch and copy screenshots
         run: |
-          git checkout main
+          git fetch origin
           git checkout -b add-screenshots-to-main
-          git checkout MacOS-app -- screenshots/
+          git checkout origin/MacOS-app -- screenshots/
           git add screenshots/
           git commit -m "Add screenshots from MacOS-app branch"
           git push origin add-screenshots-to-main
