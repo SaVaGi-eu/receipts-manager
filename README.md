@@ -1,5 +1,16 @@
 # Receipt & Warranty Manager
 
+<<<<<<< HEAD
+## Screenshots
+
+![Main Interface](screenshots/main-interface.png)
+*Receipt Manager main interface with item list and search filters*
+
+![Add Item Dialog](screenshots/add-item-dialog.png)
+*Adding a new receipt with item details*
+
+A local web-based application for managing receipts and item warranties with automatic file organization, integrity checking, and a modern green-themed UI.
+=======
 A local application for managing receipts and item warranties with automatic file organization, integrity checking, OCR receipt scanning, and a modern green-themed UI.
 
 Available as a **native macOS app** (Apple Silicon) or as a **self-hosted web app** (macOS, Linux, Windows).
@@ -20,6 +31,7 @@ Available as a **native macOS app** (Apple Silicon) or as a **self-hosted web ap
 > Because this app is not signed with an Apple Developer certificate, macOS may show a **"damaged and can't be opened"** warning. This is a false alarm — the app is safe. See the [First Launch fix](#-app-shows-damaged-and-cant-be-opened) in Troubleshooting below.
 
 ---
+>>>>>>> MacOS-app
 
 ## Features
 
