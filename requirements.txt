@@ -1,4 +1,7 @@
-# OCR Libraries (choose one or install both)
+# Core web framework (required)
+Flask>=3.0.0
+
+# OCR Libraries
 easyocr>=1.7.0         # Recommended: More accurate, supports 80+ languages
 pytesseract>=0.3.10    # Alternative: Lightweight, requires Tesseract installation
 Pillow>=10.0.0         # Image processing for both OCR engines
