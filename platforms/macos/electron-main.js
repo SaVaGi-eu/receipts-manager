@@ -39,33 +39,9 @@ function getAppDir() {
     // In development, go up two levels from platforms/macos/ to reach root
     return path.join(__dirname, '..', '..');
   }
-  // When packaged, files are in app.asar.unpacked at the same level as electron-main.js
-  // But Python files were copied from ../../ so they're TWO levels up from where electron-main.js is
-  const unpackedPath = __dirname.replace('app.asar', 'app.asar.unpacked');
-  const parentUnpacked = path.join(unpackedPath, '..', '..');
-  
-  console.log('[App] Checking paths:');
-  console.log('  __dirname:', __dirname);
-  console.log('  unpackedPath:', unpackedPath);
-  console.log('  parentUnpacked:', parentUnpacked);
-  
-  // Check where app.py actually is
-  const appPyInUnpacked = path.join(unpackedPath, 'app.py');
-  const appPyInParent = path.join(parentUnpacked, 'app.py');
-  
-  if (fs.existsSync(appPyInUnpacked)) {
-    console.log('[App] Found app.py in unpacked path');
-    return unpackedPath;
-  }
-  if (fs.existsSync(appPyInParent)) {
-    console.log('[App] Found app.py in parent unpacked path');
-    return parentUnpacked;
-  }
-  
-  console.log('[App] app.py not found, using unpacked path as fallback');
-  return unpackedPath;
+  // When packaged, extraResources are in Contents/Resources/
+  return process.resourcesPath;
 }
-
 
 // ── Settings management ───────────────────────────────────────────────────
 function getSavedDataPath() {
