@@ -35,7 +35,10 @@ function killPortProcess(port) {
 
 // ── Get the correct base directory ────────────────────────────────────────
 function getAppDir() {
-  if (!app.isPackaged) return __dirname;
+  if (!app.isPackaged) {
+    // In development, go up two levels from platforms/macos/ to reach root
+    return path.join(__dirname, '..', '..');
+  }
   const unpackedPath = __dirname.replace('app.asar', 'app.asar.unpacked');
   if (fs.existsSync(unpackedPath)) {
     console.log('[App] Using unpacked path:', unpackedPath);

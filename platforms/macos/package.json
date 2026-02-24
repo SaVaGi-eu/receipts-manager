@@ -1,7 +1,7 @@
 {
   "name": "receipt-warranty-manager",
   "version": "1.0.0",
-  "description": "Receipt & Warranty Manager",
+  "description": "Receipt & Warranty Manager - macOS Desktop App",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
@@ -21,15 +21,15 @@
     "productName": "Receipt Manager",
     "asar": true,
     "asarUnpack": [
-      "config.py",
-      "app.py",
-      "ocr_service.py",
-      "venv/**/*",
-      "templates/**/*",
-      "static/**/*",
-      "data/**/*",
-      "storage/**/*",
-      "requirements.txt"
+      "../../config.py",
+      "../../app.py",
+      "../../ocr_service.py",
+      "../../venv/**/*",
+      "../../templates/**/*",
+      "../../static/**/*",
+      "../../data/**/*",
+      "../../storage/**/*",
+      "../../requirements.txt"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -68,23 +68,23 @@
     },
     "files": [
       "electron-main.js",
-      "config.py",
-      "app.py",
-      "ocr_service.py",
-      "templates/**",
-      "static/**",
-      "data/**",
-      "storage/**",
-      "venv/**",
-      "requirements.txt"
+      "../../config.py",
+      "../../app.py",
+      "../../ocr_service.py",
+      "../../templates/**",
+      "../../static/**",
+      "../../data/**",
+      "../../storage/**",
+      "../../venv/**",
+      "../../requirements.txt"
     ],
     "extraResources": [
       {
-        "from": "storage",
+        "from": "../../storage",
         "to": "storage"
       },
       {
-        "from": "data",
+        "from": "../../data",
         "to": "data"
       }
     ]
