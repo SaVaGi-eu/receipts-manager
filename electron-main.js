@@ -7,6 +7,7 @@ const fs = require('fs');
 let flaskProcess = null;
 let mainWindow = null;
 let startupError = null;
+let waitingForLocation = false; // Track if we're waiting for folder selection
 
 const PORT = 8765; // Matches app.py - avoids macOS AirPlay on port 5000
 const FLASK_URL = `http://127.0.0.1:${PORT}`;
@@ -24,8 +25,7 @@ function killPortProcess(port) {
       encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore']
     }).trim();
     if (pids) {
-      pids.split('\
-').forEach(pid => {
+      pids.split('\n').forEach(pid => {
         try { process.kill(parseInt(pid), 'SIGKILL'); } catch (e) {}
       });
       console.log(`[Electron] Killed stale process(es) on port ${port}:`, pids);
@@ -78,16 +78,13 @@ function saveSettings(dataPath) {
 async function promptForDataFolder() {
   const defaultPath = path.join(app.getPath('documents'), 'Receipts Manager');
   
-  const result = await dialog.showMessageBox({
+  const result = await dialog.showMessageBox(mainWindow, {
     type: 'question',
     buttons: ['Choose Folder...', 'Use Default (Documents)'],
     defaultId: 1,
     title: 'First Time Setup',
     message: 'Where would you like to store your receipts and database?',
-    detail: `If you choose Default, we will create a folder at:
-${defaultPath}
-
-You can also choose any other location (like iCloud or an external drive).`,
+    detail: `If you choose Default, we will create a folder at:\n${defaultPath}\n\nYou can also choose any other location (like iCloud or an external drive).`,
     noLink: true
   });
 
@@ -95,7 +92,7 @@ You can also choose any other location (like iCloud or an external drive).`,
   if (result.response === 1) {
     chosenPath = defaultPath;
   } else {
-    const pickResult = await dialog.showOpenDialog({
+    const pickResult = await dialog.showOpenDialog(mainWindow, {
       title: 'Select Data Storage Folder',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
       defaultPath: app.getPath('documents')
@@ -113,17 +110,93 @@ You can also choose any other location (like iCloud or an external drive).`,
         fs.mkdirSync(path.join(chosenPath, 'database'), { recursive: true });
         fs.mkdirSync(path.join(chosenPath, 'storage'), { recursive: true });
       } catch (e) {
-        dialog.showErrorBox('Folder Error', `Could not create or write to folder:
-${e.message}`);
+        await dialog.showMessageBox(mainWindow, {
+          type: 'error',
+          title: 'Folder Error',
+          message: 'Could not create or write to folder',
+          detail: e.message,
+          buttons: ['Try Again']
+        });
         return promptForDataFolder(); // Try again
       }
     }
     saveSettings(chosenPath);
     return chosenPath;
   } else {
-    // User cancelled picking - we can't proceed
-    app.quit();
-    return null;
+    // User cancelled - show friendly message with retry option
+    return null; // Signal cancellation
+  }
+}
+
+// ── Show "Location Required" page when user cancels ───────────────────────
+function showLocationRequiredPage() {
+  const html = `<!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: white;
+      }
+      .container {
+        text-align: center;
+        background: rgba(255, 255, 255, 0.15);
+        padding: 60px;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        max-width: 550px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+      .icon { font-size: 72px; margin-bottom: 25px; }
+      h1 { margin: 0 0 20px 0; font-size: 32px; font-weight: 600; }
+      p { font-size: 18px; line-height: 1.7; margin: 20px 0; opacity: 0.95; }
+      button {
+        background: white;
+        color: #667eea;
+        border: none;
+        padding: 18px 50px;
+        font-size: 18px;
+        font-weight: 600;
+        border-radius: 12px;
+        cursor: pointer;
+        margin-top: 25px;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      button:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+      button:active { transform: translateY(0px); }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">📁</div>
+      <h1>Storage Location Required</h1>
+      <p>Receipt Manager needs a folder to store your receipts and database.</p>
+      <p><strong>Please select a location to continue.</strong></p>
+      <button id="selectBtn">Select Location...</button>
+    </div>
+    <script>
+      document.getElementById('selectBtn').addEventListener('click', () => {
+        // Signal to Electron we want to select location
+        window.location.href = 'app://select-location';
+      });
+    </script>
+  </body>
+  </html>`;
+  
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    waitingForLocation = true;
+    mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   }
 }
 
@@ -247,7 +320,32 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  waitForFlask(FLASK_URL, 60, () => loadAppWithRetry(5), (err) => showErrorPage(err));
+  // Listen for custom protocol to handle "Select Location" button click
+  mainWindow.webContents.on('will-navigate', async (event, url) => {
+    if (url === 'app://select-location' && waitingForLocation) {
+      event.preventDefault();
+      waitingForLocation = false;
+      
+      // Show folder picker
+      const dataPath = await promptForDataFolder();
+      if (dataPath) {
+        // User selected a location, start the server
+        console.log('[App] User selected data path:', dataPath);
+        killPortProcess(PORT);
+        await new Promise(r => setTimeout(r, 1000));
+        
+        if (!startFlask(dataPath) && startupError) {
+          showErrorPage(startupError);
+        } else {
+          waitForFlask(FLASK_URL, 60, () => loadAppWithRetry(5), (err) => showErrorPage(err));
+        }
+      } else {
+        // User cancelled again - show the page again
+        showLocationRequiredPage();
+      }
+    }
+  });
+
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -262,15 +360,19 @@ app.whenReady().then(async () => {
     callback({ responseHeaders });
   });
 
+  // Create window first
+  createWindow();
+
   // 1. Data Directory resolution
   let dataPath = getSavedDataPath();
   if (!dataPath) {
-    // Show splash window first so dialog doesn't look floating
-    createWindow();
+    // First time - prompt for location
     dataPath = await promptForDataFolder();
-    if (!dataPath) return; // app.quit() called inside
-  } else {
-    createWindow();
+    if (!dataPath) {
+      // User cancelled - show "Location Required" page (no crash, no quit)
+      showLocationRequiredPage();
+      return; // Stop here, wait for user to click button
+    }
   }
 
   // 2. Process management
@@ -278,7 +380,9 @@ app.whenReady().then(async () => {
   await new Promise(r => setTimeout(r, 1000));
   
   if (!startFlask(dataPath) && startupError) {
-    dialog.showErrorBox('Startup Error', startupError);
+    showErrorPage(startupError);
+  } else {
+    waitForFlask(FLASK_URL, 60, () => loadAppWithRetry(5), (err) => showErrorPage(err));
   }
 }).catch(err => {
   dialog.showErrorBox('Startup Error', err.message);
