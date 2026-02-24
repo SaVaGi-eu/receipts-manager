@@ -1,6 +1,20 @@
 # OCR Feature Setup Guide
 
-This guide explains how to set up and use the OCR (Optical Character Recognition) feature to automatically extract information from receipt images.
+Complete guide for setting up and using the OCR (Optical Character Recognition) feature to automatically extract information from receipt images.
+
+## 📋 Table of Contents
+
+- [What Does OCR Do?](#-what-does-ocr-do)
+- [Installation Options](#-installation-options)
+- [Quick Start](#-quick-start)
+- [Testing OCR](#-testing-ocr)
+- [Using OCR in Web Interface](#-using-ocr-in-the-web-interface)
+- [Tips for Best Results](#-tips-for-best-ocr-results)
+- [Troubleshooting](#-troubleshooting)
+- [Language Support](#-language-support)
+- [Advanced Usage](#-advanced-usage)
+
+---
 
 ## 🎯 What Does OCR Do?
 
@@ -9,8 +23,27 @@ The OCR feature automatically reads text from receipt images and extracts:
 - **Purchase date**
 - **Total amount**
 - **Individual items** (names and prices)
+- **Raw text** (complete OCR output)
 
 You can then review and edit the extracted information before saving.
+
+### Workflow
+
+```
+1. User uploads receipt image 📷
+       ↓
+2. OCR extracts text 🔍
+       ↓
+3. Parser identifies fields 🏷️
+       ↓
+4. Form pre-fills with data ✍️
+       ↓
+5. User reviews & edits 👀
+       ↓
+6. Receipt saved to database 💾
+```
+
+---
 
 ## 📦 Installation Options
 
@@ -88,6 +121,23 @@ sudo apt-get install tesseract-ocr-ell
 sudo apt-get install tesseract-ocr-deu
 ```
 
+### Comparison: EasyOCR vs Tesseract
+
+| Feature | EasyOCR | Tesseract |
+|---------|---------|-----------|
+| **Accuracy** | ⭐⭐⭐⭐⭐ Higher | ⭐⭐⭐⭐ Good |
+| **Speed** | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐ Fast |
+| **Setup** | ⭐⭐⭐⭐⭐ Easy | ⭐⭐⭐ Requires system install |
+| **Languages** | 80+ built-in | Install per language |
+| **Memory** | ~500MB | ~50MB |
+| **GPU Support** | ✅ Yes | ❌ No |
+| **Multi-lingual** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Good |
+| **Maintenance** | pip install | System updates |
+
+**Recommendation:** Start with EasyOCR for best results, switch to Tesseract if you need lower memory usage.
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Install Dependencies
@@ -137,6 +187,9 @@ Raw extracted text:
 Albert Heijn B.V.
 Hoofdstraat 123
 1234 AB Amsterdam
+
+Date: 15-02-2024
+Time: 14:23
 ...
 ```
 
@@ -148,12 +201,197 @@ Edit the OCR service initialization in `app.py` or `ocr_service.py`:
 # For English and Dutch receipts
 ocr_service = OCRService(engine="easyocr", languages=['en', 'nl'])
 
-# For English, Dutch, and Greek receipts
-ocr_service = OCRService(engine="easyocr", languages=['en', 'nl', 'el'])
+# For English, Dutch, Greek, and Latvian receipts
+ocr_service = OCRService(engine="easyocr", languages=['en', 'nl', 'el', 'lv'])
 
 # For Tesseract (uses system language packs)
 ocr_service = OCRService(engine="tesseract", languages=['eng', 'nld', 'ell'])
 ```
+
+---
+
+## 🧪 Testing OCR
+
+### Quick Test Script
+
+Create `test_ocr.py`:
+
+```python
+#!/usr/bin/env python3
+"""Test OCR functionality"""
+
+import sys
+from ocr_service import extract_receipt_data
+
+def test_ocr(image_path, engine='easyocr'):
+    """Test OCR on a receipt image."""
+    print(f"\n{'='*60}")
+    print(f"Testing OCR with {engine}")
+    print(f"Image: {image_path}")
+    print(f"{'='*60}\n")
+    
+    try:
+        # Extract data
+        data = extract_receipt_data(
+            image_path,
+            engine=engine,
+            languages=['en', 'nl', 'el', 'lv']  # Your languages
+        )
+        
+        # Display results
+        print("✅ OCR Successful!\n")
+        
+        print(f"Shop:          {data.get('shop', 'N/A')}")
+        print(f"Date:          {data.get('purchase_date', 'N/A')}")
+        
+        if data.get('total_amount'):
+            print(f"Total:         €{data['total_amount']:.2f}")
+        else:
+            print(f"Total:         N/A")
+        
+        print(f"\nItems found:   {len(data.get('items', []))}")
+        for i, item in enumerate(data.get('items', [])[:5], 1):
+            print(f"  {i}. {item['name']:<30} €{item['price']}")
+        
+        if len(data.get('items', [])) > 5:
+            print(f"  ... and {len(data['items']) - 5} more items")
+        
+        print(f"\n{'-'*60}")
+        print("Raw text (first 500 chars):")
+        print(f"{'-'*60}")
+        raw = data.get('raw_text', '')
+        print(raw[:500])
+        if len(raw) > 500:
+            print("...\n[truncated]")
+        
+        print(f"\n{'='*60}")
+        print("✅ Test PASSED")
+        print(f"{'='*60}\n")
+        
+        return True
+        
+    except Exception as e:
+        print(f"\n❌ Test FAILED")
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python test_ocr.py <image_path> [engine]")
+        print("  engine: easyocr (default) or tesseract")
+        sys.exit(1)
+    
+    image = sys.argv[1]
+    engine = sys.argv[2] if len(sys.argv) > 2 else "easyocr"
+    
+    success = test_ocr(image, engine)
+    sys.exit(0 if success else 1)
+```
+
+Run the test:
+```bash
+python test_ocr.py receipt.jpg
+```
+
+### Test Cases
+
+#### Test Case 1: Perfect Receipt
+- **Input:** Clear, well-lit photo of printed receipt
+- **Expected:** All fields extracted correctly
+
+#### Test Case 2: Poor Quality
+- **Input:** Blurry or dark photo
+- **Expected:** Some fields may be "N/A", manual editing required
+
+#### Test Case 3: Faded Thermal Receipt
+- **Input:** Old thermal receipt with faded text
+- **Expected:** May fail to extract text
+
+#### Test Case 4: Multilingual Receipt
+- **Input:** Receipt with mixed languages (Dutch + English)
+- **Expected:** Both languages recognized with proper configuration
+
+#### Test Case 5: Handwritten Receipt
+- **Input:** Handwritten receipt or notes
+- **Expected:** Lower accuracy, likely needs manual correction
+
+### Automated Batch Testing
+
+Create `test_all_receipts.sh`:
+
+```bash
+#!/bin/bash
+# Test all receipts in a folder
+
+echo "Testing OCR on all receipt images..."
+echo "===================================="
+
+pass=0
+fail=0
+
+for img in test_receipts/*.jpg test_receipts/*.png; do
+    if [ -f "$img" ]; then
+        echo "\nTesting: $img"
+        if python ocr_service.py "$img" > /dev/null 2>&1; then
+            echo "✅ PASS: $img"
+            ((pass++))
+        else
+            echo "❌ FAIL: $img"
+            ((fail++))
+        fi
+    fi
+done
+
+echo "\n===================================="
+echo "Results: $pass passed, $fail failed"
+echo "===================================="
+```
+
+Make executable and run:
+```bash
+chmod +x test_all_receipts.sh
+./test_all_receipts.sh
+```
+
+### Benchmark Testing
+
+Compare EasyOCR vs Tesseract performance:
+
+```python
+#!/usr/bin/env python3
+import time
+from ocr_service import extract_receipt_data
+
+def benchmark(image_path):
+    engines = ['easyocr', 'tesseract']
+    
+    print(f"\nBenchmarking: {image_path}")
+    print("=" * 60)
+    
+    for engine in engines:
+        try:
+            start = time.time()
+            data = extract_receipt_data(image_path, engine=engine)
+            elapsed = time.time() - start
+            
+            print(f"\n{engine.upper()}:")
+            print(f"  Time:  {elapsed:.2f}s")
+            print(f"  Shop:  {data.get('shop', 'N/A')[:30]}")
+            print(f"  Date:  {data.get('purchase_date', 'N/A')}")
+            print(f"  Items: {len(data.get('items', []))}")
+            
+        except Exception as e:
+            print(f"\n{engine.upper()}: FAILED - {e}")
+    
+    print("\n" + "=" * 60)
+
+# Usage
+benchmark('receipt.jpg')
+```
+
+---
 
 ## 🎨 Using OCR in the Web Interface
 
@@ -172,6 +410,8 @@ ocr_service = OCRService(engine="tesseract", languages=['eng', 'nld', 'ell'])
 4. Review and edit the extracted data
 5. Save the receipt
 
+---
+
 ## 📋 Supported Image Formats
 
 - **JPEG/JPG** (.jpg, .jpeg)
@@ -180,21 +420,39 @@ ocr_service = OCRService(engine="tesseract", languages=['eng', 'nld', 'ell'])
 - **TIFF** (.tiff, .tif)
 - **WebP** (.webp)
 
+---
+
 ## 💡 Tips for Best OCR Results
 
 ### Image Quality
-- **Good lighting**: Take photos in well-lit areas
-- **Straight angle**: Hold camera directly above receipt
-- **In focus**: Ensure text is sharp and readable
-- **Flat surface**: Lay receipt flat, avoid folds or wrinkles
-- **High resolution**: Use at least 1200x1600 pixels
-- **Avoid shadows**: Ensure even lighting across the receipt
+
+✅ **Good practices:**
+- **Good lighting** - Natural daylight or bright indoor lighting
+- **Straight angle** - Hold camera directly above receipt
+- **In focus** - Ensure text is sharp and readable
+- **Flat surface** - Lay receipt flat, avoid folds or wrinkles
+- **High resolution** - Use at least 1200x1600 pixels
+- **Avoid shadows** - Ensure even lighting across the receipt
 
 ### Receipt Condition
-- **Clean receipts**: Work best (avoid stains or tears)
-- **Printed receipts**: Better than handwritten notes
-- **Dark text on light background**: Most reliable
-- **Thermal receipts**: Scan before they fade
+
+✅ **What works best:**
+- **Clean receipts** - Avoid stains or tears
+- **Printed receipts** - Better than handwritten notes
+- **Dark text on light background** - Most reliable
+- **Fresh thermal receipts** - Scan before they fade
+
+### Common Receipt Types
+
+| Receipt Type | OCR Accuracy |
+|--------------|--------------|
+| **Supermarket** (Albert Heijn, Jumbo) | ⭐⭐⭐⭐⭐ Excellent |
+| **Restaurant bills** (printed) | ⭐⭐⭐⭐ Good |
+| **Retail receipts** (clothing, electronics) | ⭐⭐⭐⭐⭐ Excellent |
+| **Gas station receipts** | ⭐⭐⭐⭐ Good |
+| **Pharmacy receipts** | ⭐⭐⭐⭐ Good |
+| **Handwritten receipts** | ⭐⭐ Poor (manual review needed) |
+| **Faded thermal receipts** | ⭐ Very Poor |
 
 ### Image Preprocessing (Optional)
 
@@ -232,25 +490,31 @@ processed = preprocess_receipt('receipt.jpg', 'receipt_processed.jpg')
 data = extract_receipt_data(processed)
 ```
 
+---
+
 ## 🔧 Troubleshooting
 
 ### EasyOCR Issues
 
 **"Module not found: easyocr"**
 ```bash
-pip install easyocr
+pip install easyocr pillow numpy
 ```
 
 **"Downloading model files..." (first run)**
 - This is normal on first use
-- Models are cached for future use
-- Requires ~500MB download
-- Subsequent runs will be faster
+- Models are cached for future use (~500MB download)
+- Subsequent runs will be much faster
 
 **"CUDA not available" warning**
 - This is normal if you don't have a GPU
 - OCR will use CPU (still works fine, just slower)
 - For GPU support: `pip install torch torchvision`
+
+**Very slow first run**
+- EasyOCR downloads language models on first use
+- This only happens once
+- Cached models make future runs fast
 
 ### Tesseract Issues
 
@@ -290,6 +554,13 @@ pip install easyocr
 - Some receipts have unusual formatting
 - Add items manually if needed
 
+**If total amount is wrong:**
+- OCR looks for the largest amount or "total" keyword
+- Verify the amount manually
+- Some receipts list subtotals that may confuse the parser
+
+---
+
 ## 🌍 Language Support
 
 ### EasyOCR Language Codes
@@ -298,12 +569,17 @@ Common languages for European receipts:
 - `'en'` - English
 - `'nl'` - Dutch (Nederlands)
 - `'el'` - Greek (Ελληνικά)
+- `'lv'` - Latvian (Latviešu)
 - `'de'` - German (Deutsch)
 - `'fr'` - French (Français)
 - `'it'` - Italian (Italiano)
 - `'es'` - Spanish (Español)
 - `'pt'` - Portuguese (Português)
-- `'lv'` - Latvian (Latviešu)
+
+**Multilingual family setup (English, Dutch, Greek, Latvian):**
+```python
+ocr_service = OCRService(engine="easyocr", languages=['en', 'nl', 'el', 'lv'])
+```
 
 Full list: https://www.jaided.ai/easyocr/
 
@@ -313,34 +589,41 @@ Use 3-letter ISO codes:
 - `'eng'` - English
 - `'nld'` - Dutch
 - `'ell'` - Greek
+- `'lav'` - Latvian
 - `'deu'` - German
 - `'fra'` - French
 - `'ita'` - Italian
 - `'spa'` - Spanish
 - `'por'` - Portuguese
-- `'lav'` - Latvian
+
+---
 
 ## 🔒 Privacy & Security
 
-- **Local processing**: All OCR happens on your computer
-- **No cloud**: Receipt images are never sent to external services
-- **Your data**: Stays in your `_Receipts` folder
-- **Open source**: You can inspect the code
+- ✅ **Local processing** - All OCR happens on your computer
+- ✅ **No cloud** - Receipt images are never sent to external services
+- ✅ **Your data** - Stays in your `_Receipts` folder
+- ✅ **Open source** - You can inspect the code
+- ✅ **No internet** - After initial model download, works offline
+
+---
 
 ## 📚 Advanced Usage
 
-### Batch Processing
+### Batch Processing from Command Line
 
-Process multiple receipts from command line:
+Process multiple receipts:
 
 ```bash
 #!/bin/bash
 # Process all receipts in a folder
 
-for img in receipts/*.jpg; do
-    echo "Processing $img..."
-    python ocr_service.py "$img" easyocr
-    echo "---"
+for img in receipts/*.jpg receipts/*.png; do
+    if [ -f "$img" ]; then
+        echo "Processing $img..."
+        python ocr_service.py "$img" easyocr
+        echo "---"
+    fi
 done
 ```
 
@@ -355,49 +638,109 @@ def _extract_shop(self, text: str) -> str:
     # For example, prioritize certain stores:
     if 'albert heijn' in text.lower():
         return 'Albert Heijn'
+    if 'jumbo' in text.lower():
+        return 'Jumbo'
     # ... rest of logic
+    return self._get_first_line(text)
 ```
 
-### Integration with Other Tools
+### Python API Usage
+
+Use OCR as a Python module:
 
 ```python
-# Use as a Python module
 from ocr_service import extract_receipt_data
 
 # Extract data
 data = extract_receipt_data(
     'receipt.jpg', 
     engine='easyocr',
-    languages=['en', 'nl', 'el']
+    languages=['en', 'nl', 'el', 'lv']
 )
 
-# Use the data
-print(f"Spent €{data['total_amount']} at {data['shop']}")
+# Access extracted data
+print(f"Shop: {data['shop']}")
+print(f"Date: {data['purchase_date']}")
+print(f"Total: €{data['total_amount']}")
+
+# Process items
 for item in data['items']:
     print(f"  - {item['name']}: €{item['price']}")
+
+# Full raw text
+print(f"\nRaw OCR text:\n{data['raw_text']}")
 ```
+
+### Integration with Other Tools
+
+Export OCR data to Excel:
+
+```python
+import pandas as pd
+from ocr_service import extract_receipt_data
+
+# Process receipt
+data = extract_receipt_data('receipt.jpg')
+
+# Create DataFrame
+df = pd.DataFrame({
+    'Item': [item['name'] for item in data['items']],
+    'Price': [item['price'] for item in data['items']],
+    'Shop': data['shop'],
+    'Date': data['purchase_date']
+})
+
+# Export to Excel
+df.to_excel('receipt_data.xlsx', index=False)
+print("Exported to receipt_data.xlsx")
+```
+
+---
 
 ## 🆘 Getting Help
 
 If you encounter issues:
 
-1. Check this documentation
-2. Test with the command-line tool first
-3. Verify your image quality
-4. Try the other OCR engine
-5. Check the GitHub issues
-6. Create a new issue with:
-   - Your OS
-   - OCR engine used
+1. ✅ Check this documentation
+2. ✅ Test with the command-line tool first (`python ocr_service.py receipt.jpg`)
+3. ✅ Verify your image quality (see tips above)
+4. ✅ Try the other OCR engine
+5. ✅ Check the GitHub issues: https://github.com/SaVaGi-eu/receipts-manager/issues
+6. ✅ Create a new issue with:
+   - Your OS (macOS, Linux, Windows)
+   - OCR engine used (EasyOCR or Tesseract)
    - Example receipt image (remove personal info)
-   - Error message
+   - Complete error message
+   - Output of `python --version`
+
+---
+
+## ✅ Success Criteria
+
+OCR is working correctly when:
+
+- ✅ OCR service installs without errors
+- ✅ Can process receipt images from command line
+- ✅ Extracts shop name (may need manual correction)
+- ✅ Extracts date (or defaults to today)
+- ✅ Extracts total amount (if visible on receipt)
+- ✅ Extracts 3+ items with prices
+- ✅ Raw text is readable
+- ✅ Processing completes in <10 seconds (after first run)
+- ✅ Web interface shows extracted data in form fields
+
+---
 
 ## 📝 Next Steps
 
 Once OCR is working:
-- The web interface will automatically use it
-- Upload receipt images and watch them auto-populate
-- Build a complete receipt database with minimal typing
-- Export your data to Excel/CSV for expense reports
 
-Enjoy automated receipt management! 🎉
+1. ✅ Test from command line with various receipts
+2. ✅ Configure your languages
+3. ✅ Use the web interface to upload receipts
+4. ✅ Build your receipt database with minimal typing
+5. ✅ Export data for expense reports
+
+---
+
+**Happy receipt scanning! 📸✨**
