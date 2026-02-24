@@ -7,7 +7,10 @@
     "start": "electron .",
     "build": "electron-builder --mac --arm64",
     "build:x64": "electron-builder --mac --x64",
-    "build:universal": "electron-builder --mac --universal"
+    "build:universal": "electron-builder --mac --universal",
+    "build:dmg": "electron-builder --mac --arm64 dmg",
+    "build:dmg:x64": "electron-builder --mac --x64 dmg",
+    "build:dmg:universal": "electron-builder --mac --universal dmg"
   },
   "devDependencies": {
     "electron": "^40.6.0",
@@ -33,11 +36,33 @@
       "identity": null,
       "target": [
         {
-          "target": "dir",
+          "target": "dmg",
           "arch": [
             "arm64",
             "x64"
           ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Receipt Manager ${version}",
+      "icon": "build/icon.icns",
+      "background": "build/background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 144,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 396,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
         }
       ]
     },
