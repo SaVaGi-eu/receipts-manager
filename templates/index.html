@@ -301,23 +301,27 @@
       user-select: none;
     }
 
-    /* ===== Table Section ===== */
-    .table-section {
-      background: var(--card-bg);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
+	/* ===== Table Section ===== */
+	.table-section {
+	  background: var(--card-bg);
+	  border-radius: 12px;
+	  box-shadow: var(--shadow);
+	  overflow: hidden;
+	}
 
-    .table-wrapper {
-      overflow-x: auto;
-    }
+	.table-wrapper {
+	  overflow-x: auto;
+	  max-width: 100%;
+	}
 
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
+	.items-table {
+	  width: 100%;
+	  min-width: 1200px;  /* ADD THIS - ensures table has minimum width */
+	  border-collapse: collapse;
+	  font-size: 0.9rem;
+	  table-layout: auto;  /* ADD THIS - allows flexible column sizing */
+	}
+
 
     .items-table thead {
       background: linear-gradient(135deg, #f5f5f5, #e8e8e8);
