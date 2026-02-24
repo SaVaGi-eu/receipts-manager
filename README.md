@@ -1,5 +1,6 @@
 # Receipt & Warranty Manager
 
+<<<<<<< HEAD
 ## Screenshots
 
 ![Main Interface](screenshots/main-interface.png)
@@ -9,58 +10,142 @@
 *Adding a new receipt with item details*
 
 A local web-based application for managing receipts and item warranties with automatic file organization, integrity checking, and a modern green-themed UI.
+=======
+A local application for managing receipts and item warranties with automatic file organization, integrity checking, OCR receipt scanning, and a modern green-themed UI.
+
+Available as a **native macOS app** (Apple Silicon) or as a **self-hosted web app** (macOS, Linux, Windows).
+
+---
+
+## ⬇️ Download (macOS Apple Silicon)
+
+**No setup required — drag, drop, and run.**
+
+👉 [Download the latest DMG from Releases](https://github.com/SaVaGi-eu/receipts-manager/releases/latest)
+
+- Requires **macOS 12+ on Apple Silicon (M1/M2/M3/M4)**
+- Python, Flask, and all dependencies are bundled — nothing to install
+- PDF OCR support included (poppler bundled)
+
+> ⚠️ **Important — First Launch**  
+> Because this app is not signed with an Apple Developer certificate, macOS may show a **"damaged and can't be opened"** warning. This is a false alarm — the app is safe. See the [First Launch fix](#-app-shows-damaged-and-cant-be-opened) in Troubleshooting below.
+
+---
+>>>>>>> MacOS-app
 
 ## Features
 
 ### Core Functionality
-- **Drag & Drop Receipt Upload** - Upload PDF, JPG, or PNG files up to 50MB
-- **Multi-Item Support** - Handle single or multiple items per receipt
-- **Smart File Organization** - Automatic file naming and directory structure
-- **Guarantee Tracking** - Track warranty periods with expiration alerts
-- **Search & Filter** - Find items by brand, model, project, user, or status
-- **Data Export** - Export to JSON or CSV formats
-- **Data Import** - Import previously exported JSON data
-- **File Integrity Checking** - Automatic verification every 30 seconds + manual re-check
-- **Auto-Backup** - Rolling backups (keeps last 20) on every save
+- **Drag & Drop Receipt Upload** — Upload PDF, JPG, or PNG files up to 50MB
+- **OCR Scanning** — Automatic text extraction from receipts using EasyOCR
+- **Multi-Item Support** — Handle single or multiple items per receipt
+- **Smart File Organization** — Automatic file naming and directory structure
+- **Guarantee Tracking** — Track warranty periods with expiration alerts
+- **Search & Filter** — Find items by brand, model, project, user, or status
+- **Data Export** — Export to JSON or CSV formats
+- **Data Import** — Import previously exported JSON data
+- **File Integrity Checking** — Automatic verification every 30 seconds + manual re-check
+- **Auto-Backup** — Rolling backups (keeps last 20) on every save
 
 ### UI Features
-- **System Theme Detection** - Automatic dark/light mode based on OS settings
-- **Fresh Green Color Scheme** - Calming, nature-inspired design
-- **Alternating Row Colors** - Enhanced readability
-- **Sortable Columns** - Click headers to sort by any column
-- **Column Visibility Toggles** - Show/hide columns as needed
-- **Project Color Coding** - Visual differentiation of projects
-- **Status Highlights** - Yellow for expiring soon (90 days), red for expired
-- **Responsive Design** - Works on desktop and tablet
+- **System Theme Detection** — Automatic dark/light mode based on OS settings
+- **Fresh Green Color Scheme** — Calming, nature-inspired design
+- **Alternating Row Colors** — Enhanced readability
+- **Sortable Columns** — Click headers to sort by any column
+- **Column Visibility Toggles** — Show/hide columns as needed
+- **Project Color Coding** — Visual differentiation of projects
+- **Status Highlights** — Yellow for expiring soon (90 days), red for expired
+- **Responsive Design** — Works on desktop and tablet
+
+---
 
 ## Installation
 
+### Option A — macOS Native App (Recommended for Apple Silicon)
+
+1. [Download the DMG](https://github.com/SaVaGi-eu/receipts-manager/releases/latest)
+2. Open the DMG and drag **Receipt Manager** to your Applications folder
+3. **Before opening**: run the quarantine fix (see below) — macOS will otherwise block the app
+4. Open Terminal (`Cmd + Space` → type `Terminal` → Enter) and run:
+   ```bash
+   xattr -cr /Applications/Receipt\ Manager.app
+   ```
+5. Double-click the app — it will open normally from now on
+
+### Option B — Web App (macOS, Linux, Windows)
+
+#### Prerequisites
+- **Python 3.8 or higher**
+  - Mac: `brew install python` or download from [python.org](https://www.python.org/downloads/)
+  - Linux: `sudo apt install python3 python3-venv python3-pip`
+  - Windows: Download from [python.org](https://www.python.org/downloads/)
+- **poppler** (required for PDF OCR support)
+  - Mac: `brew install poppler`
+  - Linux: `sudo apt install poppler-utils`
+  - Windows: Download from [poppler releases](https://github.com/oschwartz10612/poppler-windows/releases)
+
+#### Quick Start
+
+**Mac / Linux:**
+```bash
+git clone https://github.com/SaVaGi-eu/receipts-manager.git
+cd receipts-manager
+./run.sh
+```
+Then open your browser to `http://127.0.0.1:5000`
+
+**Windows:**
+```cmd
+git clone https://github.com/SaVaGi-eu/receipts-manager.git
+cd receipts-manager
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
+```
+Then open your browser to `http://127.0.0.1:5000`
+
+> **First launch** may take 1-2 minutes to install dependencies.
+
+---
+
+## Build the macOS App from Source
+
+If you want to build the DMG yourself (Apple Silicon required):
+
 ### Prerequisites
-- **Mac**: macOS 10.14+ with Python 3.8+
-- **Linux**: Any modern distribution with Python 3.8+
-- **Python 3.8 or higher** must be installed
+- [Node.js](https://nodejs.org) (v18+)
+- [Homebrew](https://brew.sh)
+- Python 3.8+
 
-### Quick Start
+### Steps
 
-#### On Mac:
-1. Extract the `receipt_manager` folder
-2. Double-click `run.command`
-3. Open browser to `http://127.0.0.1:5000`
+```bash
+# 1. Clone and enter the MacOS-app branch
+git clone https://github.com/SaVaGi-eu/receipts-manager.git
+cd receipts-manager
+git checkout MacOS-app
 
-#### On Linux:
-1. Extract the `receipt_manager` folder
-2. Open terminal in the folder
-3. Run: `./run.sh`
-4. Open browser to `http://127.0.0.1:5000`
+# 2. Set up Python environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-### First-Time Setup
+# 3. Install Node dependencies
+npm install
 
-The startup script automatically:
-1. Creates a Python virtual environment (`venv/`)
-2. Installs Flask and dependencies
-3. Starts the web server
+# 4. Bundle poppler (one-time setup, ~2 minutes)
+./setup-vendor.sh
 
-**Note**: First launch may take 1-2 minutes to install dependencies.
+# 5. Test the app
+npm start
+
+# 6. Build the DMG
+npm run build
+# Output: dist/Receipt Manager-1.0.0-arm64.dmg
+```
+
+---
 
 ## Usage Guide
 
@@ -68,23 +153,14 @@ The startup script automatically:
 
 #### Step 1: Upload Receipt
 1. **Drag & drop** a receipt file onto the drop zone, or **click to browse**
-2. Fill in receipt-level fields:
+2. The OCR engine automatically extracts shop name and purchase date
+3. Review and complete the pre-filled fields:
    - **Shop**: Where you purchased (autocomplete suggests previous entries)
    - **Purchase Date**: Format `YYYY-MMM-DD` (e.g., `2026-Feb-15`)
    - **Documentation**: Receipt type (e.g., `Invoice`, `Warranty Card`)
-   - **Quantity**: Number of items on this receipt
-3. Click **Next: Item Details**
+4. Fill in item details: Brand, Model, Location, Users, Project, Guarantee
 
-#### Step 2: Item Information
-For each item (repeated `quantity` times):
-1. **Brand**: Manufacturer name
-2. **Model**: Product model number/name
-3. **Location**: Where item is stored
-4. **Users**: Tags for who uses it (type and press Enter, max 8)
-5. **Project**: Project name or leave as `N/A`
-6. **Guarantee Duration**: Number + unit (days/months/years)
-7. Click **Add Item**
-
+#### Step 2: Review & Save
 The app automatically:
 - Generates unique Receipt Group ID (`RG-0001`, `RG-0002`, etc.)
 - Creates properly organized file structure
@@ -103,111 +179,55 @@ The app automatically:
 - Filename: `Brand-Model-PurchaseDate-Shop-Location-Users-Documentation.ext`
 - Example: `Apple/Apple-iPhone15ProMax-2026Feb15-Coolblue-Home-John-Jane-Invoice.pdf`
 
-**Filename Rules**:
-- Invalid characters removed: `< > : " / \ | ? *`
-- Spaces replaced with hyphens
-- Truncated if exceeding safe length (with warning)
-- Duplicate detection prevents overwrites
-
 ### Editing Items
 
 1. Click **✏️ Edit** button on any row
 2. Modify fields as needed
 3. Click **Save Changes**
 
-**What Happens on Edit**:
-- Single-item receipts: File renamed/moved if brand/model/project/etc. changed
-- Multi-item receipts: Receipt file stays in `_Receipts/`, item metadata updated
-- If file operation fails, changes are rejected (atomic operation)
-- Old directories cleaned up if empty
+Single-item receipts are automatically renamed/moved if key fields change. Multi-item receipts stay in `_Receipts/`, only metadata is updated.
 
 ### Deleting Items
 
 1. Click **🗑️ Delete** button on any row
 2. Confirm deletion
 
-**Deletion Behavior**:
-- Deletes the underlying receipt file
-- For multi-item receipts: File deleted only when **last** item referencing it is deleted
-- Empty directories are automatically removed
+For multi-item receipts: the file is deleted only when the **last** item referencing it is deleted.
 
 ### File Integrity
 
-**Automatic Checks**:
-- Runs on startup
-- Runs every 30 seconds in background
-- Verifies all referenced files exist
-
-**When Files Go Missing**:
-- Red **🔴** indicator appears in File column
-- Row shown with strike-through
-- Edit button disabled
-- Red banner at top lists missing files
+**Automatic Checks** run on startup and every 30 seconds. When files go missing:
+- Red **🔴** indicator appears in the File column
+- Row shown with strike-through text
+- Red banner at top lists all missing files
 - Click **🔄 Re-check Files Now** to verify again
-
-**Why This Matters**:
-- Prevents editing items with missing receipts (could break data consistency)
-- Alerts you immediately if files moved/deleted outside the app
-- Maintains data integrity
 
 ### Search & Filters
 
-**Search Box**: Type to filter by brand, model, location, project, shop, documentation, or users
-
-**Filters**:
-- **Projects**: Show items from specific project
-- **Status**:
-  - Active: Guarantee still valid
-  - Expiring Soon: Within 90 days of expiration
-  - Expired: Guarantee has ended
-  - No Guarantee: Items with 0 duration
-- **Users**: Show items tagged with specific user
-
-**Sorting**: Click any column header to sort ascending/descending
-
-### Column Visibility
-
-Click **⚙️ Columns** button to show/hide:
-- ID
-- Receipt Group
-- Brand, Model, Location
-- Users, Project
-- Shop, Purchase Date, Documentation
-- Guarantee, End Date
-- File
+- **Search Box**: Filters by brand, model, location, project, shop, documentation, or users
+- **Project Filter**: Show items from a specific project
+- **Status Filter**: Active / Expiring Soon (90 days) / Expired / No Guarantee
+- **User Filter**: Show items tagged with a specific user
+- **Sorting**: Click any column header to sort ascending/descending
 
 ### Data Management
 
-**Export JSON**:
-- Complete backup of all data
-- Includes receipts, items, and metadata
-- Can be re-imported later
+| Action | Description |
+|---|---|
+| **Export JSON** | Full backup — can be re-imported later |
+| **Export CSV** | Flat view for Excel / Google Sheets |
+| **Import JSON** | Restore from backup (**replaces all current data**) |
 
-**Export CSV**:
-- Flattened view of items with receipt info
-- Opens in Excel, Google Sheets, etc.
-- Good for reporting/analysis
-
-**Import JSON**:
-- Restore from previous export
-- **Warning**: Replaces all current data
-- Creates backup before import
+---
 
 ## Data Storage
 
-### Files
-- `data/data.json` - Main database (JSON format)
-- `data/backups/` - Rolling backups (last 20 saves)
-- `_Receipts/` - Multi-item receipt files
-- `ProjectName/` or `BrandName/` - Single-item receipt files
+- `data/data.json` — Main database
+- `data/backups/` — Rolling backups (last 20 saves, timestamped)
+- `_Receipts/` — Multi-item receipt files
+- `ProjectName/` or `BrandName/` — Single-item receipt files
 
-### Backup Strategy
-- Automatic backup on every save
-- Keeps last 20 backups with timestamps
-- Format: `data_backup_YYYYMMDD_HHMMSS.json`
-- Backups stored in `data/backups/`
-
-### Data Format
+### Data Format Example
 ```json
 {
   "receipts": [
@@ -239,205 +259,174 @@ Click **⚙️ Columns** button to show/hide:
 }
 ```
 
+---
+
 ## Technical Details
 
 ### Technology Stack
-- **Backend**: Flask (Python web framework)
+- **Backend**: Flask (Python)
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
+- **OCR**: EasyOCR + pdf2image + poppler
+- **Desktop App**: Electron (macOS)
 - **Storage**: JSON file (no database required)
-- **File Handling**: Python pathlib + shutil
 
 ### System Requirements
-- **CPU**: Any modern processor
-- **RAM**: 256MB minimum
-- **Disk**: 100MB for app + space for receipt files
-- **Browser**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+
+| | macOS App | Web App |
+|---|---|---|
+| **OS** | macOS 12+ Apple Silicon | macOS / Linux / Windows |
+| **Python** | Bundled | 3.8+ required |
+| **Browser** | Not needed | Chrome 90+, Firefox 88+, Safari 14+ |
+| **RAM** | 512MB recommended | 256MB minimum |
+| **Disk** | 300MB (app) + receipts | 100MB + receipts |
 
 ### Port Configuration
 - Default: `http://127.0.0.1:5000`
-- Accessible only from local machine (not network-accessible)
-- To change port: Edit `app.py` line 685: `app.run(host='127.0.0.1', port=5000)`
+- Local machine only (not network-accessible)
+- To change port: Edit `app.py`: `app.run(host='127.0.0.1', port=5000)`
 
 ### File Upload Limits
 - Maximum file size: 50MB
 - Supported formats: PDF, JPG, JPEG, PNG
-- To change limit: Edit `app.py` line 19: `app.config['MAX_CONTENT_LENGTH']`
+- To change limit: Edit `app.py`: `app.config['MAX_CONTENT_LENGTH']`
 
-## Troubleshooting
-
-### "Python 3 is not installed"
-**Mac**: Install from https://www.python.org/downloads/  
-**Linux**: Use package manager:
-- Ubuntu/Debian: `sudo apt install python3 python3-venv python3-pip`
-- Fedora: `sudo dnf install python3 python3-pip`
-- Arch: `sudo pacman -S python python-pip`
-
-### "Permission denied" when running scripts
-**Mac/Linux**: Make scripts executable:
-```bash
-chmod +x run.command run.sh
-```
-
-### "Address already in use"
-Another application is using port 5000. Either:
-1. Stop the other application
-2. Change port in `app.py` (see Port Configuration above)
-
-### Files not uploading
-1. Check file size (max 50MB)
-2. Verify format (PDF, JPG, PNG only)
-3. Check available disk space
-4. Look for error messages in terminal
-
-### Integrity errors after moving files manually
-If you move/rename files outside the app:
-1. The integrity checker will detect missing files
-2. You'll see red 🔴 indicators
-3. Either:
-   - Move files back to original locations
-   - Delete affected items and re-upload
-
-### App won't start
-1. Check Python version: `python3 --version` (must be 3.8+)
-2. Delete `venv/` folder and restart (forces fresh install)
-3. Check terminal for error messages
-4. Ensure no other app is using port 5000
-
-## Keyboard Shortcuts
-
-Currently, the app uses mouse interaction. Keyboard shortcuts can be added by extending `app.js`.
-
-**Suggested shortcuts** (for future implementation):
-- `Ctrl/Cmd + F` - Focus search box
-- `Ctrl/Cmd + N` - New receipt upload
-- `Ctrl/Cmd + E` - Export JSON
-- `Ctrl/Cmd + R` - Refresh data
-- `Escape` - Close dialogs
-
-## Security & Privacy
-
-### Local-Only Operation
-- **No internet connection required** (after installation)
-- **No data sent to external servers**
-- All data stored locally on your machine
-
-### Access Control
-- Runs on `127.0.0.1` (localhost only)
-- Not accessible from network/internet
-- No authentication required (single-user design)
-
-**Note**: This app is designed for **personal use** on a trusted machine. If you need multi-user access or network sharing, additional authentication layers would be needed.
+---
 
 ## Folder Structure
 
 ```
-receipt_manager/
+receipts-manager/
 ├── app.py                  # Main Flask application
+├── ocr_service.py          # OCR processing service
 ├── requirements.txt        # Python dependencies
-├── run.command            # Mac launcher
-├── run.sh                 # Linux launcher
-├── README.md              # This file
+├── run.sh                  # Linux/Mac web launcher
+├── run.command             # Mac double-click launcher
+├── electron-main.js        # Electron desktop app entry point
+├── package.json            # Node.js config for Electron build
+├── setup-vendor.sh         # One-time poppler bundling script (macOS build)
+├── README.md
 ├── data/
-│   ├── data.json         # Main database
-│   └── backups/          # Auto-backups
-├── _Receipts/            # Multi-item receipts
-├── [ProjectNames]/       # Single-item receipts by project
-├── [BrandNames]/         # Single-item receipts by brand (if no project)
+│   ├── data.json           # Main database
+│   └── backups/            # Auto-backups
+├── _Receipts/              # Multi-item receipts
+├── [ProjectNames]/         # Single-item receipts by project
+├── [BrandNames]/           # Single-item receipts by brand (if no project)
 ├── static/
-│   ├── css/
-│   │   └── style.css     # Styling
-│   └── js/
-│       └── app.js        # Frontend logic
+│   ├── css/style.css       # Styling
+│   └── js/app.js           # Frontend logic
 ├── templates/
-│   └── index.html        # Main page
-└── venv/                 # Virtual environment (created on first run)
+│   └── index.html          # Main page
+└── venv/                   # Virtual environment (local only, not in git)
 ```
 
-## Advanced Configuration
+---
 
-### Guarantee End Date Calculation
+## Troubleshooting
 
-**Days**: Simple addition  
-**Months**: Adds months, keeps same day, uses last day of month if needed  
-**Years**: Adds years, uses last day of target month
+### 🚨 App shows "damaged and can't be opened"
 
-Example:
-- Purchase: 2026-Feb-15
-- Duration: 24 months
-- End Date: **2028-Feb-28** (last day of February 2028)
+This is the most common issue and affects **all users on first install**. It is **not** a real problem with the app — macOS adds a quarantine flag to every file downloaded from the internet, and applies this aggressive warning to unsigned apps.
 
-### Autocomplete Suggestions
+**Fix — open Terminal and run:**
+```bash
+xattr -cr /Applications/Receipt\ Manager.app
+```
 
-The app learns from your entries:
-- Shops, brands, models, locations, documentation types, projects, and users
-- Suggestions update after each new item
-- Clear suggestions by importing a fresh JSON export
+Alternatively, drag the app icon directly into the Terminal window after typing `xattr -cr ` (with a trailing space).
 
-### Multi-Item vs Single-Item Logic
+You only need to do this **once**. The app will open normally from then on.
 
-**System decides based on quantity**:
-- Quantity > 1 → Multi-item (one file in `_Receipts/`)
-- Quantity = 1 → Single-item (file in `ProjectName/` or `BrandName/`)
+> **Why does this happen to this app but not others?**  
+> Apps distributed via the Mac App Store or signed with an Apple Developer ID certificate ($99/year) are automatically trusted by macOS Gatekeeper. This app is open-source and unsigned, so macOS treats it with maximum suspicion. The `xattr -cr` command simply removes the quarantine flag macOS attached to the file.
 
-**Why this matters**:
-- Multi-item: Efficient for bulk purchases (one receipt, many items)
-- Single-item: Better organization for individual items (filed by project/brand)
+### "Python 3 is not installed"
+- **Mac**: `brew install python` or [python.org](https://www.python.org/downloads/)
+- **Ubuntu/Debian**: `sudo apt install python3 python3-venv python3-pip`
+- **Fedora**: `sudo dnf install python3 python3-pip`
+- **Windows**: [python.org](https://www.python.org/downloads/)
+
+### PDF OCR not working
+PDF conversion requires poppler:
+- **Mac**: `brew install poppler`
+- **Linux**: `sudo apt install poppler-utils`
+- **macOS App**: Already bundled — no action needed
+
+### "Address already in use"
+Port 5000 is taken. Either stop the other app, or change the port in `app.py`.
+
+### "Permission denied" running scripts
+```bash
+chmod +x run.sh run.command setup-vendor.sh
+```
+
+### App won't start (web version)
+1. Check Python version: `python3 --version` (must be 3.8+)
+2. Delete `venv/` and restart (forces fresh install)
+3. Check terminal for error messages
+4. Ensure port 5000 is free
+
+### Integrity errors after moving files
+If you move files outside the app, the integrity checker will flag them (red 🔴). Either move the files back, or delete and re-upload the affected items.
+
+---
 
 ## FAQ
 
+**Q: Does the macOS app work on Intel Macs?**  
+A: Not yet — the current release is Apple Silicon (M1/M2/M3/M4) only. Intel and Universal builds are planned for a future release.
+
 **Q: Can I use this on Windows?**  
-A: Not officially supported, but Flask runs on Windows. You'd need to:
-1. Install Python 3 from python.org
-2. Open Command Prompt in `receipt_manager/`
-3. Run: `python -m venv venv`
-4. Run: `venv\Scripts\activate`
-5. Run: `pip install -r requirements.txt`
-6. Run: `python app.py`
+A: Yes, via the web app (Option B above). The native Electron app is macOS-only for now.
 
 **Q: How do I move the app to another computer?**  
-A: Copy the entire `receipt_manager/` folder. All data and files are self-contained.
+A: Export your data as JSON, install the app on the new machine, then import the JSON. Or copy the entire folder if both machines use the same OS.
 
 **Q: Can multiple people use this simultaneously?**  
-A: No, it's designed for single-user local use. For multi-user, you'd need to add authentication and run on a server.
+A: It's designed for single-user local use. For multi-user, you'd need to add authentication and host on a server.
 
 **Q: What if I accidentally delete an item?**  
-A: Check `data/backups/` for recent backups. Import the most recent one before deletion.
-
-**Q: Can I customize colors/theme?**  
-A: Yes! Edit `static/css/style.css`. Modify the `:root` variables for colors.
+A: Check `data/backups/` for recent backups. Import the most recent one created before the deletion.
 
 **Q: Does this work offline?**  
-A: Yes! After initial installation, no internet connection needed.
+A: Yes — after installation, no internet connection is needed.
 
 **Q: How many items can it handle?**  
-A: Tested with 10,000+ items. Performance depends on your computer. Search/filter may slow down with 50,000+ items.
+A: Tested with 10,000+ items. Search/filter may slow with 50,000+ items.
 
 **Q: Can I add custom fields?**  
-A: Yes, but requires code changes to `app.py` (data model), `templates/index.html` (UI), and `static/js/app.js` (logic).
+A: Yes, but requires changes to `app.py`, `templates/index.html`, and `static/js/app.js`.
+
+---
+
+## Security & Privacy
+
+- **No internet connection required** after installation
+- **No data sent to external servers** — everything stays on your machine
+- Runs on `127.0.0.1` (localhost only) — not accessible from the network
+- No authentication (single-user, trusted machine design)
+
+> For multi-user or networked use, additional authentication layers would be required.
+
+---
 
 ## License
 
-This application is provided as-is for personal use. Free to modify and distribute.
+MIT License — free to use, modify, and distribute.
 
-## Support
-
-For issues or questions:
-1. Check this README thoroughly
-2. Review error messages in terminal
-3. Verify Python version and dependencies
-4. Check file permissions and disk space
+---
 
 ## Changelog
 
-### Version 1.0 (February 2026)
+### v1.0.0 (February 2026)
 - Initial release
+- Native macOS app (Apple Silicon DMG)
 - Core receipt and item management
+- OCR scanning with EasyOCR
 - Automatic file organization
-- Integrity checking
+- Integrity checking and auto-backup
 - Search, filter, sort functionality
 - Dark/light theme support
-- Export/import capabilities
-- Rolling backups
+- Export/import (JSON + CSV)
 
 ---
 

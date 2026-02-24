@@ -5,28 +5,25 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-*.so
-*.egg
 *.egg-info/
 dist/
 build/
 
-# Application data
-data/data.json
+# Data - personal files, not for version control
+storage/
+data/database/data.json
 data/backups/
-_Receipts/*
-!_Receipts/.gitkeep
+
+# Node / Electron
+node_modules/
+out/
 
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 
-# Linux
-*~
-.directory
-
-# IDE
+# Editors
 .vscode/
 .idea/
 *.swp
@@ -34,3 +31,6 @@ _Receipts/*
 
 # Logs
 *.log
+npm-debug.log*
+node_modules/
+node_modules/
