@@ -1,0 +1,92 @@
+{
+  "name": "receipt-warranty-manager",
+  "version": "1.0.0",
+  "description": "Receipt & Warranty Manager - macOS Desktop App",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --arm64",
+    "build:x64": "electron-builder --mac --x64",
+    "build:universal": "electron-builder --mac --universal",
+    "build:dmg": "electron-builder --mac --arm64 dmg",
+    "build:dmg:x64": "electron-builder --mac --x64 dmg",
+    "build:dmg:universal": "electron-builder --mac --universal dmg"
+  },
+  "devDependencies": {
+    "electron": "^40.6.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "eu.savagi.receipts-manager",
+    "productName": "Receipt Manager",
+    "asar": true,
+    "asarUnpack": [
+      "../../config.py",
+      "../../app.py",
+      "../../ocr_service.py",
+      "../../venv/**/*",
+      "../../templates/**/*",
+      "../../static/**/*",
+      "../../data/**/*",
+      "../../storage/**/*",
+      "../../requirements.txt"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Receipt Manager ${version}",
+      "icon": "build/icon.icns",
+      "background": "build/background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 144,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 396,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "electron-main.js",
+      "../../config.py",
+      "../../app.py",
+      "../../ocr_service.py",
+      "../../templates/**",
+      "../../static/**",
+      "../../data/**",
+      "../../storage/**",
+      "../../venv/**",
+      "../../requirements.txt"
+    ],
+    "extraResources": [
+      {
+        "from": "../../storage",
+        "to": "storage"
+      },
+      {
+        "from": "../../data",
+        "to": "data"
+      }
+    ]
+  }
+}
