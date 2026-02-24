@@ -43,6 +43,7 @@
     },
     "files": [
       "electron-main.js",
+      "config.py",
       "app.py",
       "ocr_service.py",
       "templates/**",
