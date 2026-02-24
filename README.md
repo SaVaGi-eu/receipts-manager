@@ -320,6 +320,48 @@ receipts-manager/
 
 ---
 
+## 📁 File Storage Locations
+
+### Application Data Directories
+
+The Receipt Manager creates and uses several folders depending on how you run it:
+
+#### macOS Native App
+
+When using the native macOS app, the following directories are created:
+
+| Directory | Purpose | Contents |
+|-----------|---------|----------|
+| `~/Documents/Receipts Manager/` (default) | **Main data storage** | - Your receipt files<br>- Database (`data/data.json`)<br>- Backups (`data/backups/`) |
+| `~/Library/Application Support/Receipt Manager/` | **App settings** | - `settings.json` (stores chosen data directory path)<br>- App preferences |
+| `~/Library/Application Support/receipt-warranty-manager/` | **Electron cache** | - Browser cache<br>- Session data<br>- Temporary files |
+
+> **Why two Application Support folders?**  
+> - `Receipt Manager` (with space) = your app's settings  
+> - `receipt-warranty-manager` (with hyphen) = Electron's internal cache  
+> 
+> Both are safe to keep. The Electron cache folder improves performance and can be deleted if needed—it will regenerate automatically.
+
+**On First Launch**, the app will ask you where to store your receipts:
+- **Default**: `~/Documents/Receipts Manager/`
+- **Custom**: Choose any location (iCloud Drive, external drive, etc.)
+
+Your choice is saved in `settings.json`, so you only need to choose once.
+
+#### Web App (Self-Hosted)
+
+When running via `python app.py` or `./run.sh`:
+
+| Directory | Purpose |
+|-----------|---------|
+| `receipts-manager/data/` | Database and backups |
+| `receipts-manager/_Receipts/` | Multi-item receipts |
+| `receipts-manager/[ProjectName]/` | Single-item receipts |
+| `receipts-manager/venv/` | Python virtual environment |
+
+**Everything stays in the project folder**—no system directories are used.
+
+---
 ## Troubleshooting
 
 ### 🚨 App shows "damaged and can't be opened"
