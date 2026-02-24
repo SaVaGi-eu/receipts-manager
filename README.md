@@ -1,6 +1,5 @@
 # Receipt & Warranty Manager
 
-<<<<<<< HEAD
 ## Screenshots
 
 ![Main Interface](screenshots/main-interface.png)
