@@ -36,3 +36,13 @@ platforms/*/dist/
 # Logs
 *.log
 npm-debug.log*
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+data.json
+*.egg-info/
+dist/
+build/
+platforms/macos/dist/
+platforms/macos/node_modules/
