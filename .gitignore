@@ -18,6 +18,10 @@ data/backups/
 node_modules/
 out/
 
+# Platform-specific build artifacts
+platforms/*/node_modules/
+platforms/*/dist/
+
 # macOS
 .DS_Store
 .AppleDouble
@@ -32,5 +36,3 @@ out/
 # Logs
 *.log
 npm-debug.log*
-node_modules/
-node_modules/
