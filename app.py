@@ -9,19 +9,37 @@ import re
 import threading
 import time
 import os
+import logging
 from datetime import datetime, timedelta
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
+import mimetypes
 
+# Internal imports (config and OCR)
+from ocr_service import extract_receipt_data
+from config import DATA_ROOT, DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR, DATA_FILE
+
+# Basic configuration
+PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
+BASE_DIR = Path(__file__).parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
+# Allowed CORS origins
 ALLOWED_ORIGINS = {
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:8765"  # add any dev hosts you use
+    "http://localhost:8765"
 }
-import os
-from pathlib import Path
 
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("receipt-manager")
+
+data_lock = threading.Lock()
+
+# ---------- Path safety helpers ----------
 def _is_within_root(root: Path, candidate: Path) -> bool:
     try:
         root_resolved = root.resolve()
@@ -32,85 +50,87 @@ def _is_within_root(root: Path, candidate: Path) -> bool:
     cand_str = str(cand_resolved)
     return cand_str == str(root_resolved) or cand_str.startswith(root_prefix)
 
+def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
+    """
+    Resolve a user-supplied relative path against root safely.
+    Returns the resolved Path if it is contained within root, otherwise None.
+    """
+    if not rel_path:
+        return None
+    # Decode percent-encoding
+    rel = unquote(rel_path)
+    # Reject absolute paths and obvious traversal tokens
+    if rel.startswith("/") or rel.startswith("\\"):
+        return None
+    if ".." in Path(rel).parts:
+        return None
+    try:
+        candidate = (root / rel).resolve(strict=False)
+    except Exception:
+        return None
+    if not _is_within_root(root, candidate):
+        return None
+    return candidate
+
 def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) -> Path:
     """
     Move src -> dst_dir/dst_name safely.
-    Returns the final destination Path on success, raises ValueError/IOError on failure.
+    Returns the final destination Path on success, raises exceptions on failure.
     """
     if not src.exists() or not src.is_file():
         raise FileNotFoundError("Source file missing")
 
-    # Sanitize dst_name further if needed (already sanitized earlier)
+    # Ensure destination directory exists
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    dst = (dst_dir / dst_name)
+    dst = dst_dir / dst_name
 
-    # Resolve parent and destination to detect symlink escapes
+    # Resolve parent and ensure it's within allowed_root
     try:
-        dst_parent_resolved = dst.parent.resolve()
+        dst_parent_resolved = dst.parent.resolve(strict=False)
     except Exception as e:
         raise ValueError(f"Invalid destination parent: {e}")
 
-    # Ensure destination parent is inside allowed root
     if not _is_within_root(allowed_root, dst_parent_resolved):
         raise ValueError("Destination outside allowed root")
 
-    # Final destination path (do not resolve dst itself yet to avoid following attacker symlink)
     final_dst = dst_parent_resolved / dst.name
 
     # If final_dst exists and is not the same as src, fail to avoid overwrite
-    if final_dst.exists() and final_dst.resolve() != src.resolve():
-        raise FileExistsError("Target file already exists")
+    if final_dst.exists():
+        try:
+            if final_dst.resolve() != src.resolve():
+                raise FileExistsError("Target file already exists")
+            else:
+                # Same file already in place
+                return final_dst
+        except FileExistsError:
+            raise
+        except Exception:
+            # If resolve fails for some reason, be conservative and fail
+            raise IOError("Unable to verify existing target")
 
-    # Use os.replace for atomic rename when possible (works across same filesystem)
+    # Attempt atomic move; fallback to shutil.move if necessary
     try:
-        # Re-check src resolved to avoid TOCTOU
-        src_resolved = src.resolve()
-        # If src and final_dst are same, nothing to do
-        if final_dst.resolve() == src_resolved:
-            return final_dst
-    except Exception:
-        pass
-
-    # Perform move/replace
-    try:
-        # Prefer os.replace for atomicity; fallback to shutil.move if needed
         try:
             os.replace(str(src), str(final_dst))
         except OSError:
-            # os.replace may fail across devices; fallback
-            import shutil
             shutil.move(str(src), str(final_dst))
     except Exception as e:
         raise IOError(f"Failed to move file: {e}")
 
-    # Final safety check
+    # Final containment check
     if not _is_within_root(allowed_root, final_dst):
-        # Attempt to undo if possible (best-effort)
+        # Attempt to undo (best-effort) is omitted; raise error
         raise IOError("Post-move destination outside allowed root")
 
+    # Optionally set safe permissions
+    try:
+        final_dst.chmod(0o640)
+    except Exception:
+        pass
+
     return final_dst
-
-# helper to set CORS safely
-def set_cors_headers(self):
-    origin = self.headers.get("Origin")
-    if origin and origin in ALLOWED_ORIGINS:
-        setcors_headers(self)
-        self.send_header("Vary", "Origin")
-        # only set credentials if you actually need them
-        # self.send_header("Access-Control-Allow-Credentials", "true")
-    # else: do not set Access-Control-Allow-Origin (or set a safe default)
-
-# ✨ Internal imports
-from ocr_service import extract_receipt_data
-from config import DATA_ROOT, DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR, DATA_FILE
-
-PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
-BASE_DIR = Path(__file__).parent
-TEMPLATES_DIR = BASE_DIR / "templates"
-STATIC_DIR = BASE_DIR / "static"
-
-data_lock = threading.Lock()
 
 # ---------- Utility functions ----------
 def sanitize_filename(text, max_length=50):
@@ -125,19 +145,10 @@ def sanitize_filename(text, max_length=50):
     return text or "unnamed"
 
 def format_date_for_filename(date_str):
-    """
-    Format a date string for safe use in filenames.
-
-    On valid input like '2024-Feb-01' it returns '2024Feb01'.
-    On invalid/unexpected input, it falls back to a strictly alphanumeric
-    representation to avoid introducing path separators or other
-    special characters into filenames.
-    """
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
     except Exception:
-        # Fallback: keep only ASCII letters and digits
         safe = re.sub(r"[^A-Za-z0-9]", "", str(date_str))
         return safe or "unknown"
 
@@ -167,7 +178,7 @@ def calculate_guarantee_end_date(purchase_date, duration, unit):
             try:
                 end_dt = datetime(year, month, day)
             except ValueError:
-                end_dt = datetime(year, month, 28)
+                # fallback to last valid day of month
                 if month == 12:
                     last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
                 else:
@@ -192,12 +203,6 @@ def load_data():
         return {"receipts": [], "items": [], "next_id": 1}
 
 def save_data(data):
-    """
-    Save data to disk. A backup is created only when the meaningful content
-    has actually changed (integrity_issues is excluded from the comparison
-    because it is refreshed every 30 s by the background worker).
-    At most 20 backups are kept; older ones are pruned automatically.
-    """
     try:
         new_content = json.dumps(data, indent=2, ensure_ascii=False)
         if DATA_FILE.exists():
@@ -220,17 +225,17 @@ def save_data(data):
             backup = BACKUP_DIR / f"data_backup_{ts}.json"
             if DATA_FILE.exists():
                 shutil.copy2(DATA_FILE, backup)
-            
+
             backups = sorted(BACKUP_DIR.glob("data_backup_*.json"))
             if len(backups) > 20:
                 for b in backups[:-20]:
                     b.unlink(missing_ok=True)
-        
+
         with DATA_FILE.open("w", encoding="utf-8") as f:
             f.write(new_content)
         return True
     except Exception as e:
-        print(f"Save error: {e}")
+        logger.exception("Save error")
         return False
 
 def generate_receipt_group_id(data):
@@ -244,13 +249,13 @@ def generate_receipt_group_id(data):
 
 def build_single_item_filename(item, receipt, ext):
     parts = [
-        sanitize_filename(item["brand"], 30),
-        sanitize_filename(item["model"], 30),
-        format_date_for_filename(receipt["purchase_date"]),
-        sanitize_filename(receipt["shop"], 20),
-        sanitize_filename(item["location"], 20),
-        "-".join(sanitize_filename(u, 15) for u in item["users"][:3]) if item["users"] else "NoUser",
-        sanitize_filename(receipt["documentation"], 20),
+        sanitize_filename(item.get("brand", "N/A"), 30),
+        sanitize_filename(item.get("model", "N/A"), 30),
+        format_date_for_filename(receipt.get("purchase_date", "unknown")),
+        sanitize_filename(receipt.get("shop", "N/A"), 20),
+        sanitize_filename(item.get("location", "N/A"), 20),
+        "-".join(sanitize_filename(u, 15) for u in item.get("users", [])[:3]) if item.get("users") else "NoUser",
+        sanitize_filename(receipt.get("documentation", "N/A"), 20),
     ]
     base = "-".join(parts)
     full = f"{base}{ext}"
@@ -262,35 +267,33 @@ def build_single_item_filename(item, receipt, ext):
 
 def build_multi_item_filename(receipt, ext):
     parts = [
-        sanitize_filename(receipt["shop"], 40),
-        format_date_for_filename(receipt["purchase_date"]),
-        sanitize_filename(receipt["documentation"], 40),
-        receipt["receipt_group_id"],
+        sanitize_filename(receipt.get("shop", "N/A"), 40),
+        format_date_for_filename(receipt.get("purchase_date", "unknown")),
+        sanitize_filename(receipt.get("documentation", "N/A"), 40),
+        receipt.get("receipt_group_id", "RG-0000"),
     ]
     base = "-".join(parts)
     full = f"{base}{ext}"
     if len(full) > 200:
-        allowed = 200 - len(ext) - len(receipt["receipt_group_id"]) - 1
+        allowed = 200 - len(ext) - len(receipt.get("receipt_group_id", "")) - 1
         p_str = "-".join(parts[:-1])[:allowed]
-        base = f"{p_str}-{receipt['receipt_group_id']}"
+        base = f"{p_str}-{receipt.get('receipt_group_id', '')}"
         full = f"{base}{ext}"
     return full
 
 def get_storage_directory(item):
-    if item["project"] and item["project"] != "N/A":
-        return STORAGE_DIR / sanitize_filename(item["project"], 50)
-    return STORAGE_DIR / sanitize_filename(item["brand"], 50)
+    if item.get("project") and item.get("project") != "N/A":
+        return STORAGE_DIR / sanitize_filename(item.get("project"), 50)
+    return STORAGE_DIR / sanitize_filename(item.get("brand", "N/A"), 50)
 
 def verify_file_integrity(data):
     issues = []
     for item in data.get("items", []):
         rel = item.get("receipt_relative_path")
         if rel:
-            # Check if it's absolute or relative to DATA_ROOT
             full = Path(rel)
             if not full.is_absolute():
                 full = DATA_ROOT / rel
-            
             if not full.exists():
                 issues.append(
                     {
@@ -311,7 +314,7 @@ def integrity_worker():
                 data["integrity_issues"] = verify_file_integrity(data)
                 save_data(data)
         except Exception:
-            pass
+            logger.exception("Integrity worker error")
 
 def _parse_multipart_file(body: bytes, content_type: str, field_name: str = "file"):
     if not content_type or "multipart/form-data" not in content_type:
@@ -349,36 +352,60 @@ def _today_ymmmdd():
     return datetime.now().strftime("%Y-%b-%d")
 
 # ---------- HTTP handler ----------
+def set_cors_headers(handler):
+    """
+    Safely set CORS headers based on ALLOWED_ORIGINS.
+    """
+    origin = handler.headers.get("Origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        handler.send_header("Access-Control-Allow-Origin", origin)
+        handler.send_header("Vary", "Origin")
+        # handler.send_header("Access-Control-Allow-Credentials", "true")  # enable if needed
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        pass
+        # silence default logging; use logger instead
+        logger.debug(format % args)
+
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         csp = (
-        "default-src 'self'; "
-        "script-src 'self'; "
-        "style-src 'self'; "
-        "img-src 'self' data:; "
-        "font-src 'self'; "
-        "connect-src 'self'; "
-        "frame-ancestors 'none'; "
-        "base-uri 'self'; "
-        "form-action 'self'"
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
         )
         self.send_header("Content-Security-Policy", csp)
         self.send_header("X-Frame-Options", "DENY")
-        # remove: self.send_header("Access-Control-Allow-Origin", "*")
         set_cors_headers(self)
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
+
     def do_OPTIONS(self):
         self._set_headers(204)
+
+    def _read_json(self):
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        body = self.rfile.read(length) if length > 0 else b""
+        if not body:
+            return {}
+        try:
+            return json.loads(body.decode("utf-8"))
+        except Exception:
+            return {}
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
         if path == "/" or path == "/index.html":
             index_file = TEMPLATES_DIR / "index.html"
             if not index_file.exists():
@@ -389,41 +416,39 @@ class Handler(BaseHTTPRequestHandler):
             self._set_headers(200, "text/html; charset=utf-8")
             self.wfile.write(html)
             return
-        from pathlib import Path
-        from urllib.parse import unquote
-        import mimetypes
-        import os
+
+        # Serve static files safely
         if path.startswith("/static/"):
-            # Remove the prefix and decode percent-encoding
             rel = path[len("/static/"):]
-            rel = unquote(rel)
-            # Reject obvious bad inputs early
-            if rel.startswith("/") or rel.startswith("\\"):
-                self._set_headers(403, "text/plain")
-                self.wfile.write(b"Forbidden")
+            candidate = safe_resolve_within(STATIC_DIR, rel)
+            if not candidate or not candidate.exists() or not candidate.is_file():
+                self._set_headers(404, "text/plain")
+                self.wfile.write(b"File not found")
                 return
-    # Build candidate path and resolve to follow symlinks
-    candidate = (STATIC_DIR / rel).resolve()
-    static_root = STATIC_DIR.resolve()
 
-    # Ensure candidate is inside static_root
-    if not (str(candidate).startswith(str(static_root) + os.sep) or candidate == static_root):
-        self._set_headers(403, "text/plain")
-        self.wfile.write(b"Forbidden")
-        return
+            # Whitelist extensions (optional)
+            ALLOWED_STATIC_EXT = {".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp"}
+            suffix = candidate.suffix.lower()
+            if suffix not in ALLOWED_STATIC_EXT:
+                ctype, _ = mimetypes.guess_type(str(candidate))
+                ctype = ctype or "application/octet-stream"
+            else:
+                ctype, _ = mimetypes.guess_type(str(candidate))
+                ctype = ctype or "application/octet-stream"
 
-    # Ensure it's a file
-    if not candidate.exists() or not candidate.is_file():
-        self._set_headers(404, "text/plain")
-        self.wfile.write(b"File not found")
-        return
-
-    # Serve with guessed content type
-    ctype, _ = mimetypes.guess_type(str(candidate))
-    ctype = ctype or "application/octet-stream"
-    self._set_headers(200, f"{ctype}; charset=utf-8")
-    self.wfile.write(candidate.read_bytes())
-    return
+            # Stream file to avoid large memory usage
+            self.send_response(200)
+            self.send_header("Content-Type", f"{ctype}; charset=utf-8")
+            set_cors_headers(self)
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            with candidate.open("rb") as f:
+                while True:
+                    chunk = f.read(64 * 1024)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+            return
 
         if path == "/api/data":
             with data_lock:
@@ -432,6 +457,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(200)
                 self.wfile.write(json.dumps(data).encode("utf-8"))
             return
+
         if path == "/api/suggestions":
             with data_lock:
                 data = load_data()
@@ -454,6 +480,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(200)
                 self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
+
         if path == "/api/export/json":
             with data_lock:
                 data = load_data()
@@ -461,6 +488,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(200, "application/json; charset=utf-8")
                 self.wfile.write(json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8"))
             return
+
         if path == "/api/export/csv":
             import csv
             from io import StringIO
@@ -489,6 +517,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(200, "text/csv; charset=utf-8")
                 self.wfile.write(csv_data.encode("utf-8"))
             return
+
         if path == "/api/file":
             qs_params = parse_qs(parsed.query)
             rel = qs_params.get("path", [None])[0]
@@ -497,15 +526,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b"Missing 'path' parameter")
                 return
             try:
-                # Path is relative to DATA_ROOT
-                target = (DATA_ROOT / rel).resolve()
-                root_resolved = DATA_ROOT.resolve()
-                # Security: must stay inside DATA_ROOT
-                if not str(target).startswith(str(root_resolved) + os.sep) and target != root_resolved:
-                    self._set_headers(403, "text/plain")
-                    self.wfile.write(b"Forbidden")
-                    return
-                if not target.exists() or not target.is_file():
+                target = safe_resolve_within(DATA_ROOT, rel)
+                if not target or not target.exists() or not target.is_file():
                     self._set_headers(404, "text/plain")
                     self.wfile.write(b"File not found")
                     return
@@ -525,25 +547,25 @@ class Handler(BaseHTTPRequestHandler):
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
-                self.wfile.write(target.read_bytes())
+                with target.open("rb") as f:
+                    while True:
+                        chunk = f.read(64 * 1024)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
             except Exception as e:
+                logger.exception("Error serving file")
                 self._set_headers(500, "text/plain")
                 self.wfile.write(f"Error: {e}".encode())
             return
+
         self._set_headers(404, "text/plain")
         self.wfile.write(b"Not found")
-    def _read_json(self):
-        length = int(self.headers.get("Content-Length", 0) or 0)
-        body = self.rfile.read(length) if length > 0 else b""
-        if not body:
-            return {}
-        try:
-            return json.loads(body.decode("utf-8"))
-        except Exception:
-            return {}
+
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
         if path == "/api/upload":
             length = int(self.headers.get("Content-Length", 0) or 0)
             max_len = 50 * 1024 * 1024
@@ -558,18 +580,25 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(400)
                 self.wfile.write(b'{"success":false,"error":"No file field found"}')
                 return
+
             # Save uploaded file
             ext = Path(filename).suffix.lower() or ".bin"
             safe_base = sanitize_filename(Path(filename).stem, max_length=80)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             upload_dir = RECEIPTS_DIR / "uploads"
-            upload_dir.mkdir(exist_ok=True)
+            upload_dir.mkdir(parents=True, exist_ok=True)
             saved_name = f"{ts}_{safe_base}{ext}"
             saved_path = upload_dir / saved_name
             saved_path.write_bytes(file_bytes)
+
             # path relative to DATA_ROOT
-            rel_path = str(saved_path.relative_to(DATA_ROOT))
-            # ✨ Run OCR extraction
+            try:
+                rel_path = str(saved_path.relative_to(DATA_ROOT))
+            except Exception:
+                # If saved_path is not under DATA_ROOT, compute a safe relative path under DATA_ROOT
+                rel_path = str(saved_path)
+
+            # Run OCR extraction (best-effort)
             ocr_data = {"shop": "N/A", "purchase_date": "N/A", "total_amount": None, "items": []}
             try:
                 ocr_result = extract_receipt_data(
@@ -584,8 +613,9 @@ class Handler(BaseHTTPRequestHandler):
                     "items": ocr_result.get("items", [])[:3],
                     "raw_text": ocr_result.get("raw_text", "")[:500]
                 }
-            except Exception as e:
-                print(f"OCR extraction failed: {e}")
+            except Exception:
+                logger.exception("OCR extraction failed")
+
             with data_lock:
                 data = load_data()
                 rg_id = generate_receipt_group_id(data)
@@ -626,6 +656,7 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
+
         if path == "/api/integrity/check":
             with data_lock:
                 data = load_data()
@@ -635,6 +666,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(200)
                 self.wfile.write(json.dumps({"success": True, "issues": issues}).encode("utf-8"))
             return
+
         if path == "/api/import/json":
             imported = self._read_json()
             if "receipts" not in imported or "items" not in imported:
@@ -648,8 +680,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(200)
                 self.wfile.write(b'{"success":true,"message":"Data imported successfully"}')
             return
+
         self._set_headers(404)
         self.wfile.write(b'{"error":"not found"}')
+
     def do_PUT(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -678,91 +712,96 @@ class Handler(BaseHTTPRequestHandler):
                 old_rel_path = item.get("receipt_relative_path")
                 old_path = (DATA_ROOT / old_rel_path) if old_rel_path else None
                 needs_move = False
+
                 def u(field, dest):
                     nonlocal needs_move
                     if field in updates:
                         dest[field] = updates[field]
                         if not is_multi and field in ["brand", "model", "location", "project"]:
                             needs_move = True
+
                 u("brand", item)
                 u("model", item)
                 u("location", item)
                 u("project", item)
                 if "users" in updates:
                     item["users"] = updates["users"] or []
-                    if not is_multi: needs_move = True
+                    if not is_multi:
+                        needs_move = True
                 if "shop" in updates:
                     receipt["shop"] = updates["shop"]
-                    if not is_multi: needs_move = True
+                    if not is_multi:
+                        needs_move = True
                 if "purchase_date" in updates:
                     receipt["purchase_date"] = updates["purchase_date"]
-                    if not is_multi: needs_move = True
+                    if not is_multi:
+                        needs_move = True
                 if "documentation" in updates:
                     receipt["documentation"] = updates["documentation"]
-                    if not is_multi: needs_move = True
+                    if not is_multi:
+                        needs_move = True
                 if "guarantee_duration" in updates:
                     item["guarantee_duration"] = updates["guarantee_duration"]
                 if "guarantee_unit" in updates:
                     item["guarantee_unit"] = updates["guarantee_unit"]
+
                 item["guarantee_end_date"] = calculate_guarantee_end_date(
                     receipt["purchase_date"],
                     item.get("guarantee_duration", 0),
                     item.get("guarantee_unit", "days")
                 )
+
                 if needs_move and old_path and old_path.exists():
                     ext = old_path.suffix
                     new_name = build_single_item_filename(item, receipt, ext)
                     new_dir = get_storage_directory(item)
                     new_dir.mkdir(parents=True, exist_ok=True)
                     new_path = new_dir / new_name
-                    if new_path.exists() and new_path.resolve() != old_path.resolve():
-                        self._set_headers(400)
-                        msg = {"success": False, "error": f"Target file already exists: {new_name}"}
-                        self.wfile.write(json.dumps(msg).encode("utf-8"))
-                        return
+
+                    # If target exists and is different, error out
                     try:
-                        if new_path.resolve() != old_path.resolve():
-                            # allowed_root should be the directory you want to contain stored receipts
-                            ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()  # or STORAGE_DIR.resolve()
-                            try:
-                                final_dst = safe_move_file(old_path, new_dir, new_name, ALLOWED_STORAGE_ROOT)
-                                rel = str(final_dst.relative_to(DATA_ROOT))
-                                receipt["receipt_filename"] = new_name
-                                receipt["receipt_relative_path"] = rel
-                                item["receipt_relative_path"] = rel
-                                # cleanup empty old dir
-                                try:
-                                    if old_path.parent.exists() and not any(old_path.parent.iterdir()):
-                                        old_path.parent.rmdir()
-                                except Exception:
-                                    pass
-                            except FileExistsError as e:
-                                self._set_headers(400)
-                                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
-                                return
-                            except (ValueError, FileNotFoundError, IOError) as e:
-                                self._set_headers(500)
-                                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
-                                return
-                        rel = str(new_path.relative_to(DATA_ROOT))
+                        if new_path.exists() and new_path.resolve() != old_path.resolve():
+                            self._set_headers(400)
+                            msg = {"success": False, "error": f"Target file already exists: {new_name}"}
+                            self.wfile.write(json.dumps(msg).encode("utf-8"))
+                            return
+                    except Exception:
+                        # If resolve fails, be conservative and abort
+                        self._set_headers(500)
+                        self.wfile.write(json.dumps({"success": False, "error": "Failed to verify target"}).encode("utf-8"))
+                        return
+
+                    # Perform safe move using helper
+                    ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()  # must match relative_to below
+                    try:
+                        final_dst = safe_move_file(old_path, new_dir, new_name, ALLOWED_STORAGE_ROOT)
+                        rel = str(final_dst.relative_to(DATA_ROOT))
                         receipt["receipt_filename"] = new_name
                         receipt["receipt_relative_path"] = rel
                         item["receipt_relative_path"] = rel
                         try:
-                            if not any(old_path.parent.iterdir()):
+                            if old_path.parent.exists() and not any(old_path.parent.iterdir()):
                                 old_path.parent.rmdir()
-                        except Exception: pass
-                    except Exception as e:
-                        self._set_headers(500)
-                        msg = {"success": False, "error": f"Failed to move file: {e}"}
-                        self.wfile.write(json.dumps(msg).encode("utf-8"))
+                        except Exception:
+                            pass
+                    except FileExistsError as e:
+                        self._set_headers(400)
+                        self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
                         return
+                    except (ValueError, FileNotFoundError, IOError) as e:
+                        logger.exception("Failed to move file")
+                        self._set_headers(500)
+                        self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                        return
+
                 save_data(data)
                 self._set_headers(200)
                 self.wfile.write(json.dumps({"success": True, "item": item}).encode("utf-8"))
             return
+
         self._set_headers(404)
         self.wfile.write(b'{"error":"not found"}')
+
     def do_DELETE(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -792,42 +831,47 @@ class Handler(BaseHTTPRequestHandler):
                                 try:
                                     if not any(file_path.parent.iterdir()):
                                         file_path.parent.rmdir()
-                                except Exception: pass
+                                except Exception:
+                                    pass
                             except Exception as e:
+                                logger.exception("Failed to delete file")
                                 self._set_headers(500)
                                 msg = {"success": False, "error": f"Failed to delete file: {e}"}
                                 self.wfile.write(json.dumps(msg).encode("utf-8"))
                                 return
-                data["receipts"] = [r for r in data["receipts"] if r["receipt_group_id"] != rg_id]
+                # Remove item and possibly receipt
                 data["items"] = [i for i in data["items"] if i["id"] != item_id]
+                # If no items remain for the receipt, remove receipt
+                if not any(i for i in data["items"] if i["receipt_group_id"] == rg_id):
+                    data["receipts"] = [r for r in data["receipts"] if r["receipt_group_id"] != rg_id]
                 save_data(data)
                 self._set_headers(200)
-                self.wfile.write(b'{"success":true}')
+                self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
             return
+
         self._set_headers(404)
         self.wfile.write(b'{"error":"not found"}')
 
-def main():
-    print("=" * 60)
-    print("Receipt & Warranty Manager")
-    print("=" * 60)
-    print(f"Data Root: {DATA_ROOT}")
-    print()
-    if not (TEMPLATES_DIR / "index.html").exists():
-        print("ERROR: templates/index.html not found!")
-        return
-    print(f"🚀 Server on http://127.0.0.1:{PORT}")
-    print("Press Ctrl+C to stop")
-    print()
-    t = threading.Thread(target=integrity_worker, daemon=True)
-    t.start()
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+# ---------- Server bootstrap ----------
+def run_server():
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    logger.info(f"Starting server on port {PORT}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n🛑 Shutting down...")
-    finally:
+        logger.info("Shutting down server")
         server.server_close()
 
 if __name__ == "__main__":
-    main()
+    # Ensure directories exist
+    for d in (DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR):
+        try:
+            Path(d).mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    # Start integrity worker
+    t = threading.Thread(target=integrity_worker, daemon=True)
+    t.start()
+
+    run_server()
