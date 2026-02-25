@@ -296,6 +296,109 @@ function showErrorPage(errorMessage) {
     mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   }
 }
+// --- Helper: poll backend until /api/data responds ---
+function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
+  const checkUrl = new URL('/api/data', url).toString();
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+
+    const attempt = () => {
+      const req = http.get(checkUrl, (res) => {
+        // consume body so socket closes cleanly
+        res.on('data', () => {});
+        res.on('end', () => {});
+        if (res.statusCode === 200) {
+          resolve();
+        } else {
+          retryOrTimeout();
+        }
+      });
+
+      req.on('error', () => {
+        retryOrTimeout();
+      });
+
+      // safety: abort request if it takes too long
+      req.setTimeout(2000, () => {
+        req.abort();
+      });
+
+      function retryOrTimeout() {
+        if (Date.now() - start >= timeoutMs) {
+          reject(new Error(`Backend did not respond within ${timeoutMs}ms`));
+        } else {
+          setTimeout(attempt, intervalMs);
+        }
+      }
+    };
+
+    attempt();
+  });
+}
+
+// --- createWindow: show loading page, wait for backend, then load FLASK_URL ---
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1100,
+    height: 800,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      // preload: path.join(__dirname, 'preload.js'), // enable if you use a preload
+    }
+  });
+
+  // Open DevTools in development for debugging
+  if (process.env.NODE_ENV !== 'production') {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+
+  const loadingHtml = `
+    <!doctype html>
+    <html>
+      <head><meta charset="utf-8"><title>Starting</title></head>
+      <body style="font-family: sans-serif; padding: 40px;">
+        <h2>Starting application…</h2>
+        <p>Waiting for local server at ${FLASK_URL}</p>
+        <p id="status">Checking...</p>
+        <script>
+          let dots = 0;
+          setInterval(() => {
+            dots = (dots + 1) % 4;
+            document.getElementById('status').textContent = 'Checking' + '.'.repeat(dots);
+          }, 500);
+        </script>
+      </body>
+    </html>
+  `;
+
+  // Show loading page immediately
+  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(loadingHtml));
+
+  // Poll backend and then load the real app
+  waitForBackendAndLoad(FLASK_URL, 500, 15000)
+    .then(() => {
+      mainWindow.loadURL(FLASK_URL);
+    })
+    .catch((err) => {
+      const errHtml = `
+        <!doctype html>
+        <html>
+          <head><meta charset="utf-8"><title>Error</title></head>
+          <body style="font-family: sans-serif; padding: 40px;">
+            <h2>Failed to start backend</h2>
+            <pre>${String(err)}</pre>
+            <p>Check the terminal running the server for details.</p>
+          </body>
+        </html>
+      `;
+      mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(errHtml));
+    });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -350,6 +453,7 @@ function createWindow() {
 
 // ── Main Entry ─────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
+  createWindow();
   // Session / CSP setup
   const ses = session.fromPartition(SESSION_PARTITION);
   ses.webRequest.onHeadersReceived((details, callback) => {

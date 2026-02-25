@@ -354,13 +354,21 @@ def _today_ymmmdd():
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
     """
-    Safely set CORS headers based on ALLOWED_ORIGINS.
+    Safely set CORS headers based on ALLOWED_ORIGINS and allow Electron (Origin: null).
     """
     origin = handler.headers.get("Origin")
-    if origin and origin in ALLOWED_ORIGINS:
+
+    # Allow Electron (Origin: null)
+    if origin is None or origin == "null":
+        handler.send_header("Access-Control-Allow-Origin", "*")
+        handler.send_header("Vary", "Origin")
+        return
+
+    # Allow known browser origins
+    if origin in ALLOWED_ORIGINS:
         handler.send_header("Access-Control-Allow-Origin", origin)
         handler.send_header("Vary", "Origin")
-        # handler.send_header("Access-Control-Allow-Credentials", "true")  # enable if needed
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -376,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
             "style-src 'self'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
-            "connect-src 'self'; "
+            f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'"
