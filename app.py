@@ -19,6 +19,77 @@ ALLOWED_ORIGINS = {
     "http://127.0.0.1:3000",
     "http://localhost:8765"  # add any dev hosts you use
 }
+import os
+from pathlib import Path
+
+def _is_within_root(root: Path, candidate: Path) -> bool:
+    try:
+        root_resolved = root.resolve()
+        cand_resolved = candidate.resolve()
+    except Exception:
+        return False
+    root_prefix = str(root_resolved) + os.sep
+    cand_str = str(cand_resolved)
+    return cand_str == str(root_resolved) or cand_str.startswith(root_prefix)
+
+def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) -> Path:
+    """
+    Move src -> dst_dir/dst_name safely.
+    Returns the final destination Path on success, raises ValueError/IOError on failure.
+    """
+    if not src.exists() or not src.is_file():
+        raise FileNotFoundError("Source file missing")
+
+    # Sanitize dst_name further if needed (already sanitized earlier)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    dst = (dst_dir / dst_name)
+
+    # Resolve parent and destination to detect symlink escapes
+    try:
+        dst_parent_resolved = dst.parent.resolve()
+    except Exception as e:
+        raise ValueError(f"Invalid destination parent: {e}")
+
+    # Ensure destination parent is inside allowed root
+    if not _is_within_root(allowed_root, dst_parent_resolved):
+        raise ValueError("Destination outside allowed root")
+
+    # Final destination path (do not resolve dst itself yet to avoid following attacker symlink)
+    final_dst = dst_parent_resolved / dst.name
+
+    # If final_dst exists and is not the same as src, fail to avoid overwrite
+    if final_dst.exists() and final_dst.resolve() != src.resolve():
+        raise FileExistsError("Target file already exists")
+
+    # Use os.replace for atomic rename when possible (works across same filesystem)
+    try:
+        # Re-check src resolved to avoid TOCTOU
+        src_resolved = src.resolve()
+        # If src and final_dst are same, nothing to do
+        if final_dst.resolve() == src_resolved:
+            return final_dst
+    except Exception:
+        pass
+
+    # Perform move/replace
+    try:
+        # Prefer os.replace for atomicity; fallback to shutil.move if needed
+        try:
+            os.replace(str(src), str(final_dst))
+        except OSError:
+            # os.replace may fail across devices; fallback
+            import shutil
+            shutil.move(str(src), str(final_dst))
+    except Exception as e:
+        raise IOError(f"Failed to move file: {e}")
+
+    # Final safety check
+    if not _is_within_root(allowed_root, final_dst):
+        # Attempt to undo if possible (best-effort)
+        raise IOError("Post-move destination outside allowed root")
+
+    return final_dst
 
 # helper to set CORS safely
 def set_cors_headers(self):
@@ -651,7 +722,28 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     try:
                         if new_path.resolve() != old_path.resolve():
-                            shutil.move(str(old_path), str(new_path))
+                            # allowed_root should be the directory you want to contain stored receipts
+                            ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()  # or STORAGE_DIR.resolve()
+                            try:
+                                final_dst = safe_move_file(old_path, new_dir, new_name, ALLOWED_STORAGE_ROOT)
+                                rel = str(final_dst.relative_to(DATA_ROOT))
+                                receipt["receipt_filename"] = new_name
+                                receipt["receipt_relative_path"] = rel
+                                item["receipt_relative_path"] = rel
+                                # cleanup empty old dir
+                                try:
+                                    if old_path.parent.exists() and not any(old_path.parent.iterdir()):
+                                        old_path.parent.rmdir()
+                                except Exception:
+                                    pass
+                            except FileExistsError as e:
+                                self._set_headers(400)
+                                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                                return
+                            except (ValueError, FileNotFoundError, IOError) as e:
+                                self._set_headers(500)
+                                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                                return
                         rel = str(new_path.relative_to(DATA_ROOT))
                         receipt["receipt_filename"] = new_name
                         receipt["receipt_relative_path"] = rel
