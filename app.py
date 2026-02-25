@@ -54,11 +54,21 @@ def sanitize_filename(text, max_length=50):
     return text or "unnamed"
 
 def format_date_for_filename(date_str):
+    """
+    Format a date string for safe use in filenames.
+
+    On valid input like '2024-Feb-01' it returns '2024Feb01'.
+    On invalid/unexpected input, it falls back to a strictly alphanumeric
+    representation to avoid introducing path separators or other
+    special characters into filenames.
+    """
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
     except Exception:
-        return date_str.replace("-", "")
+        # Fallback: keep only ASCII letters and digits
+        safe = re.sub(r"[^A-Za-z0-9]", "", str(date_str))
+        return safe or "unknown"
 
 def calculate_guarantee_end_date(purchase_date, duration, unit):
     if duration == 0:
