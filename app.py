@@ -425,6 +425,28 @@ class Handler(BaseHTTPRequestHandler):
     self.wfile.write(candidate.read_bytes())
     return
 
+def safe_join_within_root(root: Path, *parts: str) -> Path:
+    """
+    Safely join path components to a root directory, ensuring that the
+    resulting path is contained within the root after resolution.
+
+    Raises ValueError if the resulting path would escape the root.
+    """
+    root_resolved = root.resolve()
+    candidate = root_resolved.joinpath(*parts).resolve()
+    try:
+        # Python 3.9+: use is_relative_to if available
+        is_rel = candidate.is_relative_to(root_resolved)  # type: ignore[attr-defined]
+    except AttributeError:
+        try:
+            candidate.relative_to(root_resolved)
+            is_rel = True
+        except ValueError:
+            is_rel = False
+    if not is_rel:
+        raise ValueError(f"Path {candidate} escapes allowed root {root_resolved}")
+    return candidate
+
         if path == "/api/data":
             with data_lock:
                 data = load_data()
@@ -714,7 +736,19 @@ class Handler(BaseHTTPRequestHandler):
                     new_name = build_single_item_filename(item, receipt, ext)
                     new_dir = get_storage_directory(item)
                     new_dir.mkdir(parents=True, exist_ok=True)
-                    new_path = new_dir / new_name
+                    # Ensure the new path stays within the DATA_ROOT storage directory
+                    allowed_root = DATA_ROOT.resolve()
+                    try:
+                        # Derive a path relative to DATA_ROOT, then safely join
+                        rel_new_dir = new_dir.relative_to(DATA_ROOT)
+                    except ValueError:
+                        # If get_storage_directory returns something outside DATA_ROOT,
+                        # refuse to proceed.
+                        self._set_headers(400)
+                        msg = {"success": False, "error": "Invalid storage directory"}
+                        self.wfile.write(json.dumps(msg).encode("utf-8"))
+                        return
+                    new_path = safe_join_within_root(allowed_root, str(rel_new_dir), new_name)
                     if new_path.exists() and new_path.resolve() != old_path.resolve():
                         self._set_headers(400)
                         msg = {"success": False, "error": f"Target file already exists: {new_name}"}
@@ -723,9 +757,9 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         if new_path.resolve() != old_path.resolve():
                             # allowed_root should be the directory you want to contain stored receipts
-                            ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()  # or STORAGE_DIR.resolve()
+                            ALLOWED_STORAGE_ROOT = allowed_root  # or STORAGE_DIR.resolve()
                             try:
-                                final_dst = safe_move_file(old_path, new_dir, new_name, ALLOWED_STORAGE_ROOT)
+                                final_dst = safe_move_file(old_path, new_path.parent, new_name, ALLOWED_STORAGE_ROOT)
                                 rel = str(final_dst.relative_to(DATA_ROOT))
                                 receipt["receipt_filename"] = new_name
                                 receipt["receipt_relative_path"] = rel
