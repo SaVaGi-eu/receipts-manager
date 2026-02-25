@@ -18,6 +18,20 @@ const APP_NAME = "Receipt Manager";
 const SETTINGS_DIR = path.join(app.getPath('home'), 'Library', 'Application Support', APP_NAME);
 const SETTINGS_FILE = path.join(SETTINGS_DIR, 'settings.json');
 
+// ── Ensure only one instance of the app runs ──────────────────────────────
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, argv, workingDirectory) => {
+    // Someone tried to start a second instance — focus the existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 // ── Kill any process holding the given port ────────────────────────────────
 function killPortProcess(port) {
   try {
@@ -76,7 +90,7 @@ function saveSettings(dataPath) {
 // ── Folder Picker ──────────────────────────────────────────────────────────
 async function promptForDataFolder() {
   const defaultPath = path.join(app.getPath('documents'), 'Receipts Manager');
-  
+
   const result = await dialog.showMessageBox(mainWindow, {
     type: 'question',
     buttons: ['Choose Folder...', 'Use Default (Documents)'],
@@ -122,8 +136,8 @@ async function promptForDataFolder() {
     saveSettings(chosenPath);
     return chosenPath;
   } else {
-    // User cancelled - show friendly message with retry option
-    return null; // Signal cancellation
+    // User cancelled - signal cancellation
+    return null;
   }
 }
 
@@ -169,8 +183,8 @@ function showLocationRequiredPage() {
         transition: all 0.2s ease;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
       }
-      button:hover { 
-        transform: translateY(-2px); 
+      button:hover {
+        transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
       }
       button:active { transform: translateY(0px); }
@@ -192,7 +206,7 @@ function showLocationRequiredPage() {
     </script>
   </body>
   </html>`;
-  
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     waitingForLocation = true;
     mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -224,10 +238,10 @@ function findPython() {
 function startFlask(dataPath) {
   const pythonPath = findPython();
   if (!pythonPath) return false;
-  
+
   const appDir = getAppDir();
   const appPath = path.join(appDir, 'app.py');
-  
+
   if (!fs.existsSync(appPath)) {
     startupError = `Cannot find app.py at: ${appPath}`;
     return false;
@@ -236,8 +250,8 @@ function startFlask(dataPath) {
   try {
     flaskProcess = spawn(pythonPath, [appPath], {
       cwd: appDir,
-      env: { 
-        ...process.env, 
+      env: {
+        ...process.env,
         PYTHONUNBUFFERED: '1',
         DATA_DIR: dataPath // Pass the user-chosen path to Python
       }
@@ -257,7 +271,7 @@ function startFlask(dataPath) {
   }
 }
 
-// ── Standard Boilerplate (Wait/Load/Error) ──────────────────────────────────
+// ── Standard Boilerplate (Wait / Load / Error) ────────────────────────────
 function waitForFlask(url, retries, callback, errorCallback) {
   const req = http.get(url, (res) => {
     res.resume();
@@ -296,7 +310,8 @@ function showErrorPage(errorMessage) {
     mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   }
 }
-// --- Helper: poll backend until /api/data responds ---
+
+// ── Helper: poll backend until /api/data responds ─────────────────────────
 function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
   const checkUrl = new URL('/api/data', url).toString();
   return new Promise((resolve, reject) => {
@@ -336,79 +351,33 @@ function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
   });
 }
 
-// --- createWindow: show loading page, wait for backend, then load FLASK_URL ---
+// ── createWindow ───────────────────────────────────────────────────────────
 function createWindow() {
+  // If a window already exists, focus it and return
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    return;
+  }
+
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 800,
+    width: 1400,
+    height: 900,
+    title: 'Receipt & Warranty Manager',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      partition: SESSION_PARTITION,
       // preload: path.join(__dirname, 'preload.js'), // enable if you use a preload
     }
   });
 
   // Open DevTools in development for debugging
-  if (process.env.NODE_ENV !== 'production') {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
-
-  const loadingHtml = `
-    <!doctype html>
-    <html>
-      <head><meta charset="utf-8"><title>Starting</title></head>
-      <body style="font-family: sans-serif; padding: 40px;">
-        <h2>Starting application…</h2>
-        <p>Waiting for local server at ${FLASK_URL}</p>
-        <p id="status">Checking...</p>
-        <script>
-          let dots = 0;
-          setInterval(() => {
-            dots = (dots + 1) % 4;
-            document.getElementById('status').textContent = 'Checking' + '.'.repeat(dots);
-          }, 500);
-        </script>
-      </body>
-    </html>
-  `;
-
-  // Show loading page immediately
-  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(loadingHtml));
-
-  // Poll backend and then load the real app
-  waitForBackendAndLoad(FLASK_URL, 500, 15000)
-    .then(() => {
-      mainWindow.loadURL(FLASK_URL);
-    })
-    .catch((err) => {
-      const errHtml = `
-        <!doctype html>
-        <html>
-          <head><meta charset="utf-8"><title>Error</title></head>
-          <body style="font-family: sans-serif; padding: 40px;">
-            <h2>Failed to start backend</h2>
-            <pre>${String(err)}</pre>
-            <p>Check the terminal running the server for details.</p>
-          </body>
-        </html>
-      `;
-      mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(errHtml));
-    });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-}
-
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1400, height: 900,
-    title: 'Receipt & Warranty Manager',
-    webPreferences: {
-      nodeIntegration: false, contextIsolation: true,
-      partition: SESSION_PARTITION
-    }
-  });
+  //if (process.env.NODE_ENV !== 'production') {
+    //try {
+      //mainWindow.webContents.openDevTools({ mode: 'detach' });
+    //} catch (e) {}
+  //}
 
   const loadingHtml = `<html><body style="background:#764ba2;color:white;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
     <div style="border:4px solid rgba(255,255,255,.3);border-top:4px solid white;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;"></div>
@@ -417,6 +386,7 @@ function createWindow() {
   </body></html>`;
   mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(loadingHtml));
 
+  // Prevent external links from opening inside the app
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -427,7 +397,7 @@ function createWindow() {
     if (url === 'app://select-location' && waitingForLocation) {
       event.preventDefault();
       waitingForLocation = false;
-      
+
       // Show folder picker
       const dataPath = await promptForDataFolder();
       if (dataPath) {
@@ -435,7 +405,7 @@ function createWindow() {
         console.log('[App] User selected data path:', dataPath);
         killPortProcess(PORT);
         await new Promise(r => setTimeout(r, 1000));
-        
+
         if (!startFlask(dataPath) && startupError) {
           showErrorPage(startupError);
         } else {
@@ -453,7 +423,9 @@ function createWindow() {
 
 // ── Main Entry ─────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
+  // Create the window first
   createWindow();
+
   // Session / CSP setup
   const ses = session.fromPartition(SESSION_PARTITION);
   ses.webRequest.onHeadersReceived((details, callback) => {
@@ -463,25 +435,23 @@ app.whenReady().then(async () => {
     callback({ responseHeaders });
   });
 
-  // Create window first
-  createWindow();
-
   // 1. Data Directory resolution
   let dataPath = getSavedDataPath();
   if (!dataPath) {
     // First time - prompt for location
     dataPath = await promptForDataFolder();
     if (!dataPath) {
-      // User cancelled - show "Location Required" page (no crash, no quit)
+      // User cancelled initial selection - show the location required page
+      waitingForLocation = true;
       showLocationRequiredPage();
       return; // Stop here, wait for user to click button
     }
   }
 
-  // 2. Process management
+  // 2. Start backend
   killPortProcess(PORT);
-  await new Promise(r => setTimeout(r, 1000));
-  
+  await new Promise(r => setTimeout(r, 500));
+
   if (!startFlask(dataPath) && startupError) {
     showErrorPage(startupError);
   } else {
