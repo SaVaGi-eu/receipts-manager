@@ -318,29 +318,42 @@ class Handler(BaseHTTPRequestHandler):
             self._set_headers(200, "text/html; charset=utf-8")
             self.wfile.write(html)
             return
+        from pathlib import Path
+        from urllib.parse import unquote
+        import mimetypes
+        import os
         if path.startswith("/static/"):
-            rel_path = path.replace("/static/", "", 1)
-            filepath = STATIC_DIR / rel_path
-            if not filepath.exists() or not filepath.is_file():
-                self._set_headers(404, "text/plain")
-                self.wfile.write(b"File not found")
+            # Remove the prefix and decode percent-encoding
+            rel = path[len("/static/"):]
+            rel = unquote(rel)
+            # Reject obvious bad inputs early
+            if rel.startswith("/") or rel.startswith("\\"):
+                self._set_headers(403, "text/plain")
+                self.wfile.write(b"Forbidden")
                 return
-            suffix = filepath.suffix.lower()
-            content_types = {
-                ".css": "text/css",
-                ".js": "application/javascript",
-                ".json": "application/json",
-                ".png": "image/png",
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".gif": "image/gif",
-                ".svg": "image/svg+xml",
-                ".ico": "image/x-icon",
-            }
-            ctype = content_types.get(suffix, "text/plain")
-            self._set_headers(200, f"{ctype}; charset=utf-8")
-            self.wfile.write(filepath.read_bytes())
-            return
+    # Build candidate path and resolve to follow symlinks
+    candidate = (STATIC_DIR / rel).resolve()
+    static_root = STATIC_DIR.resolve()
+
+    # Ensure candidate is inside static_root
+    if not (str(candidate).startswith(str(static_root) + os.sep) or candidate == static_root):
+        self._set_headers(403, "text/plain")
+        self.wfile.write(b"Forbidden")
+        return
+
+    # Ensure it's a file
+    if not candidate.exists() or not candidate.is_file():
+        self._set_headers(404, "text/plain")
+        self.wfile.write(b"File not found")
+        return
+
+    # Serve with guessed content type
+    ctype, _ = mimetypes.guess_type(str(candidate))
+    ctype = ctype or "application/octet-stream"
+    self._set_headers(200, f"{ctype}; charset=utf-8")
+    self.wfile.write(candidate.read_bytes())
+    return
+
         if path == "/api/data":
             with data_lock:
                 data = load_data()
