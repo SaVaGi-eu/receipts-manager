@@ -14,6 +14,22 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+ALLOWED_ORIGINS = {
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8765"  # add any dev hosts you use
+}
+
+# helper to set CORS safely
+def set_cors_headers(self):
+    origin = self.headers.get("Origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        setcors_headers(self)
+        self.send_header("Vary", "Origin")
+        # only set credentials if you actually need them
+        # self.send_header("Access-Control-Allow-Credentials", "true")
+    # else: do not set Access-Control-Allow-Origin (or set a safe default)
+
 # ✨ Internal imports
 from ocr_service import extract_receipt_data
 from config import DATA_ROOT, DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR, DATA_FILE
@@ -258,17 +274,21 @@ class Handler(BaseHTTPRequestHandler):
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
-		self.send_header("Content-Security-Policy", 
-                         "default-src 'self'; "
-                         "script-src 'self'; "
-                         "style-src 'self' 'unsafe-inline'; "
-                         "img-src 'self' data:; "
-                         "font-src 'self'; "
-                         "connect-src 'self'; "
-                         "frame-ancestors 'none'; "
-                         "base-uri 'self'; "
-                         "form-action 'self'")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        csp = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+        )
+        self.send_header("Content-Security-Policy", csp)
+        self.send_header("X-Frame-Options", "DENY")
+        # remove: self.send_header("Access-Control-Allow-Origin", "*")
+        set_cors_headers(self)
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Cache-Control", "no-cache")
@@ -408,7 +428,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Disposition", f'inline; filename="{target.name}"')
-                self.send_header("Access-Control-Allow-Origin", "*")
+                set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
                 self.wfile.write(target.read_bytes())
