@@ -303,7 +303,7 @@ function createWindow() {
     title: 'Receipt & Warranty Manager',
     webPreferences: {
       nodeIntegration: false, contextIsolation: true,
-      webSecurity: false, partition: SESSION_PARTITION
+      partition: SESSION_PARTITION
     }
   });
 
