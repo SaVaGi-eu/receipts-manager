@@ -766,9 +766,26 @@ class Handler(BaseHTTPRequestHandler):
                     new_dir.mkdir(parents=True, exist_ok=True)
                     new_path = new_dir / new_name
 
+                    # Normalize and validate target path to prevent path traversal
+                    try:
+                        resolved_new_dir = new_dir.resolve()
+                        resolved_new_path = new_path.resolve()
+                    except Exception:
+                        self._set_headers(400)
+                        msg = {"success": False, "error": "Invalid target path"}
+                        self.wfile.write(json.dumps(msg).encode("utf-8"))
+                        return
+
+                    # Ensure the new path is within the intended storage directory
+                    if resolved_new_path.parent != resolved_new_dir:
+                        self._set_headers(400)
+                        msg = {"success": False, "error": "Invalid target path"}
+                        self.wfile.write(json.dumps(msg).encode("utf-8"))
+                        return
+
                     # If target exists and is different, error out
                     try:
-                        if new_path.exists() and new_path.resolve() != old_path.resolve():
+                        if resolved_new_path.exists() and resolved_new_path != old_path.resolve():
                             self._set_headers(400)
                             msg = {"success": False, "error": f"Target file already exists: {new_name}"}
                             self.wfile.write(json.dumps(msg).encode("utf-8"))
