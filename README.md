@@ -12,17 +12,17 @@ A local web-based application for managing receipts and item warranties with aut
 =======
 A local application for managing receipts and item warranties with automatic file organization, integrity checking, OCR receipt scanning, and a modern green-themed UI.
 
-Available as a **native macOS app** (Apple Silicon) or as a **self-hosted web app** (macOS, Linux, Windows).
+Available as a **native macOS app** or as a **self-hosted web app** (macOS, Linux, Windows).
 
 ---
 
-## ⬇️ Download (macOS Apple Silicon)
+## ⬇️ Download (macOS)
 
 **No setup required — drag, drop, and run.**
 
 👉 [Download the latest DMG from Releases](https://github.com/SaVaGi-eu/receipts-manager/releases/latest)
 
-- Requires **macOS 12+ on Apple Silicon (M1/M2/M3/M4)**
+- Requires **macOS 12+** on **Apple Silicon** or **Intel‑based** Macs.
 - Python, Flask, and all dependencies are bundled — nothing to install
 - PDF OCR support included (poppler bundled)
 
@@ -30,7 +30,6 @@ Available as a **native macOS app** (Apple Silicon) or as a **self-hosted web ap
 > Because this app is not signed with an Apple Developer certificate, macOS may show a **"damaged and can't be opened"** warning. This is a false alarm — the app is safe. See the [First Launch fix](#-app-shows-damaged-and-cant-be-opened) in Troubleshooting below.
 
 ---
->>>>>>> MacOS-app
 
 ## Features
 
@@ -91,7 +90,7 @@ git clone https://github.com/SaVaGi-eu/receipts-manager.git
 cd receipts-manager
 ./run.sh
 ```
-Then open your browser to `http://127.0.0.1:5000`
+Then open your browser to `http://127.0.0.1:8765`
 
 **Windows:**
 ```cmd
@@ -102,7 +101,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
-Then open your browser to `http://127.0.0.1:5000`
+Then open your browser to `http://127.0.0.1:8765`
 
 > **First launch** may take 1-2 minutes to install dependencies.
 
@@ -110,7 +109,7 @@ Then open your browser to `http://127.0.0.1:5000`
 
 ## Build the macOS App from Source
 
-If you want to build the DMG yourself (Apple Silicon required):
+If you want to build the DMG yourself:
 
 ### Prerequisites
 - [Node.js](https://nodejs.org) (v18+)
@@ -273,16 +272,16 @@ For multi-item receipts: the file is deleted only when the **last** item referen
 
 | | macOS App | Web App |
 |---|---|---|
-| **OS** | macOS 12+ Apple Silicon | macOS / Linux / Windows |
+| **OS** | macOS 12+ / Linux / Windows |
 | **Python** | Bundled | 3.8+ required |
 | **Browser** | Not needed | Chrome 90+, Firefox 88+, Safari 14+ |
 | **RAM** | 512MB recommended | 256MB minimum |
 | **Disk** | 300MB (app) + receipts | 100MB + receipts |
 
 ### Port Configuration
-- Default: `http://127.0.0.1:5000`
+- Default: `http://127.0.0.1:8765`
 - Local machine only (not network-accessible)
-- To change port: Edit `app.py`: `app.run(host='127.0.0.1', port=5000)`
+- To change port: Edit `app.py`: `app.run(host='127.0.0.1', port=8765)`
 
 ### File Upload Limits
 - Maximum file size: 50MB
@@ -294,28 +293,7 @@ For multi-item receipts: the file is deleted only when the **last** item referen
 ## Folder Structure
 
 ```
-receipts-manager/
-├── app.py                  # Main Flask application
-├── ocr_service.py          # OCR processing service
-├── requirements.txt        # Python dependencies
-├── run.sh                  # Linux/Mac web launcher
-├── run.command             # Mac double-click launcher
-├── electron-main.js        # Electron desktop app entry point
-├── package.json            # Node.js config for Electron build
-├── setup-vendor.sh         # One-time poppler bundling script (macOS build)
-├── README.md
-├── data/
-│   ├── data.json           # Main database
-│   └── backups/            # Auto-backups
-├── _Receipts/              # Multi-item receipts
-├── [ProjectNames]/         # Single-item receipts by project
-├── [BrandNames]/           # Single-item receipts by brand (if no project)
-├── static/
-│   ├── css/style.css       # Styling
-│   └── js/app.js           # Frontend logic
-├── templates/
-│   └── index.html          # Main page
-└── venv/                   # Virtual environment (local only, not in git)
+See the [folder structure documentation](https://github.com/SaVaGi-eu/receipts-manager/blob/main/STRUCTURE.md) for details.
 ```
 
 ---
@@ -393,7 +371,7 @@ PDF conversion requires poppler:
 - **macOS App**: Already bundled — no action needed
 
 ### "Address already in use"
-Port 5000 is taken. Either stop the other app, or change the port in `app.py`.
+Port 8765 is taken. Either stop the other app, or change the port in `app.py`.
 
 ### "Permission denied" running scripts
 ```bash
@@ -404,7 +382,7 @@ chmod +x run.sh run.command setup-vendor.sh
 1. Check Python version: `python3 --version` (must be 3.8+)
 2. Delete `venv/` and restart (forces fresh install)
 3. Check terminal for error messages
-4. Ensure port 5000 is free
+4. Ensure port 8765 is free
 
 ### Integrity errors after moving files
 If you move files outside the app, the integrity checker will flag them (red 🔴). Either move the files back, or delete and re-upload the affected items.
@@ -414,7 +392,7 @@ If you move files outside the app, the integrity checker will flag them (red �
 ## FAQ
 
 **Q: Does the macOS app work on Intel Macs?**  
-A: Not yet — the current release is Apple Silicon (M1/M2/M3/M4) only. Intel and Universal builds are planned for a future release.
+A: Yes. Intel and Universal builds are done.
 
 **Q: Can I use this on Windows?**  
 A: Yes, via the web app (Option B above). The native Electron app is macOS-only for now.
