@@ -85,16 +85,16 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
 
     dst = dst_dir / dst_name
 
-    # Resolve parent and ensure it's within allowed_root
+    # Resolve full destination path and ensure it's within allowed_root
     try:
-        dst_parent_resolved = dst.parent.resolve(strict=False)
+        dst_resolved = dst.resolve(strict=False)
     except Exception as e:
-        raise ValueError(f"Invalid destination parent: {e}")
+        raise ValueError(f"Invalid destination path: {e}")
 
-    if not _is_within_root(allowed_root, dst_parent_resolved):
+    if not _is_within_root(allowed_root, dst_resolved):
         raise ValueError("Destination outside allowed root")
 
-    final_dst = dst_parent_resolved / dst.name
+    final_dst = dst_resolved
 
     # If final_dst exists and is not the same as src, fail to avoid overwrite
     if final_dst.exists():
@@ -144,7 +144,9 @@ def sanitize_filename(text, max_length=50):
         text = text[:max_length].rstrip("-")
     return text or "unnamed"
 
+        # Fallback: keep only alphanumerics and clamp length to avoid abuse
 def format_date_for_filename(date_str):
+        safe = safe[:16]
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
@@ -241,6 +243,22 @@ def save_data(data):
 def generate_receipt_group_id(data):
     ids = [r["receipt_group_id"] for r in data.get("receipts", [])]
     numbers = []
+def sanitize_full_filename(name: str, max_length: int = 200) -> str:
+    """
+    Final safeguard for filenames that may include user-provided data.
+    Removes path separators and leading dots, restricts characters, and truncates length.
+    """
+    # Remove any path separators outright
+    name = name.replace("/", "").replace("\\", "")
+    # Allow only a conservative set of characters
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    # Avoid hidden or relative-path-like names
+    name = name.lstrip(".")
+    # Enforce maximum length
+    if max_length > 0 and len(name) > max_length:
+        name = name[:max_length]
+    return name or "file"
+
     for rid in ids:
         m = re.search(r"RG-(\d+)", rid)
         if m:
@@ -257,6 +275,8 @@ def build_single_item_filename(item, receipt, ext):
         "-".join(sanitize_filename(u, 15) for u in item.get("users", [])[:3]) if item.get("users") else "NoUser",
         sanitize_filename(receipt.get("documentation", "N/A"), 20),
     ]
+    # Final safety normalization on the full filename
+    full = sanitize_full_filename(full, 200)
     base = "-".join(parts)
     full = f"{base}{ext}"
     if len(full) > 200:
@@ -269,6 +289,14 @@ def build_multi_item_filename(receipt, ext):
     parts = [
         sanitize_filename(receipt.get("shop", "N/A"), 40),
         format_date_for_filename(receipt.get("purchase_date", "unknown")),
+        allowed = 200 - len(ext)
+        base = base[:allowed]
+        full = f"{base}{ext}"
+    full = sanitize_full_filename(full, 200)
+    return full
+    base = "-".join(parts)
+    full = f"{base}{ext}"
+    if len(full) > 200:
         sanitize_filename(receipt.get("documentation", "N/A"), 40),
         receipt.get("receipt_group_id", "RG-0000"),
     ]
