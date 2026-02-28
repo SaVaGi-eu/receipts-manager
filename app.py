@@ -146,13 +146,13 @@ def sanitize_filename(text, max_length=50):
 
         # Fallback: keep only alphanumerics and clamp length to avoid abuse
 def format_date_for_filename(date_str):
-        safe = safe[:16]
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
     except Exception:
         safe = re.sub(r"[^A-Za-z0-9]", "", str(date_str))
         return safe or "unknown"
+
 
 def calculate_guarantee_end_date(purchase_date, duration, unit):
     if duration == 0:
@@ -289,25 +289,20 @@ def build_multi_item_filename(receipt, ext):
     parts = [
         sanitize_filename(receipt.get("shop", "N/A"), 40),
         format_date_for_filename(receipt.get("purchase_date", "unknown")),
-        allowed = 200 - len(ext)
-        base = base[:allowed]
-        full = f"{base}{ext}"
-    full = sanitize_full_filename(full, 200)
-    return full
-    base = "-".join(parts)
-    full = f"{base}{ext}"
-    if len(full) > 200:
         sanitize_filename(receipt.get("documentation", "N/A"), 40),
         receipt.get("receipt_group_id", "RG-0000"),
     ]
     base = "-".join(parts)
     full = f"{base}{ext}"
+
     if len(full) > 200:
         allowed = 200 - len(ext) - len(receipt.get("receipt_group_id", "")) - 1
         p_str = "-".join(parts[:-1])[:allowed]
         base = f"{p_str}-{receipt.get('receipt_group_id', '')}"
         full = f"{base}{ext}"
-    return full
+
+    return sanitize_full_filename(full, 200)
+
 
 def get_storage_directory(item):
     if item.get("project") and item.get("project") != "N/A":
