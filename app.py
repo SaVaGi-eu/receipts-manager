@@ -80,19 +80,30 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     if not src.exists() or not src.is_file():
         raise FileNotFoundError("Source file missing")
 
+    # SECURITY: Validate dst_name doesn't contain path traversal sequences
+    # Check before any path operations
+    if ".." in dst_name or "/" in dst_name or "\\" in dst_name:
+        raise ValueError("Invalid filename: contains path separators or traversal sequences")
+
     # Ensure destination directory exists
     dst_dir.mkdir(parents=True, exist_ok=True)
 
+    # Construct destination path
     dst = dst_dir / dst_name
 
-    # Resolve full destination path and ensure it's within allowed_root
+    # Resolve and validate destination is within allowed_root
     try:
         dst_resolved = dst.resolve(strict=False)
+        allowed_root_resolved = allowed_root.resolve(strict=False)
+        
+        # SECURITY: Ensure resolved path is within allowed_root
+        # This prevents path traversal attacks (e.g., ../../etc/passwd)
+        if not dst_resolved.is_relative_to(allowed_root_resolved):
+            raise ValueError("Path traversal detected: destination outside allowed directory")
+    except ValueError:
+        raise  # Re-raise our security check
     except Exception as e:
         raise ValueError(f"Invalid destination path: {e}")
-
-    if not _is_within_root(allowed_root, dst_resolved):
-        raise ValueError("Destination outside allowed root")
 
     final_dst = dst_resolved
 
@@ -107,7 +118,6 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
         except FileExistsError:
             raise
         except Exception:
-            # If resolve fails for some reason, be conservative and fail
             raise IOError("Unable to verify existing target")
 
     # Attempt atomic move; fallback to shutil.move if necessary
@@ -118,11 +128,6 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
             shutil.move(str(src), str(final_dst))
     except Exception as e:
         raise IOError(f"Failed to move file: {e}")
-
-    # Final containment check
-    if not _is_within_root(allowed_root, final_dst):
-        # Attempt to undo (best-effort) is omitted; raise error
-        raise IOError("Post-move destination outside allowed root")
 
     # Optionally set safe permissions
     try:
@@ -799,14 +804,28 @@ class Handler(BaseHTTPRequestHandler):
                         self.wfile.write(json.dumps(msg).encode("utf-8"))
                         return
 
-                    # Ensure the new path is within the intended storage directory
-                    if resolved_new_path.parent != resolved_new_dir:
-                        self._set_headers(400)
-                        msg = {"success": False, "error": "Invalid target path"}
+                    # Ensure the new path is within DATA_ROOT (complete containment check)
+                    ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()
+                    try:
+                        if not resolved_new_path.is_relative_to(ALLOWED_STORAGE_ROOT):
+                            self._set_headers(400)
+                            msg = {"success": False, "error": "Invalid target path: outside allowed storage"}
+                            self.wfile.write(json.dumps(msg).encode("utf-8"))
+                            return
+    
+                        # Also verify parent directory is correct
+                        if resolved_new_path.parent != resolved_new_dir:
+                            self._set_headers(400)
+                            msg = {"success": False, "error": "Invalid target path: directory mismatch"}
+                            self.wfile.write(json.dumps(msg).encode("utf-8"))
+                            return
+                    except Exception as e:
+                        self._set_headers(500)
+                        msg = {"success": False, "error": f"Path validation failed: {e}"}
                         self.wfile.write(json.dumps(msg).encode("utf-8"))
                         return
 
-                    # If target exists and is different, error out
+                    # NOW it's safe to check if file exists
                     try:
                         if resolved_new_path.exists() and resolved_new_path != old_path.resolve():
                             self._set_headers(400)
@@ -814,7 +833,6 @@ class Handler(BaseHTTPRequestHandler):
                             self.wfile.write(json.dumps(msg).encode("utf-8"))
                             return
                     except Exception:
-                        # If resolve fails, be conservative and abort
                         self._set_headers(500)
                         self.wfile.write(json.dumps({"success": False, "error": "Failed to verify target"}).encode("utf-8"))
                         return
