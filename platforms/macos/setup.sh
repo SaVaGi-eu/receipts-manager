@@ -82,14 +82,32 @@ WORKING_PYTHON="python3"
 PYTHON_VERSION=$($WORKING_PYTHON --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
 echo "Using: $WORKING_PYTHON (Python $PYTHON_VERSION)"
 
-# Check if this is Python 3.14+ (known venv issues)
-MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
-MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+# Check if virtualenv is installed (needed for Homebrew Python)
+echo ""
+echo "Checking for virtualenv..."
 
-USE_MANUAL_PIP=false
-if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 14 ]; then
-    echo "⚠️  Python 3.14+ detected - will use manual pip installation"
-    USE_MANUAL_PIP=true
+if ! $WORKING_PYTHON -m pip show virtualenv &> /dev/null; then
+    echo "📦 virtualenv not found, installing..."
+    echo ""
+    
+    # Install virtualenv with --break-system-packages flag for Homebrew Python
+    if $WORKING_PYTHON -m pip install --break-system-packages virtualenv 2>/dev/null; then
+        echo "✅ virtualenv installed"
+    else
+        # Try without flag
+        if $WORKING_PYTHON -m pip install virtualenv 2>/dev/null; then
+            echo "✅ virtualenv installed"
+        else
+            echo "❌ Failed to install virtualenv"
+            echo ""
+            echo "Troubleshooting:"
+            echo "  Try manually: python3 -m pip install --break-system-packages virtualenv"
+            echo ""
+            exit 1
+        fi
+    fi
+else
+    echo "✅ virtualenv is installed"
 fi
 
 # Check if venv exists and is valid
@@ -109,60 +127,25 @@ else
 fi
 
 if [ "$VENV_NEEDS_CREATION" = true ]; then
-    echo "📦 Creating Python virtual environment..."
+    echo "📦 Creating Python virtual environment using virtualenv..."
     
-    if [ "$USE_MANUAL_PIP" = true ]; then
-        # For Python 3.14+, always use manual pip method
-        echo "⚙️  Using manual pip installation method for Python 3.14+..."
-        
-        if "$WORKING_PYTHON" -m venv --without-pip "$VENV_DIR" 2>/dev/null; then
-            echo "✅ Virtual environment created (without pip)"
-            
-            # Bootstrap pip manually
-            echo "📦 Installing pip..."
-            source "$VENV_DIR/bin/activate"
-            
-            if curl -sS https://bootstrap.pypa.io/get-pip.py | python; then
-                echo "✅ pip installed successfully"
-            else
-                echo "❌ Failed to install pip"
-                exit 1
-            fi
+    # Use virtualenv instead of venv (works better with Homebrew Python)
+    if $WORKING_PYTHON -m virtualenv "$VENV_DIR" 2>&1 | grep -v "^created virtual"; then
+        if [ -f "$VENV_DIR/bin/activate" ]; then
+            echo "✅ Virtual environment created successfully"
         else
-            echo "❌ Failed to create virtual environment"
-            echo ""
-            echo "Troubleshooting:"
-            echo "1. Try: brew reinstall python@3.14"
-            echo "2. Or install Python 3.13: brew install python@3.13"
-            echo ""
+            echo "❌ Virtual environment creation reported success but files are missing"
             exit 1
         fi
     else
-        # Try normal venv creation first
-        if "$WORKING_PYTHON" -m venv "$VENV_DIR" 2>/dev/null; then
-            echo "✅ Virtual environment created"
-        else
-            # Fallback to manual pip method
-            echo "⚙️  Standard method failed, using manual pip installation..."
-            
-            if "$WORKING_PYTHON" -m venv --without-pip "$VENV_DIR" 2>/dev/null; then
-                echo "✅ Virtual environment created (without pip)"
-                
-                # Bootstrap pip manually
-                echo "📦 Installing pip..."
-                source "$VENV_DIR/bin/activate"
-                
-                if curl -sS https://bootstrap.pypa.io/get-pip.py | python; then
-                    echo "✅ pip installed successfully"
-                else
-                    echo "❌ Failed to install pip"
-                    exit 1
-                fi
-            else
-                echo "❌ Failed to create virtual environment"
-                exit 1
-            fi
-        fi
+        echo "❌ Failed to create virtual environment"
+        echo ""
+        echo "Troubleshooting:"
+        echo "1. Check Python installation: python3 --version"
+        echo "2. Reinstall Python: brew reinstall python@3.14"
+        echo "3. Or try Python 3.13: brew install python@3.13 && brew unlink python@3.14 && brew link python@3.13"
+        echo ""
+        exit 1
     fi
 else
     echo "✅ Virtual environment exists and is valid"
