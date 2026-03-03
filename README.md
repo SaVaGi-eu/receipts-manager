@@ -4,36 +4,25 @@ A multilingual receipt and warranty management system with OCR support for scann
 
 ## 🚀 Quick Start
 
-### 📦 macOS Users (Recommended)
-
-Download the latest `ReceiptManager.dmg` from [Releases](https://github.com/SaVaGi-eu/receipts-manager/releases):
-
-1. Open the DMG file
-2. Drag `ReceiptManager.app` to Applications
-3. Double-click to run
-
-**No additional setup required!** The app includes:
-- Python runtime
-- All Python dependencies
-- Tesseract OCR with multilingual support (English, Dutch, Greek, Latvian)
-- Complete database and storage system
-
-### 🐧 Linux Users
-
-Use the automated setup script:
+**One command to install:**
 
 ```bash
 git clone https://github.com/SaVaGi-eu/receipts-manager.git
 cd receipts-manager
-chmod +x run.sh
-./run.sh
+chmod +x install.sh
+./install.sh
 ```
 
-The script will automatically:
-- Detect your Linux distribution
-- Install required system dependencies (Tesseract, Python packages)
-- Set up the virtual environment
-- Launch the application
+The installer will detect your system and offer appropriate options:
+
+### macOS Users
+1. **Build macOS Application** - Creates a native `.app` with DMG installer
+2. **Build Docker Container** - Run in Docker
+3. **Run Directly** - Development mode (web server)
+
+### Linux Users  
+1. **Build Docker Container** - Run in Docker
+2. **Run Directly** - Development mode (web server)
 
 ## 📋 Features
 
@@ -46,83 +35,81 @@ The script will automatically:
 - 💾 **Local Storage**: All data stored locally for privacy
 - 🖼️ **Image Management**: Attach multiple images per receipt
 
-## 🔨 Building from Source
+## 🛠️ Platform-Specific Builds
 
-### macOS
+### macOS Native App
 
-Build the standalone .app bundle:
+The macOS app includes:
+- Python runtime bundled
+- All dependencies included
+- Tesseract OCR with multilingual support
+- Native window with Electron
+- No terminal required
 
-```bash
-# Install build dependencies
-brew install python@3.12 tesseract tesseract-lang
+**Requirements:**
+- macOS 10.15 (Catalina) or later
+- 200 MB disk space
+- Node.js (for building)
 
-# Clone repository
-git clone https://github.com/SaVaGi-eu/receipts-manager.git
-cd receipts-manager
+### Docker Deployment
 
-# Build the app
-chmod +x build_macos_app.sh
-./build_macos_app.sh
-
-# The built app will be in dist/ReceiptManager.app
-# DMG installer will be in dist/ReceiptManager.dmg
-```
-
-### Linux
-
-For development or running from source:
+For server deployment or consistent environments:
 
 ```bash
-# Install system dependencies (Ubuntu/Debian)
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip python3-venv tesseract-ocr
-
-# Clone and run
-git clone https://github.com/SaVaGi-eu/receipts-manager.git
-cd receipts-manager
-chmod +x run.sh
-./run.sh
+./install.sh
+# Choose option: Build Docker Container
 ```
 
-## 🛠️ Development Setup
-
-### macOS Development (without building .app)
+Or manually:
 
 ```bash
-# Install Tesseract
-brew install tesseract tesseract-lang
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Run development server
-python app.py
+cd platforms/docker
+docker-compose up -d
 ```
 
-### Linux Development
+Access at: `http://localhost:8765`
+
+### Direct Execution
+
+For development or quick testing:
 
 ```bash
-# The run.sh script handles everything
-./run.sh
+./install.sh
+# Choose option: Run Application Directly
 ```
 
-## 📚 Documentation
-
-- [Docker Setup](DOCKER.md) - Run in Docker container
-- [Integration Guide](INTEGRATION_GUIDE.md) - API and integration options
-- [OCR Setup](OCR_SETUP.md) - Detailed OCR configuration
-- [Troubleshooting](TROUBLESHOOTING.md) - Common issues and solutions
-- [Quick Start](QUICKSTART.md) - Getting started guide
-- [Workflows](WORKFLOWS.md) - Usage workflows and examples
-- [Structure](STRUCTURE.md) - Project layout and architecture
+This creates a virtual environment and runs the Flask server.
 
 ## 📁 Project Structure
 
-See [STRUCTURE.md](STRUCTURE.md) for detailed project layout.
+```
+receipts-manager/
+├── install.sh              # Universal installer (START HERE)
+├── app.py                  # Main Flask application
+├── config.py              # Configuration
+├── ocr_service.py         # OCR processing
+├── requirements.txt       # Python dependencies
+│
+├── platforms/
+│   ├── macos/            # macOS Electron app
+│   │   ├── electron-main.js
+│   │   ├── package.json
+│   │   └── dist/         # Built .app and .dmg
+│   │
+│   └── docker/           # Docker deployment
+│       ├── Dockerfile
+│       ├── docker-compose.yml
+│       └── README.md
+│
+├── templates/            # HTML templates
+├── static/              # CSS, JS, images
+├── data/                # Database and backups (created on first run)
+└── storage/             # Uploaded receipt files (created on first run)
+```
 
 ## 🌐 Multilingual Support
 
-The application supports OCR and interface in:
+Supported OCR languages:
 - 🇬🇧 English (eng)
 - 🇳🇱 Dutch (nld)
 - 🇬🇷 Greek (ell)
@@ -132,26 +119,57 @@ Additional languages can be added by installing the corresponding Tesseract lang
 
 ## 💻 System Requirements
 
-### macOS
-- macOS 10.15 (Catalina) or later
+### macOS App
+- macOS 10.15+ (Catalina or later)
 - 200 MB disk space
-- Apple Silicon (M1/M2) or Intel processor
+- Apple Silicon (M1/M2/M3) or Intel
 
-### Linux
-- Ubuntu 20.04+, Debian 10+, or equivalent
-- Python 3.8 or later
-- Tesseract OCR 4.0+
+### Docker
+- Docker Desktop or Docker Engine
+- 500 MB disk space
+
+### Direct Execution
+- Python 3.8+
+- Tesseract OCR 4.0+ (optional, for OCR features)
 - 200 MB disk space
 
-## 🐳 Docker
+## 📚 Documentation
 
-For containerized deployment:
+- [Docker Setup](platforms/docker/README.md) - Docker-specific instructions
+- [Integration Guide](INTEGRATION_GUIDE.md) - API and integration options
+- [OCR Setup](OCR_SETUP.md) - Detailed OCR configuration
+- [Troubleshooting](TROUBLESHOOTING.md) - Common issues and solutions
+- [Quick Start](QUICKSTART.md) - Getting started guide
+- [Workflows](WORKFLOWS.md) - Usage workflows and examples
+- [Structure](STRUCTURE.md) - Project layout and architecture
+
+## 🔧 Development
+
+### Running in Development Mode
 
 ```bash
-docker-compose up -d
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the app
+python app.py
+
+# Access at http://127.0.0.1:8765
 ```
 
-See [DOCKER.md](DOCKER.md) for details.
+### Building macOS App from Source
+
+```bash
+cd platforms/macos
+npm install
+npm run build
+
+# Output: dist/Receipt Manager.dmg
+```
 
 ## 🔒 Security
 
@@ -159,7 +177,7 @@ See [SECURITY.md](SECURITY.md) for security policy and vulnerability reporting.
 
 ## 📄 License
 
-[Add your license here]
+MIT License - free to use, modify, and distribute.
 
 ## 🤝 Contributing
 
@@ -173,7 +191,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 🙏 Acknowledgments
 
 - [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - OCR engine
+- [EasyOCR](https://github.com/JaidedAI/EasyOCR) - Alternative OCR
 - [Flask](https://flask.palletsprojects.com/) - Web framework
+- [Electron](https://www.electronjs.org/) - Desktop app framework
 - [Pillow](https://python-pillow.org/) - Image processing
 
 ---
