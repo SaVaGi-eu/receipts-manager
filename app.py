@@ -40,16 +40,6 @@ logger = logging.getLogger("receipt-manager")
 data_lock = threading.Lock()
 
 # ---------- Path safety helpers ----------
-def _is_within_root(root: Path, candidate: Path) -> bool:
-    try:
-        root_resolved = root.resolve()
-        cand_resolved = candidate.resolve()
-    except Exception:
-        return False
-    root_prefix = str(root_resolved) + os.sep
-    cand_str = str(cand_resolved)
-    return cand_str == str(root_resolved) or cand_str.startswith(root_prefix)
-
 def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
     """
     Resolve a user-supplied relative path against root safely.
@@ -60,16 +50,21 @@ def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
     # Decode percent-encoding
     rel = unquote(rel_path)
     # Reject absolute paths and obvious traversal tokens
-    if rel.startswith("/") or rel.startswith("\\"):
+    if rel.startswith("/") or rel.startswith("\\\\"):
         return None
     if ".." in Path(rel).parts:
         return None
     try:
         candidate = (root / rel).resolve(strict=False)
+        root_resolved = root.resolve()
+        
+        # SECURITY: Ensure candidate is within root using Python's built-in validation
+        if not candidate.is_relative_to(root_resolved):
+            return None
+            
     except Exception:
         return None
-    if not _is_within_root(root, candidate):
-        return None
+    
     return candidate
 
 def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) -> Path:
@@ -137,11 +132,24 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
 
     return final_dst
 
+def sanitize_header_value(value: str) -> str:
+    """
+    SECURITY: Sanitize values used in HTTP headers to prevent response splitting.
+    Removes CR, LF, and other control characters that could be used for header injection.
+    """
+    if not value:
+        return ""
+    # Remove \r, \n, and other control characters
+    sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(value))
+    # Also handle Unicode characters that could fold into newlines
+    sanitized = sanitized.replace('\u0085', '').replace('\u2028', '').replace('\u2029', '')
+    return sanitized
+
 # ---------- Utility functions ----------
 def sanitize_filename(text, max_length=50):
     if not text or text == "N/A":
         return "NA"
-    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
+    text = re.sub(r'[<>:"/\\\\|?*\x00-\x1f]', "", text)
     text = re.sub(r"[\s]+", "-", text)
     text = re.sub(r"-+", "-", text)
     text = text.strip("-")
@@ -149,7 +157,22 @@ def sanitize_filename(text, max_length=50):
         text = text[:max_length].rstrip("-")
     return text or "unnamed"
 
-        # Fallback: keep only alphanumerics and clamp length to avoid abuse
+def sanitize_full_filename(name: str, max_length: int = 200) -> str:
+    """
+    Final safeguard for filenames that may include user-provided data.
+    Removes path separators and leading dots, restricts characters, and truncates length.
+    """
+    # Remove any path separators outright
+    name = name.replace("/", "").replace("\\\\", "")
+    # Allow only a conservative set of characters
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    # Avoid hidden or relative-path-like names
+    name = name.lstrip(".")
+    # Enforce maximum length
+    if max_length > 0 and len(name) > max_length:
+        name = name[:max_length]
+    return name or "file"
+
 def format_date_for_filename(date_str):
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
@@ -248,22 +271,6 @@ def save_data(data):
 def generate_receipt_group_id(data):
     ids = [r["receipt_group_id"] for r in data.get("receipts", [])]
     numbers = []
-def sanitize_full_filename(name: str, max_length: int = 200) -> str:
-    """
-    Final safeguard for filenames that may include user-provided data.
-    Removes path separators and leading dots, restricts characters, and truncates length.
-    """
-    # Remove any path separators outright
-    name = name.replace("/", "").replace("\\", "")
-    # Allow only a conservative set of characters
-    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-    # Avoid hidden or relative-path-like names
-    name = name.lstrip(".")
-    # Enforce maximum length
-    if max_length > 0 and len(name) > max_length:
-        name = name[:max_length]
-    return name or "file"
-
     for rid in ids:
         m = re.search(r"RG-(\d+)", rid)
         if m:
@@ -280,14 +287,14 @@ def build_single_item_filename(item, receipt, ext):
         "-".join(sanitize_filename(u, 15) for u in item.get("users", [])[:3]) if item.get("users") else "NoUser",
         sanitize_filename(receipt.get("documentation", "N/A"), 20),
     ]
-    # Final safety normalization on the full filename
-    full = sanitize_full_filename(full, 200)
     base = "-".join(parts)
     full = f"{base}{ext}"
     if len(full) > 200:
         allowed = 200 - len(ext)
         base = base[:allowed]
         full = f"{base}{ext}"
+    # Final safety normalization on the full filename
+    full = sanitize_full_filename(full, 200)
     return full
 
 def build_multi_item_filename(receipt, ext):
@@ -392,6 +399,9 @@ def set_cors_headers(handler):
         handler.send_header("Vary", "Origin")
         return
 
+    # SECURITY: Sanitize origin before using in header to prevent response splitting
+    origin = sanitize_header_value(origin)
+
     # Allow known browser origins
     if origin in ALLOWED_ORIGINS:
         handler.send_header("Access-Control-Allow-Origin", origin)
@@ -405,6 +415,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
+        # SECURITY: Sanitize content_type to prevent header injection
+        content_type = sanitize_header_value(content_type)
         self.send_header("Content-Type", content_type)
         csp = (
             "default-src 'self'; "
@@ -471,6 +483,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 ctype, _ = mimetypes.guess_type(str(candidate))
                 ctype = ctype or "application/octet-stream"
+
+            # SECURITY: Sanitize content type before using in header
+            ctype = sanitize_header_value(ctype)
 
             # Stream file to avoid large memory usage
             self.send_response(200)
@@ -577,9 +592,17 @@ class Handler(BaseHTTPRequestHandler):
                     ".webp": "image/webp",
                 }
                 ctype = file_content_types.get(suffix, "application/octet-stream")
+                
+                # SECURITY: Sanitize filename and content type for headers
+                # Apply double sanitization: filename constraints + header injection prevention
+                safe_filename = sanitize_header_value(sanitize_full_filename(target.name, 100))
+                ctype = sanitize_header_value(ctype)
+                
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
-                self.send_header("Content-Disposition", f'inline; filename="{target.name}"')
+                # Use explicit concatenation instead of f-string to make sanitization flow clearer to CodeQL
+                disposition_value = 'inline; filename="' + safe_filename + '"'
+                self.send_header("Content-Disposition", disposition_value)
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
@@ -838,7 +861,6 @@ class Handler(BaseHTTPRequestHandler):
                         return
 
                     # Perform safe move using helper
-                    ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()  # must match relative_to below
                     try:
                         final_dst = safe_move_file(old_path, new_dir, new_name, ALLOWED_STORAGE_ROOT)
                         rel = str(final_dst.relative_to(DATA_ROOT))
