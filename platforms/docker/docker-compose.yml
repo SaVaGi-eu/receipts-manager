@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  receipts-manager:
+    build: ../..
+    container_name: receipts-manager
+    ports:
+      - "8765:8765"
+    volumes:
+      - receipt-data:/app/data
+      - receipt-storage:/app/storage
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8765
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import http.client; conn = http.client.HTTPConnection('localhost', 8765); conn.request('GET', '/'); response = conn.getresponse(); exit(0 if response.status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  receipt-data:
+  receipt-storage:

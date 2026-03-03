@@ -1,0 +1,54 @@
+# Python
+venv/
+build_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data - personal files
+storage/
+data/database/data.json
+data/backups/
+
+# Node / Electron
+node_modules/
+out/
+
+# Platform-specific
+platforms/*/node_modules/
+platforms/*/dist/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Git
+.git/
+.github/
+.gitignore
+
+# Documentation
+*.md
+screenshots/
+
+# Build artifacts
+*.dmg
+*.app
+.eggs/
+*.spec
