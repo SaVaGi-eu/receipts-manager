@@ -7,29 +7,55 @@ echo "Receipt & Warranty Manager (standalone)"
 echo "=========================================="
 echo ""
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1
-}
+# Detect OS
+OS="unknown"
+case "$(uname -s)" in
+    Darwin*)
+        OS="macos"
+        ;;
+    Linux*)
+        OS="linux"
+        ;;
+    CYGWIN*|MINGW*|MSYS*)
+        OS="windows"
+        ;;
+esac
 
-# 1) Check for python3
-if ! need_cmd python3; then
-  echo "Error: python3 is not installed or not in PATH."
-  read -p "Press Enter to exit..."
-  exit 1
+echo "Detected OS: $OS"
+echo ""
+
+# Check for python3
+if ! command -v python3 &> /dev/null; then
+    echo "Error: python3 is not installed or not in PATH."
+    read -p "Press Enter to exit..."
+    exit 1
 fi
 
 echo -n "Python 3 found: "
 python3 --version || true
 echo ""
 
-# Activate venv if it exists
-if [ -f "venv/bin/activate" ]; then
-  source venv/bin/activate
-fi
-
-# 2) Auto-install missing dependencies
-echo "Checking dependencies..."
-python3 << 'EOF'
+# Platform-specific setup
+if [ "$OS" = "macos" ]; then
+    # macOS: Use platform-specific setup
+    if [ -f "platforms/macos/setup.sh" ]; then
+        bash platforms/macos/setup.sh
+        
+        if [ $? -ne 0 ]; then
+            echo ""
+            echo "❌ Setup failed. Cannot continue."
+            read -p "Press Enter to exit..."
+            exit 1
+        fi
+    else
+        echo "⚠️  Warning: macOS setup script not found."
+        echo "Attempting to run with system Python..."
+        echo ""
+    fi
+else
+    # Linux/Other: Generic dependency check with auto-install
+    echo "Checking dependencies..."
+    python3 << 'EOF'
 import sys
 import subprocess
 
@@ -67,9 +93,10 @@ else:
     print("✅ All required dependencies are installed.\n")
 EOF
 
-# 3) Check for available updates (informational only)
-if [ -f "check_deps.py" ]; then
-  python3 check_deps.py || true
+    # Check for available updates (informational only)
+    if [ -f "check_deps.py" ]; then
+        python3 check_deps.py || true
+    fi
 fi
 
 echo "Starting built-in HTTP server on http://127.0.0.1:5000 ..."
@@ -77,11 +104,17 @@ echo "Press Ctrl+C in this terminal to stop."
 echo ""
 
 # Run the application
-python3 app.py
+# Use venv python if available (macOS), otherwise system python3
+if [ -f "venv/bin/python" ]; then
+    venv/bin/python app.py
+else
+    python3 app.py
+fi
+
 status=$?
 
 if [ $status -ne 0 ]; then
-  echo ""
-  echo "Application exited with error (status $status)."
-  read -p "Press Enter to exit..."
+    echo ""
+    echo "Application exited with error (status $status)."
+    read -p "Press Enter to exit..."
 fi
