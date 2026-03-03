@@ -104,11 +104,23 @@ echo "Press Ctrl+C in this terminal to stop."
 echo ""
 
 # Run the application
-# Use venv python if available (macOS), otherwise system python3
-if [ -f "venv/bin/python" ]; then
-    venv/bin/python app.py
+# Determine Python to use based on OS
+if [ "$OS" = "macos" ]; then
+    # macOS: Use venv from Application Support
+    MACOS_VENV="$HOME/Library/Application Support/receipts-manager/venv/bin/python"
+    if [ -f "$MACOS_VENV" ]; then
+        "$MACOS_VENV" app.py
+    else
+        echo "⚠️  Warning: Virtual environment not found. Using system Python."
+        python3 app.py
+    fi
 else
-    python3 app.py
+    # Linux/Other: Use local venv if available, otherwise system Python
+    if [ -f "venv/bin/python" ]; then
+        venv/bin/python app.py
+    else
+        python3 app.py
+    fi
 fi
 
 status=$?
