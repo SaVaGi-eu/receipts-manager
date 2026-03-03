@@ -150,8 +150,8 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
     echo ""
     
     # Use virtualenv with --no-seed to avoid pip installation issues
-    # We'll install pip manually afterwards
-    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
+    # Properly quote the path to handle spaces
+    if "$WORKING_PYTHON" -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
         if [ -f "$VENV_DIR/bin/activate" ] && [ -f "$VENV_DIR/bin/python" ]; then
             echo "✅ Virtual environment created"
             
