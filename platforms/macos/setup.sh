@@ -6,6 +6,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Use a hidden directory in user's home (avoids macOS permission issues and spaces in path)
 VENV_DIR="$HOME/.receipts-manager-venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+VENV_PIP="$VENV_DIR/bin/pip"
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
 cd "$PROJECT_ROOT"
@@ -129,7 +131,7 @@ VENV_NEEDS_CREATION=false
 
 if [ -d "$VENV_DIR" ]; then
     # Check if venv is valid (has activate script and python binary)
-    if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_DIR/bin/python" ]; then
+    if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_PYTHON" ]; then
         echo "⚠️  Existing virtual environment is broken/incomplete"
         echo "🧹 Removing broken venv..."
         rm -rf "$VENV_DIR" 2>/dev/null
@@ -144,17 +146,15 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
     
     # Use virtualenv with --no-seed to avoid pip installation issues
     if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
-        if [ -f "$VENV_DIR/bin/activate" ] && [ -f "$VENV_DIR/bin/python" ]; then
+        if [ -f "$VENV_PYTHON" ]; then
             echo "✅ Virtual environment created"
             
             # Manually install pip
             echo "📦 Installing pip..."
-            source "$VENV_DIR/bin/activate"
             
-            # Download and run get-pip.py
-            if curl -sS https://bootstrap.pypa.io/get-pip.py | python > /dev/null 2>&1; then
+            if curl -sS https://bootstrap.pypa.io/get-pip.py | "$VENV_PYTHON" > /dev/null 2>&1; then
                 # Verify pip is installed
-                if python -m pip --version > /dev/null 2>&1; then
+                if [ -f "$VENV_PIP" ] && "$VENV_PIP" --version > /dev/null 2>&1; then
                     echo "✅ pip installed successfully"
                 else
                     echo "❌ pip installation verification failed"
@@ -165,7 +165,7 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
                 exit 1
             fi
         else
-            echo "❌ Virtual environment creation failed - missing files"
+            echo "❌ Virtual environment creation failed - missing python binary"
             exit 1
         fi
     else
@@ -182,19 +182,16 @@ else
     echo "✅ Virtual environment exists and is valid"
 fi
 
-# Activate virtual environment
-source "$VENV_DIR/bin/activate"
-
-# Verify activation worked
-if [ -z "$VIRTUAL_ENV" ]; then
-    echo "❌ Failed to activate virtual environment"
+# Verify pip is available
+if [ ! -f "$VENV_PIP" ]; then
+    echo "❌ pip not found in virtual environment"
     exit 1
 fi
 
 # Upgrade pip in venv
 echo ""
 echo "Upgrading pip in virtual environment..."
-python -m pip install --upgrade pip --quiet 2>/dev/null
+"$VENV_PYTHON" -m pip install --upgrade pip --quiet 2>/dev/null
 
 # Check if dependencies need to be installed
 echo ""
@@ -218,7 +215,7 @@ while IFS= read -r line; do
         "Pillow") import_name="PIL" ;;
     esac
     
-    if ! python -c "import $import_name" 2>/dev/null; then
+    if ! "$VENV_PYTHON" -c "import $import_name" 2>/dev/null; then
         NEED_INSTALL=true
         break
     fi
@@ -230,7 +227,7 @@ if [ "$NEED_INSTALL" = true ]; then
     echo "This may take several minutes (especially torch/torchvision)..."
     echo ""
     
-    pip install -r "$REQUIREMENTS"
+    "$VENV_PIP" install -r "$REQUIREMENTS"
     
     if [ $? -ne 0 ]; then
         echo ""
