@@ -7,8 +7,8 @@ from setuptools import setup
 
 APP = ['app.py']
 DATA_FILES = [
-    ('templates', ['templates/index.html']),  # Adjust based on your template structure
-    ('static', ['static/']),  # Adjust based on your static files
+    ('templates', ['templates/index.html']),
+    ('static', ['static/']),
 ]
 
 OPTIONS = {
@@ -22,6 +22,8 @@ OPTIONS = {
         'click',
         'itsdangerous',
         'markupsafe',
+        'easyocr',
+        'pdf2image',
     ],
     'includes': [
         'ocr_service',
@@ -35,7 +37,6 @@ OPTIONS = {
         'test',
         'unittest',
     ],
-    # 'iconfile': 'static/icon.icns',  # Uncomment if you have an icon
     'plist': {
         'CFBundleName': 'Receipt Manager',
         'CFBundleDisplayName': 'Receipt Manager',
@@ -61,11 +62,4 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
-    install_requires=[
-        'flask',
-        'pytesseract',
-        'pillow',
-        'werkzeug',
-    ],
 )
-
