@@ -110,6 +110,17 @@ else
     echo "✅ virtualenv is installed"
 fi
 
+# Clear virtualenv cache to avoid permission issues
+echo ""
+echo "Clearing virtualenv cache..."
+VIRTUALENV_CACHE="$HOME/Library/Caches/virtualenv"
+if [ -d "$VIRTUALENV_CACHE" ]; then
+    rm -rf "$VIRTUALENV_CACHE"
+    echo "✅ Cache cleared"
+else
+    echo "✅ No cache to clear"
+fi
+
 # Check if venv exists and is valid
 echo ""
 VENV_NEEDS_CREATION=false
@@ -127,14 +138,26 @@ else
 fi
 
 if [ "$VENV_NEEDS_CREATION" = true ]; then
-    echo "📦 Creating Python virtual environment using virtualenv..."
+    echo "📦 Creating Python virtual environment..."
     
-    # Use virtualenv instead of venv (works better with Homebrew Python)
-    if $WORKING_PYTHON -m virtualenv "$VENV_DIR" 2>&1 | grep -v "^created virtual"; then
+    # Use virtualenv with --no-seed to avoid pip installation issues
+    # We'll install pip manually afterwards
+    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" 2>&1 | grep -v "^created virtual" | grep -v "^$"; then
         if [ -f "$VENV_DIR/bin/activate" ]; then
-            echo "✅ Virtual environment created successfully"
+            echo "✅ Virtual environment created"
+            
+            # Manually install pip
+            echo "📦 Installing pip..."
+            source "$VENV_DIR/bin/activate"
+            
+            if curl -sS https://bootstrap.pypa.io/get-pip.py | python 2>&1 | grep -E "(Successfully installed|Requirement already satisfied)"; then
+                echo "✅ pip installed successfully"
+            else
+                echo "❌ Failed to install pip"
+                exit 1
+            fi
         else
-            echo "❌ Virtual environment creation reported success but files are missing"
+            echo "❌ Virtual environment creation failed - missing files"
             exit 1
         fi
     else
