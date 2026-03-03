@@ -106,8 +106,8 @@ echo ""
 # Run the application
 # Determine Python to use based on OS
 if [ "$OS" = "macos" ]; then
-    # macOS: Use venv from Application Support
-    MACOS_VENV="$HOME/Library/Application Support/receipts-manager/venv/bin/python"
+    # macOS: Use venv from home directory
+    MACOS_VENV="$HOME/.receipts-manager-venv/bin/python"
     if [ -f "$MACOS_VENV" ]; then
         "$MACOS_VENV" app.py
     else
