@@ -83,10 +83,27 @@ fi
 # Find Python version
 echo ""
 WORKING_PYTHON="python3"
-PYTHON_VERSION=$($WORKING_PYTHON --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
-echo "Using: $WORKING_PYTHON (Python $PYTHON_VERSION)"
 
-# Check if virtualenv is installed (needed for Homebrew Python)
+# Check if Python 3.13 is available and prefer it over 3.14
+if command -v python3.13 &> /dev/null; then
+    WORKING_PYTHON="python3.13"
+    echo "Using: python3.13 (stable version)"
+elif command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+    echo "Using: python3 (Python $PYTHON_VERSION)"
+    
+    # Warn about Python 3.14
+    MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+    MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+    if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 14 ]; then
+        echo "⚠️  Python 3.14 has known issues with virtual environments"
+    fi
+else
+    echo "❌ Python 3 not found"
+    exit 1
+fi
+
+# Check if virtualenv is installed
 echo ""
 echo "Checking for virtualenv..."
 
@@ -94,19 +111,13 @@ if ! $WORKING_PYTHON -m pip show virtualenv &> /dev/null; then
     echo "📦 virtualenv not found, installing..."
     echo ""
     
-    # Install virtualenv with --break-system-packages flag for Homebrew Python
     if $WORKING_PYTHON -m pip install --break-system-packages virtualenv 2>/dev/null; then
         echo "✅ virtualenv installed"
     else
-        # Try without flag
         if $WORKING_PYTHON -m pip install virtualenv 2>/dev/null; then
             echo "✅ virtualenv installed"
         else
             echo "❌ Failed to install virtualenv"
-            echo ""
-            echo "Troubleshooting:"
-            echo "  Try manually: python3 -m pip install --break-system-packages virtualenv"
-            echo ""
             exit 1
         fi
     fi
@@ -114,7 +125,7 @@ else
     echo "✅ virtualenv is installed"
 fi
 
-# Clear virtualenv cache to avoid permission issues
+# Clear virtualenv cache
 echo ""
 echo "Clearing virtualenv cache..."
 VIRTUALENV_CACHE="$HOME/Library/Caches/virtualenv"
@@ -130,7 +141,6 @@ echo ""
 VENV_NEEDS_CREATION=false
 
 if [ -d "$VENV_DIR" ]; then
-    # Check if venv is valid (has activate script, python binary, AND pip)
     if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_PYTHON" ] || [ ! -f "$VENV_PIP" ]; then
         echo "⚠️  Existing virtual environment is broken/incomplete"
         echo "🧹 Removing broken venv..."
@@ -144,8 +154,11 @@ fi
 if [ "$VENV_NEEDS_CREATION" = true ]; then
     echo "📦 Creating Python virtual environment..."
     
-    # Use virtualenv with --no-seed to avoid pip installation issues
-    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
+    # Try to create venv
+    VENV_ERROR=$(mktemp)
+    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" 2>"$VENV_ERROR" >/dev/null; then
+        rm -f "$VENV_ERROR"
+        
         if [ -f "$VENV_PYTHON" ]; then
             echo "✅ Virtual environment created"
             
@@ -153,7 +166,6 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
             echo "📦 Installing pip..."
             
             if curl -sS https://bootstrap.pypa.io/get-pip.py | "$VENV_PYTHON" > /dev/null 2>&1; then
-                # Verify pip is installed
                 if [ -f "$VENV_PIP" ] && "$VENV_PIP" --version > /dev/null 2>&1; then
                     echo "✅ pip installed successfully"
                 else
@@ -169,48 +181,70 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
             exit 1
         fi
     else
+        # Failed - show error and offer Python 3.13
         echo "❌ Failed to create virtual environment"
         echo ""
-        echo "Troubleshooting:"
-        echo "1. Check Python installation: python3 --version"
-        echo "2. Reinstall Python: brew reinstall python@3.14"
-        echo "3. Or try Python 3.13: brew install python@3.13 && brew unlink python@3.14 && brew link python@3.13"
+        echo "Error details:"
+        cat "$VENV_ERROR"
+        rm -f "$VENV_ERROR"
         echo ""
+        
+        # If using Python 3.14, offer to install 3.13
+        if [[ "$WORKING_PYTHON" == "python3" ]]; then
+            PYTHON_VERSION=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+            MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+            MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+            
+            if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 14 ]; then
+                echo "Python 3.14 is too new and has broken venv support."
+                echo ""
+                
+                if ! command -v python3.13 &> /dev/null; then
+                    read -p "Would you like to install Python 3.13 (stable)? (y/n): " -n 1 -r
+                    echo ""
+                    
+                    if [[ $REPLY =~ ^[Yy]$ ]]; then
+                        echo "📦 Installing Python 3.13..."
+                        brew install python@3.13
+                        
+                        if command -v python3.13 &> /dev/null; then
+                            echo "✅ Python 3.13 installed"
+                            echo ""
+                            echo "Please run ./run.sh again to use Python 3.13"
+                            exit 0
+                        else
+                            echo "❌ Python 3.13 installation failed"
+                            exit 1
+                        fi
+                    fi
+                fi
+            fi
+        fi
+        
         exit 1
     fi
 else
     echo "✅ Virtual environment exists and is valid"
 fi
 
-# Double-check pip is available (should never fail if above logic is correct)
-if [ ! -f "$VENV_PIP" ]; then
-    echo "❌ pip not found in virtual environment - this should not happen"
-    echo "Try removing $VENV_DIR and running again"
-    exit 1
-fi
-
-# Upgrade pip in venv
+# Upgrade pip
 echo ""
-echo "Upgrading pip in virtual environment..."
+echo "Upgrading pip..."
 "$VENV_PYTHON" -m pip install --upgrade pip --quiet 2>/dev/null
 
-# Check if dependencies need to be installed
+# Check dependencies
 echo ""
 echo "Checking Python dependencies..."
 
 NEED_INSTALL=false
 
-# Read requirements and check if installed
 while IFS= read -r line; do
-    # Skip comments and empty lines
     [[ "$line" =~ ^#.*$ ]] && continue
     [[ -z "$line" ]] && continue
     
-    # Extract package name (before >= or ==)
     package=$(echo "$line" | sed 's/[><=].*//')
-    
-    # Map package name to import name if different
     import_name="$package"
+    
     case "$package" in
         "opencv-python") import_name="cv2" ;;
         "Pillow") import_name="PIL" ;;
@@ -233,7 +267,6 @@ if [ "$NEED_INSTALL" = true ]; then
     if [ $? -ne 0 ]; then
         echo ""
         echo "⚠️  Warning: Some Python packages failed to install."
-        echo "You may need to install them manually inside the venv."
         echo ""
     else
         echo ""
