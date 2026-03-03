@@ -1,0 +1,45 @@
+# Git attributes for Receipt Manager
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Force LF line endings for source files
+*.py text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.command text eol=lf
+*.txt text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.dmg binary
+*.app binary
+*.zip binary
+*.tar.gz binary
+
+# Exclude files from export archives
+export-ignore .gitattributes
+export-ignore .gitignore
+export-ignore .github/
+export-ignore tests/
+export-ignore .pre-commit-config.yaml
+export-ignore .editorconfig
+export-ignore screenshots/
+
+# Linguist overrides (for GitHub language statistics)
+*.js linguist-language=JavaScript
+*.py linguist-language=Python
+vendor/* linguist-vendored
+static/vendor/* linguist-vendored

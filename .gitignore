@@ -1,45 +1,156 @@
 # Python
-venv/
-build_env/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-*.egg-info/
-dist/
 build/
-
-# macOS build artifacts
-*.dmg
-*.app
+develop-eggs/
+dist/
+downloads/
+eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFILE.lock
 
-# Data - personal files, not for version control
-storage/
-data/database/data.json
-data/backups/
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+build_env/
 
-# Node / Electron
-node_modules/
-out/
+# PyInstaller
+*.manifest
+*.spec
 
-# Platform-specific build artifacts
-platforms/*/node_modules/
-platforms/*/dist/
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Editors
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node.js / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.npm
+.yarn/
+
+# Build artifacts
+dist/
+out/
+build/
+platforms/macos/dist/
+platforms/macos/out/
+platforms/macos/node_modules/
+platforms/macos/build/
+*.dmg
+*.app
+*.pkg
+*.deb
+*.rpm
+
+# Data directories (user data should not be in repo)
+data/database/data.json
+data/backups/
+storage/
+!data/.gitkeep
+!storage/.gitkeep
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # Logs
 *.log
-npm-debug.log*
-data.json
+logs/
+*.log.*
+
+# OS-specific
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Spotlight-V100
+.Trashes
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Compiled source
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Docker
+.dockerignore.swp
