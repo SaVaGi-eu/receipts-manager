@@ -15,6 +15,57 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import sys
+import os
+import pytesseract
+from pathlib import Path
+
+def get_tesseract_config():
+    """
+    Detect if running from .app bundle and configure Tesseract paths accordingly.
+    Returns tuple: (tesseract_cmd, tessdata_dir)
+    """
+    if getattr(sys, 'frozen', False):
+        # Running in .app bundle (py2app)
+        if hasattr(sys, '_MEIPASS'):
+            # PyInstaller
+            bundle_dir = sys._MEIPASS
+        else:
+            # py2app
+            bundle_dir = os.path.dirname(os.path.dirname(os.path.dirname(sys.executable)))
+        
+        tesseract_cmd = os.path.join(
+            bundle_dir, 
+            'Resources', 
+            'tesseract', 
+            'bin', 
+            'tesseract'
+        )
+        tessdata_dir = os.path.join(
+            bundle_dir,
+            'Resources',
+            'tesseract',
+            'tessdata'
+        )
+        
+        if os.path.exists(tesseract_cmd):
+            print(f"ℹ️  Using bundled Tesseract: {tesseract_cmd}")
+            return tesseract_cmd, tessdata_dir
+        else:
+            print(f"⚠️  Bundled Tesseract not found at {tesseract_cmd}, falling back to system")
+    
+    # Running from source or bundled Tesseract not found - use system
+    print("ℹ️  Using system Tesseract")
+    return 'tesseract', None  # Use system default
+
+# Configure Tesseract on module import
+tesseract_cmd, tessdata_dir = get_tesseract_config()
+pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+if tessdata_dir:
+    # Set TESSDATA_PREFIX environment variable for bundled tessdata
+    os.environ['TESSDATA_PREFIX'] = tessdata_dir
+
 # Check for PDF support
 try:
     from pdf2image import convert_from_path

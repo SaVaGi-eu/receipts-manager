@@ -161,7 +161,7 @@ def sanitize_header_value(value: str) -> str:
 def sanitize_filename(text, max_length=50):
     if not text or text == "N/A":
         return "NA"
-    text = re.sub(r'[<>:"/\\\\|?*\x00-\x1f]', "", text)
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
     text = re.sub(r"[\s]+", "-", text)
     text = re.sub(r"-+", "-", text)
     text = text.strip("-")

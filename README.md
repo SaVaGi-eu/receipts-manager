@@ -12,7 +12,7 @@ A local web-based application for managing receipts and item warranties with aut
 =======
 A local application for managing receipts and item warranties with automatic file organization, integrity checking, OCR receipt scanning, and a modern green-themed UI.
 
-Available as a **native macOS app** or as a **self-hosted web app** (macOS, Linux, Windows).
+Available as a **native macOS app** or as a **self-hosted web app** (Linux, Windows).
 
 ---
 
@@ -55,6 +55,12 @@ Available as a **native macOS app** or as a **self-hosted web app** (macOS, Linu
 - **Status Highlights** — Yellow for expiring soon (90 days), red for expired
 - **Responsive Design** — Works on desktop and tablet
 
+**No additional setup required!** The app includes:
+- Python runtime
+- All Python dependencies
+- Tesseract OCR with multilingual support (English, Dutch, Greek, Latvian)
+- Complete database and storage system
+
 ---
 
 ## Installation
@@ -70,27 +76,24 @@ Available as a **native macOS app** or as a **self-hosted web app** (macOS, Linu
    ```
 5. Double-click the app — it will open normally from now on
 
-### Option B — Web App (macOS, Linux, Windows)
+### Option B — Web App (Linux, Windows)
 
 #### Prerequisites
 - **Python 3.8 or higher**
-  - Mac: `brew install python` or download from [python.org](https://www.python.org/downloads/)
   - Linux: `sudo apt install python3 python3-venv python3-pip`
   - Windows: Download from [python.org](https://www.python.org/downloads/)
 - **poppler** (required for PDF OCR support)
-  - Mac: `brew install poppler`
   - Linux: `sudo apt install poppler-utils`
   - Windows: Download from [poppler releases](https://github.com/oschwartz10612/poppler-windows/releases)
 
 #### Quick Start
 
-**Mac / Linux:**
+**Linux:**
 ```bash
 git clone https://github.com/SaVaGi-eu/receipts-manager.git
 cd receipts-manager
+chmod +x run.sh
 ./run.sh
-```
-Then open your browser to `http://127.0.0.1:8765`
 
 **Windows:**
 ```cmd

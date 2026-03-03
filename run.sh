@@ -1,4 +1,24 @@
 #!/bin/bash
+# run.sh - Run Receipt Manager (Linux only)
+
+# Detect OS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "⚠️  macOS Detected"
+    echo ""
+    echo "macOS users should use the ReceiptManager.app bundle instead."
+    echo "The .app includes all dependencies and doesn't require manual setup."
+    echo ""
+    echo "To build the .app:"
+    echo "  ./build_macos_app.sh"
+    echo ""
+    echo "Or download from: https://github.com/SaVaGi-eu/receipts-manager/releases"
+    echo ""
+    exit 1
+fi
+
+# Continue with your existing Linux setup code below...
+echo "🐧 Receipt Manager Setup (Linux)"
+echo "================================="
 
 cd "$(dirname "$0")"
 
