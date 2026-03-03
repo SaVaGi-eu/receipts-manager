@@ -80,14 +80,39 @@ fi
 echo ""
 if [ ! -d "$VENV_DIR" ]; then
     echo "📦 Creating Python virtual environment..."
-    python3 -m venv "$VENV_DIR"
     
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to create virtual environment"
-        exit 1
+    # Try normal venv creation first
+    if python3 -m venv "$VENV_DIR" 2>/dev/null; then
+        echo "✅ Virtual environment created"
+    else
+        # Homebrew Python often fails with ensurepip, so create without pip and install it manually
+        echo "⚙️  Standard venv failed, trying alternative method..."
+        
+        if python3 -m venv --without-pip "$VENV_DIR" 2>/dev/null; then
+            echo "✅ Virtual environment created (without pip)"
+            
+            # Bootstrap pip manually
+            echo "📦 Installing pip..."
+            source "$VENV_DIR/bin/activate"
+            
+            curl -sS https://bootstrap.pypa.io/get-pip.py | python
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ pip installed successfully"
+            else
+                echo "❌ Failed to install pip"
+                exit 1
+            fi
+        else
+            echo "❌ Failed to create virtual environment"
+            echo ""
+            echo "Troubleshooting:"
+            echo "1. Try reinstalling Python: brew reinstall python@3.14"
+            echo "2. Or use system Python instead of Homebrew Python"
+            echo ""
+            exit 1
+        fi
     fi
-    
-    echo "✅ Virtual environment created"
 else
     echo "✅ Virtual environment exists"
 fi
@@ -98,7 +123,7 @@ source "$VENV_DIR/bin/activate"
 # Upgrade pip in venv
 echo ""
 echo "Upgrading pip in virtual environment..."
-python -m pip install --upgrade pip --quiet
+python -m pip install --upgrade pip --quiet 2>/dev/null
 
 # Check if dependencies need to be installed
 echo ""
@@ -115,7 +140,14 @@ while IFS= read -r line; do
     # Extract package name (before >= or ==)
     package=$(echo "$line" | sed 's/[><=].*//')
     
-    if ! python -c "import $package" 2>/dev/null; then
+    # Map package name to import name if different
+    import_name="$package"
+    case "$package" in
+        "opencv-python") import_name="cv2" ;;
+        "Pillow") import_name="PIL" ;;
+    esac
+    
+    if ! python -c "import $import_name" 2>/dev/null; then
         NEED_INSTALL=true
         break
     fi
