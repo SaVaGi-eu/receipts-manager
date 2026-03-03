@@ -182,29 +182,35 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="modalBrand" data-i18n="labelBrand">Brand</label>
-              <input type="text" id="modalBrand" list="brandList">
+              <label for="modalWarranty"><span data-i18n="labelWarranty">Warranty (months)</span></label>
+              <input type="number" id="modalWarranty" min="0" step="1" data-i18n-placeholder="warrantyPlaceholder" placeholder="24">
             </div>
             <div class="form-group">
-              <label for="modalModel" data-i18n="labelModel">Model</label>
-              <input type="text" id="modalModel" list="modelList">
+              <label for="modalBrand" data-i18n="labelBrand">Brand</label>
+              <input type="text" id="modalBrand" list="brandList">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
+              <label for="modalModel" data-i18n="labelModel">Model</label>
+              <input type="text" id="modalModel" list="modelList">
+            </div>
+            <div class="form-group">
               <label for="modalLocation" data-i18n="labelLocation">Location</label>
               <input type="text" id="modalLocation" list="locationList">
             </div>
+          </div>
+
+          <div class="form-row">
             <div class="form-group">
               <label for="modalProject" data-i18n="labelProject">Project</label>
               <input type="text" id="modalProject" list="projectList">
             </div>
-          </div>
-
-          <div class="form-group full-width">
-            <label for="modalDocumentation" data-i18n="labelDocumentation">Documentation</label>
-            <input type="text" id="modalDocumentation" list="docList">
+            <div class="form-group">
+              <label for="modalDocumentation" data-i18n="labelDocumentation">Documentation</label>
+              <input type="text" id="modalDocumentation" list="docList">
+            </div>
           </div>
 
           <div class="form-group full-width">
