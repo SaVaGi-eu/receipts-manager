@@ -316,6 +316,7 @@
         try { $('modalPurchaseDate').value = new Date(pd.replace(/-/g, ' ')).toISOString().split('T')[0]; }
         catch { $('modalPurchaseDate').value = ''; }
       }
+      $('modalWarranty').value = '';
       $('modalBrand').value = ''; $('modalModel').value = ''; $('modalLocation').value = '';
       $('modalProject').value = ''; $('modalDocumentation').value = ''; $('modalUsers').value = '';
       const itemsPreview = $('modalItemsPreview');
@@ -340,6 +341,7 @@
 
       const shop          = $('modalShop').value.trim();
       const purchaseDate  = $('modalPurchaseDate').value;
+      const warranty      = parseInt($('modalWarranty').value) || 0;
       const brand         = $('modalBrand').value.trim()         || 'N/A';
       const model         = $('modalModel').value.trim()         || 'N/A';
       const location      = $('modalLocation').value.trim()      || 'N/A';
@@ -361,7 +363,18 @@
         const resp = await fetchJson(API.updateItem(itemId), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shop, purchase_date: formattedDate, brand, model, location, project, documentation, users })
+          body: JSON.stringify({ 
+            shop, 
+            purchase_date: formattedDate, 
+            brand, 
+            model, 
+            location, 
+            project, 
+            documentation, 
+            users,
+            guarantee_duration: warranty,
+            guarantee_unit: 'months'
+          })
         });
         if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
         closeOcrModal();
@@ -384,6 +397,9 @@
       $('modalProject').value        = item.project          !== 'N/A' ? item.project          : '';
       $('modalDocumentation').value  = receipt.documentation !== 'N/A' ? receipt.documentation : '';
       $('modalUsers').value          = (item.users || []).join(', ');
+
+      const warranty = item.guarantee_unit === 'months' ? (item.guarantee_duration || 0) : 0;
+      $('modalWarranty').value = warranty > 0 ? warranty : '';
 
       const pd = receipt.purchase_date || '';
       if (pd && pd !== 'N/A') {
