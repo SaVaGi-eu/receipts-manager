@@ -76,6 +76,70 @@ else
     echo "✅ All system dependencies are installed"
 fi
 
+# Find a working Python version for venv
+echo ""
+echo "Finding suitable Python version..."
+
+WORKING_PYTHON=""
+PYTHON_CANDIDATES=("python3" "python3.13" "python3.12" "python3.11" "python3.10")
+
+for py_cmd in "${PYTHON_CANDIDATES[@]}"; do
+    if command -v "$py_cmd" &> /dev/null; then
+        echo -n "Testing $py_cmd... "
+        
+        # Test if this Python can create a venv
+        TEST_VENV="/tmp/test_venv_$$"
+        if "$py_cmd" -m venv "$TEST_VENV" &> /dev/null; then
+            rm -rf "$TEST_VENV"
+            echo "✅ Works!"
+            WORKING_PYTHON="$py_cmd"
+            break
+        else
+            # Try with --without-pip
+            if "$py_cmd" -m venv --without-pip "$TEST_VENV" &> /dev/null; then
+                rm -rf "$TEST_VENV"
+                echo "✅ Works (needs manual pip)!"
+                WORKING_PYTHON="$py_cmd"
+                NEEDS_MANUAL_PIP=true
+                break
+            else
+                rm -rf "$TEST_VENV" 2>/dev/null
+                echo "❌ Broken"
+            fi
+        fi
+    fi
+done
+
+if [ -z "$WORKING_PYTHON" ]; then
+    echo ""
+    echo "❌ No working Python version found for venv creation."
+    echo ""
+    echo "Homebrew Python 3.14 has known issues with venv."
+    echo ""
+    read -p "Would you like to install Python 3.13 via Homebrew? (y/n): " -n 1 -r
+    echo ""
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "📦 Installing Python 3.13..."
+        brew install python@3.13
+        
+        if command -v python3.13 &> /dev/null; then
+            WORKING_PYTHON="python3.13"
+            echo "✅ Python 3.13 installed successfully!"
+        else
+            echo "❌ Installation failed."
+            exit 1
+        fi
+    else
+        echo ""
+        echo "Cannot proceed without a working Python version."
+        exit 1
+    fi
+fi
+
+echo ""
+echo "Using: $WORKING_PYTHON ($($WORKING_PYTHON --version))"
+
 # Check if venv exists and is valid
 echo ""
 VENV_NEEDS_CREATION=false
@@ -95,14 +159,11 @@ fi
 if [ "$VENV_NEEDS_CREATION" = true ]; then
     echo "📦 Creating Python virtual environment..."
     
-    # Try normal venv creation first
-    if python3 -m venv "$VENV_DIR" 2>/dev/null; then
-        echo "✅ Virtual environment created"
-    else
-        # Homebrew Python often fails with ensurepip, so create without pip and install it manually
-        echo "⚙️  Standard venv failed, trying alternative method..."
+    if [ "$NEEDS_MANUAL_PIP" = true ]; then
+        # Create without pip, then install it manually
+        "$WORKING_PYTHON" -m venv --without-pip "$VENV_DIR"
         
-        if python3 -m venv --without-pip "$VENV_DIR" 2>/dev/null; then
+        if [ $? -eq 0 ]; then
             echo "✅ Virtual environment created (without pip)"
             
             # Bootstrap pip manually
@@ -119,11 +180,16 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
             fi
         else
             echo "❌ Failed to create virtual environment"
-            echo ""
-            echo "Troubleshooting:"
-            echo "1. Try reinstalling Python: brew reinstall python@3.14"
-            echo "2. Or use system Python instead of Homebrew Python"
-            echo ""
+            exit 1
+        fi
+    else
+        # Normal venv creation
+        "$WORKING_PYTHON" -m venv "$VENV_DIR"
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ Virtual environment created"
+        else
+            echo "❌ Failed to create virtual environment"
             exit 1
         fi
     fi
