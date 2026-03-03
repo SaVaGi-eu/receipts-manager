@@ -115,7 +115,7 @@ echo ""
 echo "Clearing virtualenv cache..."
 VIRTUALENV_CACHE="$HOME/Library/Caches/virtualenv"
 if [ -d "$VIRTUALENV_CACHE" ]; then
-    rm -rf "$VIRTUALENV_CACHE"
+    rm -rf "$VIRTUALENV_CACHE" 2>/dev/null
     echo "✅ Cache cleared"
 else
     echo "✅ No cache to clear"
@@ -130,7 +130,39 @@ if [ -d "$VENV_DIR" ]; then
     if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_DIR/bin/python" ]; then
         echo "⚠️  Existing virtual environment is broken/incomplete"
         echo "🧹 Removing broken venv..."
-        rm -rf "$VENV_DIR"
+        
+        # Try normal removal first
+        if rm -rf "$VENV_DIR" 2>/dev/null; then
+            echo "✅ Broken venv removed"
+        else
+            # Files might be locked/protected, need sudo
+            echo "⚠️  Some files are protected and require elevated permissions"
+            echo ""
+            read -p "Allow sudo to remove protected files? (y/n): " -n 1 -r
+            echo ""
+            
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                sudo rm -rf "$VENV_DIR"
+                if [ $? -eq 0 ]; then
+                    echo "✅ Broken venv removed with sudo"
+                else
+                    echo "❌ Failed to remove venv even with sudo"
+                    echo ""
+                    echo "Please manually delete: $VENV_DIR"
+                    echo "Then run this script again."
+                    echo ""
+                    exit 1
+                fi
+            else
+                echo "❌ Cannot proceed without removing broken venv"
+                echo ""
+                echo "Please manually delete: $VENV_DIR"
+                echo "Then run this script again."
+                echo ""
+                exit 1
+            fi
+        fi
+        
         VENV_NEEDS_CREATION=true
     fi
 else
@@ -138,20 +170,28 @@ else
 fi
 
 if [ "$VENV_NEEDS_CREATION" = true ]; then
+    echo ""
     echo "📦 Creating Python virtual environment..."
     
     # Use virtualenv with --no-seed to avoid pip installation issues
     # We'll install pip manually afterwards
-    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" 2>&1 | grep -v "^created virtual" | grep -v "^$"; then
-        if [ -f "$VENV_DIR/bin/activate" ]; then
+    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
+        if [ -f "$VENV_DIR/bin/activate" ] && [ -f "$VENV_DIR/bin/python" ]; then
             echo "✅ Virtual environment created"
             
             # Manually install pip
             echo "📦 Installing pip..."
             source "$VENV_DIR/bin/activate"
             
-            if curl -sS https://bootstrap.pypa.io/get-pip.py | python 2>&1 | grep -E "(Successfully installed|Requirement already satisfied)"; then
-                echo "✅ pip installed successfully"
+            # Download and run get-pip.py
+            if curl -sS https://bootstrap.pypa.io/get-pip.py | python > /dev/null 2>&1; then
+                # Verify pip is installed
+                if python -m pip --version > /dev/null 2>&1; then
+                    echo "✅ pip installed successfully"
+                else
+                    echo "❌ pip installation verification failed"
+                    exit 1
+                fi
             else
                 echo "❌ Failed to install pip"
                 exit 1
