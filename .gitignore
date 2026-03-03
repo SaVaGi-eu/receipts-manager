@@ -1,5 +1,6 @@
 # Python
 venv/
+build_env/
 __pycache__/
 *.pyc
 *.pyo
@@ -8,6 +9,11 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# macOS build artifacts
+*.dmg
+*.app
+.eggs/
 
 # Data - personal files, not for version control
 storage/
@@ -36,13 +42,4 @@ platforms/*/dist/
 # Logs
 *.log
 npm-debug.log*
-node_modules/
-__pycache__/
-*.pyc
-.DS_Store
 data.json
-*.egg-info/
-dist/
-build/
-platforms/macos/dist/
-platforms/macos/node_modules/
