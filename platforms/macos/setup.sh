@@ -4,9 +4,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Use a safe location in user's home directory for venv (avoids macOS permission issues)
-APP_SUPPORT="$HOME/Library/Application Support/receipts-manager"
-VENV_DIR="$APP_SUPPORT/venv"
+# Use a hidden directory in user's home (avoids macOS permission issues and spaces in path)
+VENV_DIR="$HOME/.receipts-manager-venv"
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
 cd "$PROJECT_ROOT"
@@ -14,9 +13,6 @@ cd "$PROJECT_ROOT"
 echo "🍎 macOS Setup for Receipt Manager"
 echo "====================================="
 echo ""
-
-# Create app support directory if needed
-mkdir -p "$APP_SUPPORT"
 
 # Check if Homebrew is installed
 if ! command -v brew &> /dev/null; then
@@ -144,14 +140,10 @@ else
 fi
 
 if [ "$VENV_NEEDS_CREATION" = true ]; then
-    echo ""
     echo "📦 Creating Python virtual environment..."
-    echo "   Location: $VENV_DIR"
-    echo ""
     
     # Use virtualenv with --no-seed to avoid pip installation issues
-    # Properly quote the path to handle spaces
-    if "$WORKING_PYTHON" -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
+    if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" > /dev/null 2>&1; then
         if [ -f "$VENV_DIR/bin/activate" ] && [ -f "$VENV_DIR/bin/python" ]; then
             echo "✅ Virtual environment created"
             
@@ -188,7 +180,6 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
     fi
 else
     echo "✅ Virtual environment exists and is valid"
-    echo "   Location: $VENV_DIR"
 fi
 
 # Activate virtual environment
