@@ -23,6 +23,11 @@
     ],
     "extraResources": [
       {
+        "from": "../../venv",
+        "to": "venv",
+        "filter": ["**/*", "!**/__pycache__", "!**/*.pyc"]
+      },
+      {
         "from": "../../app.py",
         "to": "app.py"
       },
