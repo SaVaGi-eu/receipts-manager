@@ -1,5 +1,10 @@
 name: Build and Release macOS App
 
+# Explicit permissions for security
+permissions:
+  contents: write
+  actions: read
+
 on:
   push:
     tags:
@@ -10,6 +15,9 @@ jobs:
   build-macos:
     name: Build macOS Application
     runs-on: macos-latest
+    permissions:
+      contents: write
+      actions: read
 
     steps:
       - name: Checkout code
@@ -80,6 +88,9 @@ jobs:
   build-docker:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
 
     steps:
       - name: Checkout code

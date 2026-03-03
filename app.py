@@ -39,29 +39,53 @@ logger = logging.getLogger("receipt-manager")
 
 data_lock = threading.Lock()
 
-# ---------- Path safety helpers ----------
+# ---------- Security helpers ----------
+def sanitize_header_value(value: str) -> str:
+    """
+    SECURITY: Sanitize values used in HTTP headers to prevent response splitting.
+    Removes CR, LF, and other control characters that could be used for header injection.
+    """
+    if not value:
+        return ""
+    # Remove \r, \n, and other control characters
+    sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(value))
+    # Also handle Unicode characters that could fold into newlines
+    sanitized = sanitized.replace('\u0085', '').replace('\u2028', '').replace('\u2029', '')
+    return sanitized
+
 def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
     """
-    Resolve a user-supplied relative path against root safely.
+    SECURITY: Resolve a user-supplied relative path against root safely.
     Returns the resolved Path if it is contained within root, otherwise None.
+    
+    This function validates paths through multiple layers:
+    1. Rejects empty paths
+    2. Decodes percent-encoding
+    3. Rejects absolute paths
+    4. Rejects paths with .. components
+    5. Validates final resolved path is within root using is_relative_to()
     """
     if not rel_path:
         return None
+    
     # Decode percent-encoding
     rel = unquote(rel_path)
-    # Reject absolute paths and obvious traversal tokens
+    
+    # SECURITY: Reject absolute paths
     if rel.startswith("/") or rel.startswith("\\\\"):
         return None
+    
+    # SECURITY: Reject paths with .. components
     if ".." in Path(rel).parts:
         return None
+    
     try:
-        # lgtm[py/path-injection]
-        # SECURITY REVIEW: Path is validated before resolution (lines 52-56) and after (line 62)
-        # Input containing ".." is rejected before this line, and is_relative_to() validates containment after
+        # Resolve paths
+        root_resolved = root.resolve(strict=False)
         candidate = (root / rel).resolve(strict=False)
-        root_resolved = root.resolve()
         
-        # SECURITY: Ensure candidate is within root using Python's built-in validation
+        # SECURITY: Explicit containment check that CodeQL can track
+        # This prevents path traversal attacks
         if not candidate.is_relative_to(root_resolved):
             return None
             
@@ -70,18 +94,42 @@ def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
     
     return candidate
 
+def validate_path_within_root(path: Path, root: Path) -> bool:
+    """
+    SECURITY: Explicitly validate that a path is within root.
+    Returns True if path is safely contained within root, False otherwise.
+    
+    This is a helper for CodeQL to track path validation through data flow.
+    """
+    try:
+        resolved_path = path.resolve(strict=False)
+        resolved_root = root.resolve(strict=False)
+        return resolved_path.is_relative_to(resolved_root)
+    except Exception:
+        return False
+
 def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) -> Path:
     """
-    Move src -> dst_dir/dst_name safely.
+    SECURITY: Move src -> dst_dir/dst_name safely with comprehensive validation.
     Returns the final destination Path on success, raises exceptions on failure.
+    
+    Validation steps:
+    1. Verify source exists and is a file
+    2. Sanitize destination filename (no path separators or ..)
+    3. Validate destination directory is within allowed_root
+    4. Validate final destination is within allowed_root
+    5. Check for existing files to prevent overwrites
     """
     if not src.exists() or not src.is_file():
         raise FileNotFoundError("Source file missing")
 
     # SECURITY: Validate dst_name doesn't contain path traversal sequences
-    # Check before any path operations
     if ".." in dst_name or "/" in dst_name or "\\" in dst_name:
         raise ValueError("Invalid filename: contains path separators or traversal sequences")
+
+    # SECURITY: Validate dst_dir is within allowed_root
+    if not validate_path_within_root(dst_dir, allowed_root):
+        raise ValueError("Destination directory outside allowed root")
 
     # Ensure destination directory exists
     dst_dir.mkdir(parents=True, exist_ok=True)
@@ -89,24 +137,11 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     # Construct destination path
     dst = dst_dir / dst_name
 
-    # Resolve and validate destination is within allowed_root
-    try:
-        # lgtm[py/path-injection]
-        # SECURITY REVIEW: dst_name validated for path separators/traversal (line 85)
-        # Then dst_resolved is checked with is_relative_to() on line 96
-        dst_resolved = dst.resolve(strict=False)
-        allowed_root_resolved = allowed_root.resolve(strict=False)
-        
-        # SECURITY: Ensure resolved path is within allowed_root
-        # This prevents path traversal attacks (e.g., ../../etc/passwd)
-        if not dst_resolved.is_relative_to(allowed_root_resolved):
-            raise ValueError("Path traversal detected: destination outside allowed directory")
-    except ValueError:
-        raise  # Re-raise our security check
-    except Exception as e:
-        raise ValueError(f"Invalid destination path: {e}")
+    # SECURITY: Validate final destination is within allowed_root
+    if not validate_path_within_root(dst, allowed_root):
+        raise ValueError("Path traversal detected: destination outside allowed directory")
 
-    final_dst = dst_resolved
+    final_dst = dst.resolve(strict=False)
 
     # If final_dst exists and is not the same as src, fail to avoid overwrite
     if final_dst.exists():
@@ -124,38 +159,19 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     # Attempt atomic move; fallback to shutil.move if necessary
     try:
         try:
-            # lgtm[py/path-injection]
-            # SECURITY REVIEW: final_dst was validated with is_relative_to() on line 96
             os.replace(str(src), str(final_dst))
         except OSError:
-            # lgtm[py/path-injection]
-            # SECURITY REVIEW: final_dst was validated with is_relative_to() on line 96
             shutil.move(str(src), str(final_dst))
     except Exception as e:
         raise IOError(f"Failed to move file: {e}")
 
     # Optionally set safe permissions
     try:
-        # lgtm[py/path-injection]
-        # SECURITY REVIEW: final_dst was validated with is_relative_to() on line 96
         final_dst.chmod(0o640)
     except Exception:
         pass
 
     return final_dst
-
-def sanitize_header_value(value: str) -> str:
-    """
-    SECURITY: Sanitize values used in HTTP headers to prevent response splitting.
-    Removes CR, LF, and other control characters that could be used for header injection.
-    """
-    if not value:
-        return ""
-    # Remove \r, \n, and other control characters
-    sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(value))
-    # Also handle Unicode characters that could fold into newlines
-    sanitized = sanitized.replace('\u0085', '').replace('\u2028', '').replace('\u2029', '')
-    return sanitized
 
 # ---------- Utility functions ----------
 def sanitize_filename(text, max_length=50):
@@ -329,34 +345,48 @@ def build_multi_item_filename(receipt, ext):
 
 
 def get_storage_directory(item):
+    """
+    SECURITY: Build storage directory path using sanitized components.
+    Returns a Path within STORAGE_DIR based on project or brand.
+    """
+    # Sanitize to prevent path traversal
     if item.get("project") and item.get("project") != "N/A":
-        # lgtm[py/path-injection]
-        # SECURITY REVIEW: project value sanitized by sanitize_filename() which removes path separators
-        return STORAGE_DIR / sanitize_filename(item.get("project"), 50)
-    # lgtm[py/path-injection]
-    # SECURITY REVIEW: brand value sanitized by sanitize_filename() which removes path separators
-    return STORAGE_DIR / sanitize_filename(item.get("brand", "N/A"), 50)
+        safe_project = sanitize_filename(item.get("project"), 50)
+        result = STORAGE_DIR / safe_project
+    else:
+        safe_brand = sanitize_filename(item.get("brand", "N/A"), 50)
+        result = STORAGE_DIR / safe_brand
+    
+    # SECURITY: Validate result is within STORAGE_DIR
+    if not validate_path_within_root(result, STORAGE_DIR):
+        # Fallback to safe default
+        return STORAGE_DIR / "default"
+    
+    return result
 
 def verify_file_integrity(data):
+    """
+    SECURITY: Read-only integrity check of file existence.
+    Paths were validated when originally saved via safe_move_file().
+    """
     issues = []
     for item in data.get("items", []):
         rel = item.get("receipt_relative_path")
         if rel:
             full = Path(rel)
             if not full.is_absolute():
-                # lgtm[py/path-injection]
-                # SECURITY REVIEW: This is a read-only integrity check, not user-controlled path access
-                # Path was validated when originally saved via safe_move_file()
                 full = DATA_ROOT / rel
-            if not full.exists():
-                issues.append(
-                    {
-                        "id": item["id"],
-                        "type": "item",
-                        "receipt_group_id": item["receipt_group_id"],
-                        "path": rel,
-                    }
-                )
+            # Validate path before checking existence
+            if validate_path_within_root(full, DATA_ROOT):
+                if not full.exists():
+                    issues.append(
+                        {
+                            "id": item["id"],
+                            "type": "item",
+                            "receipt_group_id": item["receipt_group_id"],
+                            "path": rel,
+                        }
+                    )
     return issues
 
 def integrity_worker():
@@ -408,7 +438,8 @@ def _today_ymmmdd():
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
     """
-    Safely set CORS headers based on ALLOWED_ORIGINS and allow Electron (Origin: null).
+    SECURITY: Safely set CORS headers with sanitized origin values.
+    Prevents header injection via malicious Origin headers.
     """
     origin = handler.headers.get("Origin")
 
@@ -418,12 +449,12 @@ def set_cors_headers(handler):
         handler.send_header("Vary", "Origin")
         return
 
-    # SECURITY: Sanitize origin before using in header to prevent response splitting
-    origin = sanitize_header_value(origin)
+    # SECURITY: Sanitize origin to prevent response splitting
+    origin_sanitized = sanitize_header_value(origin)
 
     # Allow known browser origins
-    if origin in ALLOWED_ORIGINS:
-        handler.send_header("Access-Control-Allow-Origin", origin)
+    if origin_sanitized in ALLOWED_ORIGINS:
+        handler.send_header("Access-Control-Allow-Origin", origin_sanitized)
         handler.send_header("Vary", "Origin")
 
 
@@ -435,8 +466,8 @@ class Handler(BaseHTTPRequestHandler):
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
         # SECURITY: Sanitize content_type to prevent header injection
-        content_type = sanitize_header_value(content_type)
-        self.send_header("Content-Type", content_type)
+        content_type_safe = sanitize_header_value(content_type)
+        self.send_header("Content-Type", content_type_safe)
         csp = (
             "default-src 'self'; "
             "script-src 'self'; "
@@ -484,7 +515,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(html)
             return
 
-        # Serve static files safely
+        # SECURITY: Serve static files with path validation
         if path.startswith("/static/"):
             rel = path[len("/static/"):]
             candidate = safe_resolve_within(STATIC_DIR, rel)
@@ -493,7 +524,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b"File not found")
                 return
 
-            # Whitelist extensions (optional)
+            # Whitelist extensions
             ALLOWED_STATIC_EXT = {".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp"}
             suffix = candidate.suffix.lower()
             if suffix not in ALLOWED_STATIC_EXT:
@@ -504,16 +535,15 @@ class Handler(BaseHTTPRequestHandler):
                 ctype = ctype or "application/octet-stream"
 
             # SECURITY: Sanitize content type before using in header
-            ctype = sanitize_header_value(ctype)
+            ctype_safe = sanitize_header_value(ctype)
 
             # Stream file to avoid large memory usage
             self.send_response(200)
-            self.send_header("Content-Type", f"{ctype}; charset=utf-8")
+            self.send_header("Content-Type", f"{ctype_safe}; charset=utf-8")
             set_cors_headers(self)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            # lgtm[py/path-injection]
-            # SECURITY REVIEW: candidate validated by safe_resolve_within() which uses is_relative_to()
+            # SECURITY: candidate validated by safe_resolve_within()
             with candidate.open("rb") as f:
                 while True:
                     chunk = f.read(64 * 1024)
@@ -598,11 +628,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b"Missing 'path' parameter")
                 return
             try:
+                # SECURITY: Validate path using safe_resolve_within
                 target = safe_resolve_within(DATA_ROOT, rel)
                 if not target or not target.exists() or not target.is_file():
                     self._set_headers(404, "text/plain")
                     self.wfile.write(b"File not found")
                     return
+                
                 suffix = target.suffix.lower()
                 file_content_types = {
                     ".pdf": "application/pdf",
@@ -614,21 +646,23 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 ctype = file_content_types.get(suffix, "application/octet-stream")
                 
-                # SECURITY: Sanitize filename and content type for headers
-                # Apply double sanitization: filename constraints + header injection prevention
-                safe_filename = sanitize_header_value(sanitize_full_filename(target.name, 100))
-                ctype = sanitize_header_value(ctype)
+                # SECURITY: Double sanitization for Content-Disposition
+                # 1. Sanitize filename (remove path separators, limit length)
+                safe_filename = sanitize_full_filename(target.name, 100)
+                # 2. Sanitize for header injection (remove CR/LF)
+                safe_filename = sanitize_header_value(safe_filename)
+                # 3. Sanitize content type
+                ctype_safe = sanitize_header_value(ctype)
                 
                 self.send_response(200)
-                self.send_header("Content-Type", ctype)
-                # Use explicit concatenation instead of f-string to make sanitization flow clearer to CodeQL
-                disposition_value = 'inline; filename="' + safe_filename + '"'
-                self.send_header("Content-Disposition", disposition_value)
+                self.send_header("Content-Type", ctype_safe)
+                # Use safe string concatenation (not f-string) to be explicit about sanitization
+                disposition = 'inline; filename="' + safe_filename + '"'
+                self.send_header("Content-Disposition", disposition)
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
-                # lgtm[py/path-injection]
-                # SECURITY REVIEW: target validated by safe_resolve_within() which uses is_relative_to()
+                # SECURITY: target validated by safe_resolve_within()
                 with target.open("rb") as f:
                     while True:
                         chunk = f.read(64 * 1024)
@@ -663,24 +697,27 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"success":false,"error":"No file field found"}')
                 return
 
-            # Save uploaded file
+            # SECURITY: Sanitize uploaded filename and build safe path
             ext = Path(filename).suffix.lower() or ".bin"
             safe_base = sanitize_filename(Path(filename).stem, max_length=80)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             upload_dir = RECEIPTS_DIR / "uploads"
             upload_dir.mkdir(parents=True, exist_ok=True)
             saved_name = f"{ts}_{safe_base}{ext}"
-            # lgtm[py/path-injection]
-            # SECURITY REVIEW: saved_name constructed from timestamp + sanitized filename (no path separators)
-            # upload_dir is a trusted constant (RECEIPTS_DIR/uploads)
             saved_path = upload_dir / saved_name
+            
+            # SECURITY: Validate path before writing
+            if not validate_path_within_root(saved_path, RECEIPTS_DIR):
+                self._set_headers(400)
+                self.wfile.write(b'{"success":false,"error":"Invalid upload path"}')
+                return
+            
             saved_path.write_bytes(file_bytes)
 
             # path relative to DATA_ROOT
             try:
                 rel_path = str(saved_path.relative_to(DATA_ROOT))
             except Exception:
-                # If saved_path is not under DATA_ROOT, compute a safe relative path under DATA_ROOT
                 rel_path = str(saved_path)
 
             # Run OCR extraction (best-effort)
@@ -795,9 +832,13 @@ class Handler(BaseHTTPRequestHandler):
                 items_in_group = [i for i in data["items"] if i["receipt_group_id"] == item["receipt_group_id"]]
                 is_multi = len(items_in_group) > 1
                 old_rel_path = item.get("receipt_relative_path")
-                # lgtm[py/path-injection]
-                # SECURITY REVIEW: old_rel_path was validated when saved via safe_move_file()
-                old_path = (DATA_ROOT / old_rel_path) if old_rel_path else None
+                # SECURITY: Build old_path and validate
+                old_path = None
+                if old_rel_path:
+                    old_path = DATA_ROOT / old_rel_path
+                    if not validate_path_within_root(old_path, DATA_ROOT):
+                        old_path = None
+                
                 needs_move = False
 
                 def u(field, dest):
@@ -842,59 +883,11 @@ class Handler(BaseHTTPRequestHandler):
                     ext = old_path.suffix
                     new_name = build_single_item_filename(item, receipt, ext)
                     new_dir = get_storage_directory(item)
-                    # lgtm[py/path-injection]
-                    # SECURITY REVIEW: new_dir constructed by get_storage_directory() which uses sanitized filenames
                     new_dir.mkdir(parents=True, exist_ok=True)
-                    # lgtm[py/path-injection]
-                    # SECURITY REVIEW: new_name from build_single_item_filename() which uses sanitize_full_filename()
-                    new_path = new_dir / new_name
 
-                    # Normalize and validate target path to prevent path traversal
+                    # SECURITY: Use safe_move_file helper which validates paths
                     try:
-                        resolved_new_dir = new_dir.resolve()
-                        resolved_new_path = new_path.resolve()
-                    except Exception:
-                        self._set_headers(400)
-                        msg = {"success": False, "error": "Invalid target path"}
-                        self.wfile.write(json.dumps(msg).encode("utf-8"))
-                        return
-
-                    # Ensure the new path is within DATA_ROOT (complete containment check)
-                    ALLOWED_STORAGE_ROOT = DATA_ROOT.resolve()
-                    try:
-                        if not resolved_new_path.is_relative_to(ALLOWED_STORAGE_ROOT):
-                            self._set_headers(400)
-                            msg = {"success": False, "error": "Invalid target path: outside allowed storage"}
-                            self.wfile.write(json.dumps(msg).encode("utf-8"))
-                            return
-    
-                        # Also verify parent directory is correct
-                        if resolved_new_path.parent != resolved_new_dir:
-                            self._set_headers(400)
-                            msg = {"success": False, "error": "Invalid target path: directory mismatch"}
-                            self.wfile.write(json.dumps(msg).encode("utf-8"))
-                            return
-                    except Exception as e:
-                        self._set_headers(500)
-                        msg = {"success": False, "error": f"Path validation failed: {e}"}
-                        self.wfile.write(json.dumps(msg).encode("utf-8"))
-                        return
-
-                    # NOW it's safe to check if file exists
-                    try:
-                        if resolved_new_path.exists() and resolved_new_path != old_path.resolve():
-                            self._set_headers(400)
-                            msg = {"success": False, "error": f"Target file already exists: {new_name}"}
-                            self.wfile.write(json.dumps(msg).encode("utf-8"))
-                            return
-                    except Exception:
-                        self._set_headers(500)
-                        self.wfile.write(json.dumps({"success": False, "error": "Failed to verify target"}).encode("utf-8"))
-                        return
-
-                    # Perform safe move using helper
-                    try:
-                        final_dst = safe_move_file(old_path, new_dir, new_name, ALLOWED_STORAGE_ROOT)
+                        final_dst = safe_move_file(old_path, new_dir, new_name, DATA_ROOT)
                         rel = str(final_dst.relative_to(DATA_ROOT))
                         receipt["receipt_filename"] = new_name
                         receipt["receipt_relative_path"] = rel
@@ -944,10 +937,9 @@ class Handler(BaseHTTPRequestHandler):
                 if len(items_in_group) == 1:
                     rel = item.get("receipt_relative_path")
                     if rel:
-                        # lgtm[py/path-injection]
-                        # SECURITY REVIEW: rel was validated when saved via safe_move_file()
+                        # SECURITY: Validate path before deletion
                         file_path = DATA_ROOT / rel
-                        if file_path.exists():
+                        if validate_path_within_root(file_path, DATA_ROOT) and file_path.exists():
                             try:
                                 file_path.unlink()
                                 try:
