@@ -12,6 +12,7 @@ BUILD_DIR="dist"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 TESSERACT_HOMEBREW="/opt/homebrew/bin/tesseract"
 TESSDATA_HOMEBREW="/opt/homebrew/share/tessdata"
+BUILD_VENV="build_env"
 
 # Check prerequisites
 echo "📋 Checking prerequisites..."
@@ -40,13 +41,32 @@ if [ -d "$BUILD_DIR" ]; then
     rm -rf "$BUILD_DIR"
 fi
 
-# Install py2app if needed
-echo "📦 Checking py2app..."
-python3.12 -m pip install --upgrade py2app 2>&1 | grep -v "already satisfied" || true
+if [ -d "$BUILD_VENV" ]; then
+    echo "🧹 Cleaning previous build environment..."
+    rm -rf "$BUILD_VENV"
+fi
+
+# Create temporary virtual environment for building
+echo "📦 Creating build environment..."
+python3.12 -m venv --without-pip "$BUILD_VENV"
+source "$BUILD_VENV/bin/activate"
+
+# Install pip in the venv
+echo "📦 Installing pip in build environment..."
+curl -sS https://bootstrap.pypa.io/get-pip.py | python
+
+# Install build dependencies
+echo "📦 Installing build dependencies..."
+pip install --upgrade pip setuptools wheel
+pip install py2app
+pip install -r requirements.txt
 
 # Build the app using py2app
 echo "🔨 Building app bundle..."
-python3.12 setup.py py2app
+python setup.py py2app
+
+# Deactivate venv
+deactivate
 
 # Create directories for Tesseract
 echo "📁 Preparing Tesseract directories..."
@@ -98,6 +118,10 @@ hdiutil create -volname "$APP_NAME" \
     -ov -format UDZO \
     "$BUILD_DIR/$APP_NAME.dmg"
 
+# Clean up build environment
+echo "🧹 Cleaning up build environment..."
+rm -rf "$BUILD_VENV"
+
 echo ""
 echo "✅ Build complete!"
 echo "   App bundle: $APP_BUNDLE"
@@ -108,4 +132,3 @@ echo "   Binary: $(file $APP_BUNDLE/Contents/Resources/tesseract/bin/tesseract |
 echo "   Languages: ${LANGUAGES[*]}"
 echo ""
 echo "🧪 To test: open $APP_BUNDLE"
-
