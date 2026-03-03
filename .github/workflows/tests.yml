@@ -1,5 +1,11 @@
 name: Tests
 
+# Explicit permissions for security
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 on:
   push:
     branches: [ main, develop ]
@@ -10,6 +16,9 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     
     strategy:
       matrix:
@@ -60,6 +69,8 @@ jobs:
   docker-test:
     name: Test Docker Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
