@@ -76,69 +76,21 @@ else
     echo "✅ All system dependencies are installed"
 fi
 
-# Find a working Python version for venv
+# Find Python version
 echo ""
-echo "Finding suitable Python version..."
+WORKING_PYTHON="python3"
+PYTHON_VERSION=$($WORKING_PYTHON --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+echo "Using: $WORKING_PYTHON (Python $PYTHON_VERSION)"
 
-WORKING_PYTHON=""
-PYTHON_CANDIDATES=("python3" "python3.13" "python3.12" "python3.11" "python3.10")
+# Check if this is Python 3.14+ (known venv issues)
+MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
 
-for py_cmd in "${PYTHON_CANDIDATES[@]}"; do
-    if command -v "$py_cmd" &> /dev/null; then
-        echo -n "Testing $py_cmd... "
-        
-        # Test if this Python can create a venv
-        TEST_VENV="/tmp/test_venv_$$"
-        if "$py_cmd" -m venv "$TEST_VENV" &> /dev/null; then
-            rm -rf "$TEST_VENV"
-            echo "✅ Works!"
-            WORKING_PYTHON="$py_cmd"
-            break
-        else
-            # Try with --without-pip
-            if "$py_cmd" -m venv --without-pip "$TEST_VENV" &> /dev/null; then
-                rm -rf "$TEST_VENV"
-                echo "✅ Works (needs manual pip)!"
-                WORKING_PYTHON="$py_cmd"
-                NEEDS_MANUAL_PIP=true
-                break
-            else
-                rm -rf "$TEST_VENV" 2>/dev/null
-                echo "❌ Broken"
-            fi
-        fi
-    fi
-done
-
-if [ -z "$WORKING_PYTHON" ]; then
-    echo ""
-    echo "❌ No working Python version found for venv creation."
-    echo ""
-    echo "Homebrew Python 3.14 has known issues with venv."
-    echo ""
-    read -p "Would you like to install Python 3.13 via Homebrew? (y/n): " -n 1 -r
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "📦 Installing Python 3.13..."
-        brew install python@3.13
-        
-        if command -v python3.13 &> /dev/null; then
-            WORKING_PYTHON="python3.13"
-            echo "✅ Python 3.13 installed successfully!"
-        else
-            echo "❌ Installation failed."
-            exit 1
-        fi
-    else
-        echo ""
-        echo "Cannot proceed without a working Python version."
-        exit 1
-    fi
+USE_MANUAL_PIP=false
+if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 14 ]; then
+    echo "⚠️  Python 3.14+ detected - will use manual pip installation"
+    USE_MANUAL_PIP=true
 fi
-
-echo ""
-echo "Using: $WORKING_PYTHON ($($WORKING_PYTHON --version))"
 
 # Check if venv exists and is valid
 echo ""
@@ -159,20 +111,18 @@ fi
 if [ "$VENV_NEEDS_CREATION" = true ]; then
     echo "📦 Creating Python virtual environment..."
     
-    if [ "$NEEDS_MANUAL_PIP" = true ]; then
-        # Create without pip, then install it manually
-        "$WORKING_PYTHON" -m venv --without-pip "$VENV_DIR"
+    if [ "$USE_MANUAL_PIP" = true ]; then
+        # For Python 3.14+, always use manual pip method
+        echo "⚙️  Using manual pip installation method for Python 3.14+..."
         
-        if [ $? -eq 0 ]; then
+        if "$WORKING_PYTHON" -m venv --without-pip "$VENV_DIR" 2>/dev/null; then
             echo "✅ Virtual environment created (without pip)"
             
             # Bootstrap pip manually
             echo "📦 Installing pip..."
             source "$VENV_DIR/bin/activate"
             
-            curl -sS https://bootstrap.pypa.io/get-pip.py | python
-            
-            if [ $? -eq 0 ]; then
+            if curl -sS https://bootstrap.pypa.io/get-pip.py | python; then
                 echo "✅ pip installed successfully"
             else
                 echo "❌ Failed to install pip"
@@ -180,17 +130,38 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
             fi
         else
             echo "❌ Failed to create virtual environment"
+            echo ""
+            echo "Troubleshooting:"
+            echo "1. Try: brew reinstall python@3.14"
+            echo "2. Or install Python 3.13: brew install python@3.13"
+            echo ""
             exit 1
         fi
     else
-        # Normal venv creation
-        "$WORKING_PYTHON" -m venv "$VENV_DIR"
-        
-        if [ $? -eq 0 ]; then
+        # Try normal venv creation first
+        if "$WORKING_PYTHON" -m venv "$VENV_DIR" 2>/dev/null; then
             echo "✅ Virtual environment created"
         else
-            echo "❌ Failed to create virtual environment"
-            exit 1
+            # Fallback to manual pip method
+            echo "⚙️  Standard method failed, using manual pip installation..."
+            
+            if "$WORKING_PYTHON" -m venv --without-pip "$VENV_DIR" 2>/dev/null; then
+                echo "✅ Virtual environment created (without pip)"
+                
+                # Bootstrap pip manually
+                echo "📦 Installing pip..."
+                source "$VENV_DIR/bin/activate"
+                
+                if curl -sS https://bootstrap.pypa.io/get-pip.py | python; then
+                    echo "✅ pip installed successfully"
+                else
+                    echo "❌ Failed to install pip"
+                    exit 1
+                fi
+            else
+                echo "❌ Failed to create virtual environment"
+                exit 1
+            fi
         fi
     fi
 else
