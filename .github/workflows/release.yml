@@ -1,0 +1,121 @@
+name: Build and Release macOS App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build macOS Application
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew install tesseract tesseract-lang
+
+      - name: Create Python virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          deactivate
+
+      - name: Install Node dependencies
+        working-directory: platforms/macos
+        run: npm ci
+
+      - name: Build macOS app
+        working-directory: platforms/macos
+        run: |
+          # Detect architecture
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+            npm run build
+          else
+            npm run build:x64
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List build artifacts
+        run: |
+          echo "Build artifacts:"
+          ls -lh platforms/macos/dist/
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Receipt-Manager-macOS
+          path: platforms/macos/dist/*.dmg
+          if-no-files-found: error
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: platforms/macos/dist/*.dmg
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        working-directory: platforms/docker
+        run: |
+          docker build -f Dockerfile -t receipts-manager:latest ../..
+
+      - name: Test Docker image
+        run: |
+          docker run -d -p 8765:8765 --name test-container receipts-manager:latest
+          sleep 10
+          curl -f http://localhost:8765 || exit 1
+          docker stop test-container
+
+      - name: Export Docker image
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          docker save receipts-manager:latest | gzip > receipt-manager-docker.tar.gz
+
+      - name: Upload Docker image artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Receipt-Manager-Docker
+          path: receipt-manager-docker.tar.gz
+
+      - name: Add Docker image to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: receipt-manager-docker.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
