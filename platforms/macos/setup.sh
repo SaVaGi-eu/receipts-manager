@@ -76,9 +76,23 @@ else
     echo "✅ All system dependencies are installed"
 fi
 
-# Create virtual environment if it doesn't exist
+# Check if venv exists and is valid
 echo ""
-if [ ! -d "$VENV_DIR" ]; then
+VENV_NEEDS_CREATION=false
+
+if [ -d "$VENV_DIR" ]; then
+    # Check if venv is valid (has activate script and python binary)
+    if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_DIR/bin/python" ]; then
+        echo "⚠️  Existing virtual environment is broken/incomplete"
+        echo "🧹 Removing broken venv..."
+        rm -rf "$VENV_DIR"
+        VENV_NEEDS_CREATION=true
+    fi
+else
+    VENV_NEEDS_CREATION=true
+fi
+
+if [ "$VENV_NEEDS_CREATION" = true ]; then
     echo "📦 Creating Python virtual environment..."
     
     # Try normal venv creation first
@@ -114,11 +128,17 @@ if [ ! -d "$VENV_DIR" ]; then
         fi
     fi
 else
-    echo "✅ Virtual environment exists"
+    echo "✅ Virtual environment exists and is valid"
 fi
 
 # Activate virtual environment
 source "$VENV_DIR/bin/activate"
+
+# Verify activation worked
+if [ -z "$VIRTUAL_ENV" ]; then
+    echo "❌ Failed to activate virtual environment"
+    exit 1
+fi
 
 # Upgrade pip in venv
 echo ""
