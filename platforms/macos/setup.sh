@@ -130,8 +130,8 @@ echo ""
 VENV_NEEDS_CREATION=false
 
 if [ -d "$VENV_DIR" ]; then
-    # Check if venv is valid (has activate script and python binary)
-    if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_PYTHON" ]; then
+    # Check if venv is valid (has activate script, python binary, AND pip)
+    if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -f "$VENV_PYTHON" ] || [ ! -f "$VENV_PIP" ]; then
         echo "⚠️  Existing virtual environment is broken/incomplete"
         echo "🧹 Removing broken venv..."
         rm -rf "$VENV_DIR" 2>/dev/null
@@ -182,9 +182,10 @@ else
     echo "✅ Virtual environment exists and is valid"
 fi
 
-# Verify pip is available
+# Double-check pip is available (should never fail if above logic is correct)
 if [ ! -f "$VENV_PIP" ]; then
-    echo "❌ pip not found in virtual environment"
+    echo "❌ pip not found in virtual environment - this should not happen"
+    echo "Try removing $VENV_DIR and running again"
     exit 1
 fi
 
