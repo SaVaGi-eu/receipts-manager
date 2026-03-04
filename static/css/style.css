@@ -1,5 +1,24 @@
 /* ===== CUSTOM ADDITIONS FOR NEW FEATURES ===== */
 
+/* Fix 1: Red Add Receipt button styling */
+.btn-add-receipt {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f44336;
+  color: white;
+}
+
+.btn-add-receipt:hover {
+  background: #d32f2f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
+}
+
 /* Requirement 3: Yellow warning banner at bottom of modal */
 .warning-banner {
   background: #fff3cd;
@@ -52,13 +71,6 @@
 /* Requirement 4: Existing receipt section */
 .existing-receipt-section {
   margin-bottom: 2rem;
-}
-
-.existing-receipt-section label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: var(--text-secondary);
 }
 
 .existing-receipt-select {

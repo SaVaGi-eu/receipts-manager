@@ -63,8 +63,8 @@
       </div>
 
       <div class="toolbar-right">
-        <!-- Requirement 1: Add New Receipt button -->
-        <button id="addReceiptBtn" class="btn-primary" data-i18n="addReceipt">➕ Add New Receipt</button>
+        <!-- Fix 1: Red button with nice icon -->
+        <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
         <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
         <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
         <button id="exportJsonBtn" class="btn-secondary" data-i18n="exportJson">⬇ JSON</button>
@@ -122,7 +122,7 @@
               <td colspan="13">
                 <div class="empty-message">
                   <span class="empty-icon">📦</span>
-                  <p data-i18n="noItems">No items yet. Click "Add New Receipt" to get started!</p>
+                  <p data-i18n="noItems">No items yet. Click "Add Receipt" to get started!</p>
                 </div>
               </td>
             </tr>
@@ -146,15 +146,14 @@
   <div id="ocrModal" class="modal">
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <!-- Requirement 3: Dynamic modal title -->
         <h2 id="modalTitle" data-i18n="verifyReceipt">📄 Verify Receipt Data</h2>
         <button id="closeModal" class="modal-close">&times;</button>
       </div>
 
       <div class="modal-body">
-        <!-- ===== TOP SECTION: Upload OR Select Existing (Requirements 2 & 4) ===== -->
+        <!-- ===== TOP SECTION: Upload OR Select Existing ===== -->
         <div class="upload-select-section">
-          <!-- Requirement 2: Drag & drop moved to modal -->
+          <!-- Drag & drop in modal -->
           <div id="modalDropZone" class="drop-zone drop-zone-modal">
             <div class="drop-zone-content">
               <span class="drop-icon">📁</span>
@@ -167,16 +166,13 @@
           </div>
           <input type="file" id="modalFileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
 
-          <!-- Requirement 4: OR separator -->
+          <!-- Fix 2: Removed 'Text' from OR -->
           <div class="or-separator">
-            <span data-i18n="orText">OR</span>
+            <span data-i18n="or">OR</span>
           </div>
 
-          <!-- Requirement 4: Select existing receipt dropdown -->
+          <!-- Fix 3: Removed label completely -->
           <div class="existing-receipt-section">
-            <label for="existingReceiptSelect">
-              <span data-i18n="selectExistingReceipt">Select an existing receipt to add another item:</span>
-            </label>
             <select id="existingReceiptSelect" class="existing-receipt-select">
               <option value="" data-i18n="selectReceiptOption">-- Choose existing receipt --</option>
             </select>
@@ -233,7 +229,7 @@
             </div>
           </div>
 
-          <!-- Requirement 6: Multi-user tag input -->
+          <!-- Multi-user tag input -->
           <div class="form-group full-width">
             <label data-i18n="labelUsers">Users</label>
             <div id="userTagsContainer" class="tag-input-container">
@@ -245,7 +241,7 @@
                      placeholder="Type name and press Enter..." 
                      list="userList">
             </div>
-            <small class="form-hint" data-i18n="usersHint">Press Enter or Comma to add. Click × to remove.</small>
+            <!-- Fix 4: Removed hint -->
           </div>
 
           <div id="modalItemsPreview" class="items-preview">
@@ -253,9 +249,9 @@
             <ul id="modalItemsList"></ul>
           </div>
 
-          <!-- ===== BOTTOM SECTION: Warning Banner (Requirement 3) ===== -->
-          <div class="warning-banner" data-i18n="verifyInfo">
-            ⚠️ Please verify the extracted information and make corrections if needed.
+          <!-- Fix 5: Added ⚠️ emoji -->
+          <div class="warning-banner">
+            ⚠️ <span data-i18n="verifyInfo">Please verify the extracted information and make corrections if needed.</span>
           </div>
 
           <div class="modal-footer">
