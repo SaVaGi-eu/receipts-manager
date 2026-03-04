@@ -38,20 +38,8 @@
 
   <main class="app-main">
 
-    <!-- ===== Upload Zone ===== -->
-    <section class="upload-section">
-      <div id="dropZone" class="drop-zone">
-        <div class="drop-zone-content">
-          <span class="drop-icon">📁</span>
-          <p>
-            <span data-i18n="dragDrop">Drag & Drop receipt file here or</span><br>
-            <a href="#" class="browse-link" data-i18n="clickBrowse">click to browse</a>
-          </p>
-          <p class="drop-hint" data-i18n="supported">Supported: PDF, JPG, PNG (max 50MB)</p>
-        </div>
-      </div>
-      <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
-    </section>
+    <!-- ===== REMOVED: Upload section from main page (Requirement 2) ===== -->
+    <!-- Now handled in modal -->
 
     <!-- ===== Toolbar ===== -->
     <section class="toolbar">
@@ -75,6 +63,8 @@
       </div>
 
       <div class="toolbar-right">
+        <!-- Requirement 1: Add New Receipt button -->
+        <button id="addReceiptBtn" class="btn-primary" data-i18n="addReceipt">➕ Add New Receipt</button>
         <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
         <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
         <button id="exportJsonBtn" class="btn-secondary" data-i18n="exportJson">⬇ JSON</button>
@@ -132,7 +122,7 @@
               <td colspan="13">
                 <div class="empty-message">
                   <span class="empty-icon">📦</span>
-                  <p data-i18n="noItems">No items yet. Upload a receipt to get started!</p>
+                  <p data-i18n="noItems">No items yet. Click "Add New Receipt" to get started!</p>
                 </div>
               </td>
             </tr>
@@ -152,22 +142,52 @@
   <datalist id="projectList"></datalist>
   <datalist id="userList"></datalist>
 
-  <!-- ===== OCR Verification Modal ===== -->
+  <!-- ===== OCR Verification Modal (REDESIGNED) ===== -->
   <div id="ocrModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content modal-wide">
       <div class="modal-header">
-        <h2 data-i18n="verifyReceipt">📄 Verify Receipt Data</h2>
+        <!-- Requirement 3: Dynamic modal title -->
+        <h2 id="modalTitle" data-i18n="verifyReceipt">📄 Verify Receipt Data</h2>
         <button id="closeModal" class="modal-close">&times;</button>
       </div>
 
       <div class="modal-body">
-        <p class="info-banner" data-i18n="verifyInfo">
-          Please verify the extracted information and make corrections if needed.
-        </p>
+        <!-- ===== TOP SECTION: Upload OR Select Existing (Requirements 2 & 4) ===== -->
+        <div class="upload-select-section">
+          <!-- Requirement 2: Drag & drop moved to modal -->
+          <div id="modalDropZone" class="drop-zone drop-zone-modal">
+            <div class="drop-zone-content">
+              <span class="drop-icon">📁</span>
+              <p>
+                <span data-i18n="dragDrop">Drag & Drop receipt file here or</span><br>
+                <a href="#" class="browse-link" data-i18n="clickBrowse">click to browse</a>
+              </p>
+              <p class="drop-hint" data-i18n="supported">Supported: PDF, JPG, PNG (max 50MB)</p>
+            </div>
+          </div>
+          <input type="file" id="modalFileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
 
+          <!-- Requirement 4: OR separator -->
+          <div class="or-separator">
+            <span data-i18n="orText">OR</span>
+          </div>
+
+          <!-- Requirement 4: Select existing receipt dropdown -->
+          <div class="existing-receipt-section">
+            <label for="existingReceiptSelect">
+              <span data-i18n="selectExistingReceipt">Select an existing receipt to add another item:</span>
+            </label>
+            <select id="existingReceiptSelect" class="existing-receipt-select">
+              <option value="" data-i18n="selectReceiptOption">-- Choose existing receipt --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ===== MIDDLE SECTION: Form Fields ===== -->
         <form id="ocrForm">
           <input type="hidden" id="modalItemId">
           <input type="hidden" id="modalReceiptGroupId">
+          <input type="hidden" id="modalMode"><!-- new|edit|existing -->
 
           <div class="form-row">
             <div class="form-group">
@@ -182,45 +202,60 @@
 
           <div class="form-row">
             <div class="form-group">
+              <label for="modalDocumentation" data-i18n="labelDocumentation">Documentation</label>
+              <input type="text" id="modalDocumentation" list="docList">
+            </div>
+            <div class="form-group">
               <label for="modalWarranty"><span data-i18n="labelWarranty">Warranty (months)</span></label>
               <input type="number" id="modalWarranty" min="0" step="1" data-i18n-placeholder="warrantyPlaceholder" placeholder="24">
             </div>
+          </div>
+
+          <div class="form-row">
             <div class="form-group">
               <label for="modalBrand" data-i18n="labelBrand">Brand</label>
               <input type="text" id="modalBrand" list="brandList">
             </div>
-          </div>
-
-          <div class="form-row">
             <div class="form-group">
               <label for="modalModel" data-i18n="labelModel">Model</label>
               <input type="text" id="modalModel" list="modelList">
             </div>
-            <div class="form-group">
-              <label for="modalLocation" data-i18n="labelLocation">Location</label>
-              <input type="text" id="modalLocation" list="locationList">
-            </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
+              <label for="modalLocation" data-i18n="labelLocation">Location</label>
+              <input type="text" id="modalLocation" list="locationList">
+            </div>
+            <div class="form-group">
               <label for="modalProject" data-i18n="labelProject">Project</label>
               <input type="text" id="modalProject" list="projectList">
             </div>
-            <div class="form-group">
-              <label for="modalDocumentation" data-i18n="labelDocumentation">Documentation</label>
-              <input type="text" id="modalDocumentation" list="docList">
-            </div>
           </div>
 
+          <!-- Requirement 6: Multi-user tag input -->
           <div class="form-group full-width">
-            <label for="modalUsers" data-i18n="labelUsers">Users (comma-separated)</label>
-            <input type="text" id="modalUsers" data-i18n-placeholder="usersPlaceholder" placeholder="John, Jane, Bob">
+            <label data-i18n="labelUsers">Users</label>
+            <div id="userTagsContainer" class="tag-input-container">
+              <div id="userTags" class="user-tags">
+                <!-- Tags will be added here dynamically -->
+              </div>
+              <input type="text" id="userTagInput" class="tag-input" 
+                     data-i18n-placeholder="usersPlaceholder" 
+                     placeholder="Type name and press Enter..." 
+                     list="userList">
+            </div>
+            <small class="form-hint" data-i18n="usersHint">Press Enter or Comma to add. Click × to remove.</small>
           </div>
 
           <div id="modalItemsPreview" class="items-preview">
             <h4 data-i18n="detectedItems">📦 Detected Items (preview)</h4>
             <ul id="modalItemsList"></ul>
+          </div>
+
+          <!-- ===== BOTTOM SECTION: Warning Banner (Requirement 3) ===== -->
+          <div class="warning-banner" data-i18n="verifyInfo">
+            ⚠️ Please verify the extracted information and make corrections if needed.
           </div>
 
           <div class="modal-footer">
@@ -231,6 +266,7 @@
       </div>
     </div>
   </div>
+
 <script src="/static/translations.js"></script>
 <script src="/static/app.js"></script>
 </body>
