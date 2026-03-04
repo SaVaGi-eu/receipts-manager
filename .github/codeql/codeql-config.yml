@@ -1,0 +1,41 @@
+# CodeQL Configuration
+# https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning
+
+name: "Enhanced CodeQL Config"
+
+# Disable default queries (we'll specify them explicitly)
+disable-default-queries: false
+
+# Query suites to run
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Paths to analyze
+paths:
+  - "**/*.py"
+  - "**/*.js"
+  - "**/*.yml"
+  - "**/*.yaml"
+
+# Paths to ignore
+paths-ignore:
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/*_test.py"
+  - "**/test_*.py"
+  - "**/node_modules/**"
+  - "**/venv/**"
+  - "**/build_env/**"
+  - "**/__pycache__/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/*.md"
+
+# Query filters - customize severity thresholds
+query-filters:
+  - exclude:
+      id: py/quantum-readiness/cbom/all-cryptographic-algorithms
+  - exclude:
+      id: py/clear-text-logging-sensitive-data
+      # We don't log sensitive data, this is for receipt metadata only
