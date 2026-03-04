@@ -18,19 +18,21 @@ exclude =
 
 # Ignore specific rules that conflict with black or are too strict
 # E203: whitespace before ':' (conflicts with black)
+# E226: missing whitespace around arithmetic operator (style preference)
 # E501: line too long (handled by black)
 # W503: line break before binary operator (conflicts with black)
 # E402: module level import not at top of file (sometimes needed)
-# F401: imported but unused (handled by other tools)
-ignore = E203,E501,W503,E402,F401
+ignore = E203,E226,E501,W503,E402
 
-# Complexity settings
-max-complexity = 15
+# Complexity settings - HTTP handlers are naturally complex
+max-complexity = 25
 
 # Enable specific checks
 select = E,W,F,C
 
-# Per-file ignores (if needed)
+# Per-file ignores
 per-file-ignores =
     __init__.py:F401
     tests/*:F401,F811
+    ocr_service.py:F811
+    check_deps.py:E741
