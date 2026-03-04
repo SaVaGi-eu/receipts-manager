@@ -6,20 +6,39 @@ Supports both images (JPG, PNG) and PDF files
 """
 
 import logging
+import os
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
+
+import pytesseract
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import os
-import sys
-from pathlib import Path
 
-import pytesseract
+def sanitize_for_logging(text: str, max_length: int = 200) -> str:
+    """
+    SECURITY: Sanitize user input before logging to prevent log injection.
+    Removes newlines, carriage returns, and other control characters that could
+    be used to forge log entries or inject malicious content into logs.
+
+    Args:
+        text: User-controlled text to sanitize
+        max_length: Maximum length to truncate to
+
+    Returns:
+        Sanitized text safe for logging
+    """
+    if not text:
+        return ""
+    # Remove control characters including CR, LF, and other escape sequences
+    sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(text))
+    # Truncate to prevent log flooding
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+    return sanitized
 
 
 def get_tesseract_config():
@@ -27,6 +46,8 @@ def get_tesseract_config():
     Detect if running from .app bundle and configure Tesseract paths accordingly.
     Returns tuple: (tesseract_cmd, tessdata_dir)
     """
+    import sys
+
     if getattr(sys, "frozen", False):
         # Running in .app bundle (py2app)
         if hasattr(sys, "_MEIPASS"):
@@ -105,14 +126,15 @@ class OCRService:
         except ImportError:
             raise ImportError("EasyOCR not installed. Install with: pip3 install easyocr")
         except Exception as e:
-            logger.error(f"Failed to initialize EasyOCR: {e}")
+            # SECURITY: Sanitize exception message before logging
+            safe_msg = sanitize_for_logging(str(e))
+            logger.error(f"Failed to initialize EasyOCR: {safe_msg}")
             raise
 
     def _init_tesseract(self):
         """Initialize Tesseract OCR."""
         try:
-            import pytesseract
-            from PIL import Image
+            from PIL import Image  # noqa: F401
 
             # Test if Tesseract is installed
             pytesseract.get_tesseract_version()
@@ -147,13 +169,18 @@ class OCRService:
             )
 
         try:
+            # SECURITY: Sanitize path before logging to prevent log injection
+            safe_path = sanitize_for_logging(pdf_path)
+            logger.info(f"Converting PDF to images: {safe_path}")
+
             # Convert PDF to images (one per page)
-            logger.info(f"Converting PDF to images: {pdf_path}")
             images = convert_from_path(pdf_path, dpi=300)
             logger.info(f"Converted {len(images)} page(s) from PDF")
             return images
         except Exception as e:
-            logger.error(f"Failed to convert PDF: {e}")
+            # SECURITY: Sanitize exception message before logging
+            safe_msg = sanitize_for_logging(str(e))
+            logger.error(f"Failed to convert PDF: {safe_msg}")
             raise
 
     def _extract_text_from_pil_image(self, pil_image) -> str:
@@ -183,7 +210,9 @@ class OCRService:
         """
         # Handle PDF files
         if self._is_pdf(image_path):
-            logger.info(f"Processing PDF file: {image_path}")
+            # SECURITY: Sanitize path before logging to prevent log injection
+            safe_path = sanitize_for_logging(image_path)
+            logger.info(f"Processing PDF file: {safe_path}")
             images = self._pdf_to_images(image_path)
 
             # Extract text from all pages
@@ -231,7 +260,10 @@ class OCRService:
         """
         # Extract raw text
         text = self.extract_text(image_path)
-        logger.info(f"Extracted text:\n{text}")
+
+        # SECURITY: Don't log full raw text as it may contain sensitive data
+        # Only log length for debugging
+        logger.info(f"Extracted {len(text)} characters from receipt")
 
         # Parse the text
         parsed_data = self._parse_receipt_text(text)
@@ -408,20 +440,6 @@ def create_ocr_service(engine: str = "easyocr", languages: List[str] = None) -> 
         Initialized OCRService instance
     """
     return OCRService(engine=engine, languages=languages)
-
-
-def extract_receipt_data(image_path: str, engine: str = "easyocr", languages: List[str] = None) -> Dict[str, any]:
-    """
-    Convenience function to extract receipt data from image or PDF.
-
-    Args:
-        image_path: Path to receipt image or PDF
-        engine: OCR engine to use
-        languages: List of language codes
-
-    Returns:
-        Dictionary with extracted receipt data
-    """
 
 
 def extract_receipt_data(image_path: str, engine: str = "easyocr", languages: List[str] = None) -> Dict[str, any]:
