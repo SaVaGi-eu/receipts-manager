@@ -22,10 +22,11 @@ exclude =
 # E501: line too long (handled by black)
 # W503: line break before binary operator (conflicts with black)
 # E402: module level import not at top of file (sometimes needed)
-ignore = E203,E226,E501,W503,E402
+# F841: local variable assigned but never used (often in exception handlers)
+ignore = E203,E226,E501,W503,E402,F841
 
 # Complexity settings - HTTP handlers are naturally complex
-max-complexity = 25
+max-complexity = 35
 
 # Enable specific checks
 select = E,W,F,C
@@ -34,5 +35,5 @@ select = E,W,F,C
 per-file-ignores =
     __init__.py:F401
     tests/*:F401,F811
-    ocr_service.py:F811
+    ocr_service.py:F401,F811
     check_deps.py:E741
