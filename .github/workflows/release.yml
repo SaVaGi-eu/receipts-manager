@@ -76,7 +76,7 @@ jobs:
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: platforms/macos/dist/*.dmg
           draft: false
@@ -125,7 +125,7 @@ jobs:
 
       - name: Add Docker image to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: receipt-manager-docker.tar.gz
         env:
