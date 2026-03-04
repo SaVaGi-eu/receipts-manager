@@ -84,7 +84,7 @@ check_tesseract() {
 # Build macOS App
 build_macos_app() {
     echo -e "\n${BLUE}═══ Building macOS Application ═══${NC}\n"
-    
+
     # Check prerequisites
     echo "Checking prerequisites..."
     check_nodejs || {
@@ -92,13 +92,13 @@ build_macos_app() {
         echo "Install with: brew install node"
         exit 1
     }
-    
+
     check_python || {
         echo -e "\n${RED}Python 3 is required.${NC}"
         echo "Install with: brew install python@3.12"
         exit 1
     }
-    
+
     check_tesseract || {
         echo -e "\n${YELLOW}Tesseract is recommended for OCR.${NC}"
         echo "Install with: brew install tesseract tesseract-lang"
@@ -108,7 +108,7 @@ build_macos_app() {
             exit 1
         fi
     }
-    
+
     # Detect architecture
     if [[ "$ARCH" == "arm64" ]]; then
         BUILD_TARGET="--mac --arm64"
@@ -117,16 +117,16 @@ build_macos_app() {
         BUILD_TARGET="--mac --x64"
         echo -e "${GREEN}Building for Intel Mac${NC}"
     fi
-    
+
     # Navigate to macOS build directory
     cd platforms/macos
-    
+
     # Install Node dependencies if needed
     if [ ! -d "node_modules" ]; then
         echo "Installing Node.js dependencies..."
         npm install
     fi
-    
+
     # Create venv in root if it doesn't exist
     cd ../..
     if [ ! -d "venv" ]; then
@@ -137,14 +137,14 @@ build_macos_app() {
         pip install -r requirements.txt
         deactivate
     fi
-    
+
     # Build the app
     cd platforms/macos
     echo "Building Electron app..."
     npm run build
-    
+
     cd ../..
-    
+
     if [ -d "platforms/macos/dist" ]; then
         echo -e "\n${GREEN}✓ Build successful!${NC}"
         echo -e "\n${BLUE}Application location:${NC}"
@@ -162,16 +162,16 @@ build_macos_app() {
 # Build Docker Container
 build_docker() {
     echo -e "\n${BLUE}═══ Building Docker Container ═══${NC}\n"
-    
+
     check_docker || {
         echo -e "\n${RED}Docker is required.${NC}"
         echo "Install from: https://www.docker.com/products/docker-desktop"
         exit 1
     }
-    
+
     echo "Building Docker image..."
     docker-compose build
-    
+
     echo -e "\n${GREEN}✓ Docker image built!${NC}"
     echo -e "\n${YELLOW}To start the container:${NC}"
     echo "  docker-compose up -d"
@@ -179,7 +179,7 @@ build_docker() {
     echo "  docker-compose down"
     echo -e "\n${YELLOW}Access the app at:${NC}"
     echo "  http://localhost:8765"
-    
+
     read -p "Start the container now? (Y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
@@ -192,7 +192,7 @@ build_docker() {
 # Run Application Directly
 run_direct() {
     echo -e "\n${BLUE}═══ Running Application ═══${NC}\n"
-    
+
     check_python || {
         echo -e "\n${RED}Python 3 is required.${NC}"
         case "$OS" in
@@ -205,7 +205,7 @@ run_direct() {
         esac
         exit 1
     }
-    
+
     check_tesseract || {
         echo -e "\n${YELLOW}Tesseract is recommended for OCR.${NC}"
         case "$OS" in
@@ -217,7 +217,7 @@ run_direct() {
                 ;;
         esac
     }
-    
+
     # Create venv if it doesn't exist
     if [ ! -d "venv" ]; then
         echo "Creating Python virtual environment..."
@@ -229,12 +229,12 @@ run_direct() {
     else
         source venv/bin/activate
     fi
-    
+
     echo -e "\n${GREEN}Starting Receipt Manager...${NC}"
     echo "Access the app at: http://127.0.0.1:8765"
     echo "Press Ctrl+C to stop"
     echo ""
-    
+
     python3 app.py
 }
 
@@ -242,7 +242,7 @@ run_direct() {
 show_menu() {
     echo "What would you like to do?"
     echo ""
-    
+
     if [[ "$OS" == "Darwin" ]]; then
         echo "  1) Build macOS Application (.app + .dmg)"
         echo "  2) Build Docker Container"
@@ -250,7 +250,7 @@ show_menu() {
         echo "  4) Exit"
         echo ""
         read -p "Enter your choice [1-4]: " choice
-        
+
         case $choice in
             1)
                 build_macos_app
@@ -276,7 +276,7 @@ show_menu() {
         echo "  3) Exit"
         echo ""
         read -p "Enter your choice [1-3]: " choice
-        
+
         case $choice in
             1)
                 build_docker

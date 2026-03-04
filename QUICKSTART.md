@@ -2,7 +2,8 @@
 
 ## Installation (First Time Only)
 
-### Mac Users:
+### Mac Users
+
 1. Extract the `receipt_manager` folder to your desired location
 2. Navigate to the folder in Finder
 3. **Double-click** `run.command`
@@ -10,23 +11,30 @@
    - Right-click `run.command` → Open
    - Click "Open" in the dialog
 5. Wait for setup to complete (1-2 minutes first time)
-6. Browser will open automatically, or visit: http://127.0.0.1:5000
+6. Browser will open automatically, or visit: <http://127.0.0.1:5000>
 
-### Linux Users:
+### Linux Users
+
 1. Extract the `receipt_manager` folder
 2. Open Terminal and navigate to the folder:
+
    ```bash
    cd /path/to/receipt_manager
    ```
+
 3. Make script executable (if needed):
+
    ```bash
    chmod +x run.sh
    ```
+
 4. Run the application:
+
    ```bash
    ./run.sh
    ```
-5. Open browser to: http://127.0.0.1:5000
+
+5. Open browser to: <http://127.0.0.1:5000>
 
 ## Basic Usage
 
@@ -59,6 +67,7 @@ Done! Your item is now tracked with warranty expiration date automatically calcu
 **Filter by Project**: Select from the Projects dropdown
 
 **Filter by Status**:
+
 - Active: Warranties still valid
 - Expiring Soon: Within 90 days
 - Expired: Past warranty date

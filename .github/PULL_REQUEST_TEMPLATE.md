@@ -1,9 +1,11 @@
 ## Description
+
 Please include a summary of the changes and which issue is fixed. Include relevant motivation and context.
 
 Fixes # (issue)
 
 ## Type of Change
+
 Please delete options that are not relevant.
 
 - [ ] Bug fix (non-breaking change which fixes an issue)
@@ -15,16 +17,19 @@ Please delete options that are not relevant.
 - [ ] Test additions/updates
 
 ## How Has This Been Tested?
+
 Please describe the tests that you ran to verify your changes.
 
 - [ ] Test A
 - [ ] Test B
 
 **Test Configuration**:
+
 - OS: [e.g., macOS 14.0]
 - Python version: [e.g., 3.11.5]
 
 ## Checklist
+
 - [ ] My code follows the style guidelines of this project
 - [ ] I have performed a self-review of my code
 - [ ] I have commented my code, particularly in hard-to-understand areas
@@ -35,7 +40,9 @@ Please describe the tests that you ran to verify your changes.
 - [ ] Any dependent changes have been merged and published
 
 ## Screenshots (if applicable)
+
 If your changes include UI modifications, please add screenshots.
 
 ## Additional Notes
+
 Add any additional notes for reviewers here.

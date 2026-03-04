@@ -24,11 +24,11 @@ if ! command -v brew &> /dev/null; then
     echo ""
     read -p "Would you like to install Homebrew now? (y/n): " -n 1 -r
     echo ""
-    
+
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "📦 Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        
+
         # Check if installation succeeded
         if ! command -v brew &> /dev/null; then
             echo ""
@@ -37,7 +37,7 @@ if ! command -v brew &> /dev/null; then
             echo ""
             exit 1
         fi
-        
+
         echo "✅ Homebrew installed successfully!"
         echo ""
     else
@@ -68,7 +68,7 @@ if [ ${#MISSING_BREW_DEPS[@]} -gt 0 ]; then
     echo ""
     read -p "Would you like to install them via Homebrew? (y/n): " -n 1 -r
     echo ""
-    
+
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "📦 Installing system dependencies..."
         brew install "${MISSING_BREW_DEPS[@]}"
@@ -91,7 +91,7 @@ if command -v python3.13 &> /dev/null; then
 elif command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
     echo "Using: python3 (Python $PYTHON_VERSION)"
-    
+
     # Warn about Python 3.14
     MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
     MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
@@ -110,7 +110,7 @@ echo "Checking for virtualenv..."
 if ! $WORKING_PYTHON -m pip show virtualenv &> /dev/null; then
     echo "📦 virtualenv not found, installing..."
     echo ""
-    
+
     if $WORKING_PYTHON -m pip install --break-system-packages virtualenv 2>/dev/null; then
         echo "✅ virtualenv installed"
     else
@@ -153,18 +153,18 @@ fi
 
 if [ "$VENV_NEEDS_CREATION" = true ]; then
     echo "📦 Creating Python virtual environment..."
-    
+
     # Try to create venv
     VENV_ERROR=$(mktemp)
     if $WORKING_PYTHON -m virtualenv --no-seed "$VENV_DIR" 2>"$VENV_ERROR" >/dev/null; then
         rm -f "$VENV_ERROR"
-        
+
         if [ -f "$VENV_PYTHON" ]; then
             echo "✅ Virtual environment created"
-            
+
             # Manually install pip
             echo "📦 Installing pip..."
-            
+
             if curl -sS https://bootstrap.pypa.io/get-pip.py | "$VENV_PYTHON" > /dev/null 2>&1; then
                 if [ -f "$VENV_PIP" ] && "$VENV_PIP" --version > /dev/null 2>&1; then
                     echo "✅ pip installed successfully"
@@ -188,25 +188,25 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
         cat "$VENV_ERROR"
         rm -f "$VENV_ERROR"
         echo ""
-        
+
         # If using Python 3.14, offer to install 3.13
         if [[ "$WORKING_PYTHON" == "python3" ]]; then
             PYTHON_VERSION=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
             MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
             MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
-            
+
             if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 14 ]; then
                 echo "Python 3.14 is too new and has broken venv support."
                 echo ""
-                
+
                 if ! command -v python3.13 &> /dev/null; then
                     read -p "Would you like to install Python 3.13 (stable)? (y/n): " -n 1 -r
                     echo ""
-                    
+
                     if [[ $REPLY =~ ^[Yy]$ ]]; then
                         echo "📦 Installing Python 3.13..."
                         brew install python@3.13
-                        
+
                         if command -v python3.13 &> /dev/null; then
                             echo "✅ Python 3.13 installed"
                             echo ""
@@ -220,7 +220,7 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
                 fi
             fi
         fi
-        
+
         exit 1
     fi
 else
@@ -241,15 +241,15 @@ NEED_INSTALL=false
 while IFS= read -r line; do
     [[ "$line" =~ ^#.*$ ]] && continue
     [[ -z "$line" ]] && continue
-    
+
     package=$(echo "$line" | sed 's/[><=].*//')
     import_name="$package"
-    
+
     case "$package" in
         "opencv-python") import_name="cv2" ;;
         "Pillow") import_name="PIL" ;;
     esac
-    
+
     if ! "$VENV_PYTHON" -c "import $import_name" 2>/dev/null; then
         NEED_INSTALL=true
         break
@@ -261,9 +261,9 @@ if [ "$NEED_INSTALL" = true ]; then
     echo "📦 Installing Python dependencies..."
     echo "This may take several minutes (especially torch/torchvision)..."
     echo ""
-    
+
     "$VENV_PIP" install -r "$REQUIREMENTS"
-    
+
     if [ $? -ne 0 ]; then
         echo ""
         echo "⚠️  Warning: Some Python packages failed to install."

@@ -5,6 +5,7 @@ This directory contains platform-specific setup scripts to handle OS differences
 ## How It Works
 
 The main `run.sh` launcher:
+
 1. Detects the operating system (macOS, Linux, Windows, etc.)
 2. Delegates to the appropriate platform-specific setup script
 3. Falls back to generic setup for unsupported platforms
@@ -17,6 +18,7 @@ The main `run.sh` launcher:
 **Problem:** Homebrew Python is "externally managed" (PEP 668), preventing direct pip installations.
 
 **Solution:**
+
 - Checks for Homebrew (offers to install if missing)
 - Installs system dependencies via Homebrew (e.g., `poppler` for PDF support)
 - Creates a Python virtual environment (`venv/`)
@@ -24,10 +26,12 @@ The main `run.sh` launcher:
 - Runs the app using `venv/bin/python`
 
 **Files:**
+
 - `setup.sh` - Interactive setup script
 - `requirements.txt` - Python dependencies for venv
 
 **Usage:**
+
 ```bash
 ./run.sh  # Automatically detects macOS and runs setup
 ```
@@ -35,6 +39,7 @@ The main `run.sh` launcher:
 ### Linux (`platforms/linux/`) - *Coming Soon*
 
 Linux setup will handle:
+
 - Package manager detection (apt, dnf, pacman, etc.)
 - System dependency installation
 - Python package installation via pip
@@ -42,6 +47,7 @@ Linux setup will handle:
 ### Windows (`platforms/windows/`) - *Coming Soon*
 
 Windows setup will handle:
+
 - Chocolatey or winget for system dependencies
 - Python package installation via pip
 - Path configuration
@@ -58,6 +64,7 @@ To add support for a new platform:
 ### Setup Script Requirements
 
 Your setup script should:
+
 - ✅ Check for required system dependencies
 - ✅ Prompt user before installing anything
 - ✅ Create/manage Python environment if needed
@@ -68,6 +75,7 @@ Your setup script should:
 ## Generic Fallback
 
 For unsupported platforms, `run.sh` falls back to:
+
 - Generic dependency check via pip
 - Attempt `pip install --user` for missing packages
 - Run with system Python

@@ -351,7 +351,7 @@ Is this a multi-item receipt? (quantity > 1)
     │          Directory: _Receipts/
     │
     └─── NO → Single-item filename:
-               Parts: [Brand, Model, PurchaseDate, Shop, Location, 
+               Parts: [Brand, Model, PurchaseDate, Shop, Location,
                       Users (first 3), Documentation]
                Example: Apple-iPhone15-2026Feb15-Coolblue-Home-John-Jane-Invoice.pdf
 

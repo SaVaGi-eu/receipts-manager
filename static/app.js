@@ -363,14 +363,14 @@
         const resp = await fetchJson(API.updateItem(itemId), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            shop, 
-            purchase_date: formattedDate, 
-            brand, 
-            model, 
-            location, 
-            project, 
-            documentation, 
+          body: JSON.stringify({
+            shop,
+            purchase_date: formattedDate,
+            brand,
+            model,
+            location,
+            project,
+            documentation,
             users,
             guarantee_duration: warranty,
             guarantee_unit: 'months'

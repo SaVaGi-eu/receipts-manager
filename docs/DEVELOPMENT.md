@@ -16,12 +16,14 @@ Comprehensive guide for developers working on Receipt Manager.
 ## Prerequisites
 
 ### Required
+
 - Python 3.8 or higher
 - Git
 - Node.js 16+ (for macOS builds)
 - Tesseract OCR 4.0+
 
 ### Recommended
+
 - Docker (for testing containers)
 - VS Code or PyCharm
 - macOS (for building macOS app)
@@ -29,11 +31,13 @@ Comprehensive guide for developers working on Receipt Manager.
 ### Installation
 
 **macOS:**
+
 ```bash
 brew install python@3.12 node tesseract tesseract-lang git
 ```
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt-get install python3 python3-venv python3-pip nodejs npm tesseract-ocr git
 ```
@@ -80,7 +84,7 @@ STORAGE_DIR=./storage_dev
 python app.py
 ```
 
-Access at: http://127.0.0.1:8765
+Access at: <http://127.0.0.1:8765>
 
 ## Development Workflow
 
@@ -122,8 +126,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types:**
+
 - `feat`: New feature
-- `fix`: Bug fix  
+- `fix`: Bug fix
 - `docs`: Documentation
 - `style`: Formatting
 - `refactor`: Code restructuring
@@ -131,6 +136,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore`: Maintenance
 
 **Examples:**
+
 ```
 feat(ocr): Add Greek language support
 
@@ -146,11 +152,13 @@ chore(deps): Update Flask to 3.0.0
 ### Python
 
 **Formatting:**
+
 - Line length: 120 characters
 - Use Black for formatting
 - Use isort for import sorting
 
 **Example:**
+
 ```python
 from typing import Dict, List, Optional
 
@@ -163,11 +171,11 @@ from ocr_service import perform_ocr
 
 def process_receipt(image_path: str, language: str = "eng") -> Dict[str, str]:
     """Process receipt image with OCR.
-    
+
     Args:
         image_path: Path to image file
         language: OCR language code
-        
+
     Returns:
         Dict containing extracted text and metadata
     """
@@ -177,6 +185,7 @@ def process_receipt(image_path: str, language: str = "eng") -> Dict[str, str]:
 ```
 
 **Run formatters:**
+
 ```bash
 black .
 isort .
@@ -198,7 +207,7 @@ function createWindow() {
       contextIsolation: true
     }
   });
-  
+
   mainWindow.loadURL('http://localhost:8765');
 }
 ```
@@ -230,6 +239,7 @@ pytest -s
 ### Writing Tests
 
 **Test file structure:**
+
 ```python
 # tests/test_my_module.py
 import pytest
@@ -425,12 +435,14 @@ def my_route():
 ### Adding a New OCR Language
 
 1. Install Tesseract language pack:
+
    ```bash
    brew install tesseract-lang  # macOS
    sudo apt-get install tesseract-ocr-deu  # Linux (German example)
    ```
 
 2. Update `.env.example`:
+
    ```bash
    OCR_LANGUAGE=eng+nld+ell+lav+deu
    ```

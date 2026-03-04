@@ -9,7 +9,7 @@ cd platforms/docker
 docker-compose up -d
 ```
 
-Access at: http://localhost:8765
+Access at: <http://localhost:8765>
 
 ## Building from Source
 
@@ -53,6 +53,7 @@ environment:
 ### Volumes
 
 **Data persistence:**
+
 - `receipt-data`: Database and backups
 - `receipt-storage`: Uploaded receipt files
 

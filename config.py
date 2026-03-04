@@ -27,6 +27,7 @@ SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 
 # ── Path resolution ─────────────────────────────────────────────────────────────
 
+
 def get_data_root() -> Path:
     """
     Returns the root data directory as a Path object.
@@ -100,15 +101,8 @@ def save_data_path(chosen_path: str) -> bool:
     """
     try:
         SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-        settings = {
-            "data_directory": str(chosen_path),
-            "app_name": APP_NAME,
-            "version": 1
-        }
-        SETTINGS_FILE.write_text(
-            json.dumps(settings, indent=2, ensure_ascii=False),
-            encoding="utf-8"
-        )
+        settings = {"data_directory": str(chosen_path), "app_name": APP_NAME, "version": 1}
+        SETTINGS_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
         return True
     except Exception as e:
         print(f"[Config] ERROR: could not save settings: {e}", file=sys.stderr)
@@ -117,12 +111,12 @@ def save_data_path(chosen_path: str) -> bool:
 
 # ── Resolved paths (imported by app.py) ────────────────────────────────────────
 
-DATA_ROOT    = get_data_root()
+DATA_ROOT = get_data_root()
 DATABASE_DIR = DATA_ROOT / "database"
-STORAGE_DIR  = DATA_ROOT / "storage"
+STORAGE_DIR = DATA_ROOT / "storage"
 RECEIPTS_DIR = STORAGE_DIR / "_Receipts"
-BACKUP_DIR   = DATABASE_DIR / "backups"
-DATA_FILE    = DATABASE_DIR / "data.json"
+BACKUP_DIR = DATABASE_DIR / "backups"
+DATA_FILE = DATABASE_DIR / "data.json"
 
 # Create all required directories
 for _d in (DATA_ROOT, DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR):

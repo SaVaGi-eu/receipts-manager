@@ -71,25 +71,30 @@ receipt_manager/
 ## File Purposes
 
 ### Core Application
+
 - **app.py**: Flask backend - handles uploads, data storage, file operations, integrity checks
 - **requirements.txt**: Flask==3.0.0, Werkzeug==3.0.1
 - **data/data.json**: Main database with receipts[], items[], next_id
 
 ### Launchers
+
 - **run.command**: Mac executable - creates venv, installs deps, runs app
 - **run.sh**: Linux executable - same as above for Linux
 
 ### UI Components
+
 - **templates/index.html**: Main page structure and dialogs
 - **static/css/style.css**: Green theme, dark/light modes, responsive design
 - **static/js/app.js**: All frontend logic and interactivity
 
 ### Documentation
+
 - **README.md**: Complete 500+ line documentation
 - **QUICKSTART.md**: Simplified getting started guide
 - **.gitignore**: Version control exclusions
 
 ### Data Storage
+
 - **data/**: JSON database and backups
 - **_Receipts/**: Multi-item receipts (quantity > 1)
 - **ProjectName/**: Single-item receipts organized by project
@@ -98,6 +103,7 @@ receipt_manager/
 ## Key Features in Code
 
 ### app.py Highlights
+
 - `sanitize_filename()`: Cleans text for safe filenames
 - `calculate_guarantee_end_date()`: Smart date calculation (handles months/years correctly)
 - `build_single_item_filename()`: Creates organized filenames
@@ -107,6 +113,7 @@ receipt_manager/
 - Rolling backup system (keeps last 20)
 
 ### app.js Highlights
+
 - Drag & drop file upload with visual feedback
 - Real-time search and multi-level filtering
 - Sortable table columns with visual indicators
@@ -118,6 +125,7 @@ receipt_manager/
 - Autocomplete suggestions from previous entries
 
 ### style.css Highlights
+
 - CSS custom properties for easy theming
 - System theme detection (@media prefers-color-scheme)
 - Fresh green color palette (--accent-green, --accent-light)
@@ -130,6 +138,7 @@ receipt_manager/
 ## Data Flow
 
 ### Upload Flow
+
 ```
 User drops file
     ↓
@@ -163,6 +172,7 @@ Return success + receipt_group_id
 ```
 
 ### Edit Flow
+
 ```
 User clicks Edit button
     ↓
@@ -190,6 +200,7 @@ Return success
 ```
 
 ### Integrity Check Flow
+
 ```
 Startup / Every 30s / Manual trigger
     ↓
@@ -217,6 +228,7 @@ Disable edit on missing items
 ## Installation Process
 
 ### First Run
+
 ```
 User double-clicks run.command/run.sh
     ↓
@@ -244,6 +256,7 @@ User opens browser
 ## Technical Specifications
 
 ### Backend
+
 - **Language**: Python 3.8+
 - **Framework**: Flask 3.0.0
 - **Storage**: JSON file (no SQL database)
@@ -251,17 +264,20 @@ User opens browser
 - **File handling**: pathlib + shutil
 
 ### Frontend
+
 - **HTML5**: Semantic markup, dialogs, drag & drop API
 - **CSS3**: Custom properties, flexbox, grid, media queries
 - **JavaScript**: ES6+, Fetch API, async/await
 - **No frameworks**: Vanilla JS for simplicity
 
 ### Data Format
+
 - **JSON**: Human-readable, easy to backup/restore
 - **UTF-8**: Full unicode support
 - **Indented**: 2-space formatting for readability
 
 ### File Naming
+
 - **Sanitization**: Removes invalid characters
 - **Max length**: 200 chars (filesystem safe)
 - **Truncation**: With user warning
@@ -270,17 +286,20 @@ User opens browser
 ## Security Considerations
 
 ### Local-Only
+
 - Binds to 127.0.0.1 (localhost)
 - Not accessible from network
 - No external requests (after install)
 
 ### Data Protection
+
 - Rolling backups (last 20 saves)
 - Atomic file operations
 - Integrity verification
 - No data sent to external servers
 
 ### Input Validation
+
 - File type checking (PDF, JPG, PNG)
 - File size limit (50MB)
 - Date format validation
@@ -290,12 +309,14 @@ User opens browser
 ## Performance
 
 ### Tested Capacity
+
 - **Items**: 10,000+ items tested
 - **Files**: Limited by disk space
 - **Search**: Fast up to 50,000 items
 - **Startup**: <2 seconds (after first install)
 
 ### Optimization
+
 - Background integrity checks (non-blocking)
 - Efficient filtering/sorting algorithms
 - Minimal DOM manipulation
@@ -323,6 +344,6 @@ User opens browser
 
 ---
 
-**Total Code**: ~2,500 lines  
-**Technologies**: Python, Flask, HTML, CSS, JavaScript  
+**Total Code**: ~2,500 lines
+**Technologies**: Python, Flask, HTML, CSS, JavaScript
 **License**: Free for personal use

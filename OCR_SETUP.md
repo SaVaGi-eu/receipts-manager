@@ -19,6 +19,7 @@ Complete guide for setting up and using the OCR (Optical Character Recognition) 
 ## 🎯 What Does OCR Do?
 
 The OCR feature automatically reads text from receipt images and extracts:
+
 - **Shop/Merchant name**
 - **Purchase date**
 - **Total amount**
@@ -52,16 +53,19 @@ You have two OCR engine choices:
 ### Option 1: EasyOCR (Recommended)
 
 **Advantages:**
+
 - More accurate text recognition
 - Supports 80+ languages out of the box
 - No additional system installations needed
 - Works well with multilingual receipts (English, Dutch, Greek, etc.)
 
 **Disadvantages:**
+
 - Larger download (~500MB for models on first run)
 - Slightly slower on first use
 
 **Installation:**
+
 ```bash
 pip install easyocr pillow numpy
 ```
@@ -69,11 +73,13 @@ pip install easyocr pillow numpy
 ### Option 2: Tesseract OCR
 
 **Advantages:**
+
 - Lightweight and fast
 - Industry standard
 - Lower memory usage
 
 **Disadvantages:**
+
 - Requires system installation
 - May be less accurate on some receipts
 - Needs language packs installed separately
@@ -81,12 +87,14 @@ pip install easyocr pillow numpy
 **Installation:**
 
 **macOS:**
+
 ```bash
 brew install tesseract
 pip install pytesseract pillow
 ```
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt-get update
 sudo apt-get install tesseract-ocr
@@ -94,10 +102,12 @@ pip install pytesseract pillow
 ```
 
 **Windows:**
-1. Download installer from: https://github.com/UB-Mannheim/tesseract/wiki
+
+1. Download installer from: <https://github.com/UB-Mannheim/tesseract/wiki>
 2. Install Tesseract
 3. Add to PATH or note installation directory
 4. Install Python package:
+
 ```bash
 pip install pytesseract pillow
 ```
@@ -107,11 +117,13 @@ pip install pytesseract pillow
 For multilingual support with Tesseract:
 
 **macOS:**
+
 ```bash
 brew install tesseract-lang
 ```
 
 **Ubuntu/Debian:**
+
 ```bash
 # Dutch
 sudo apt-get install tesseract-ocr-nld
@@ -143,12 +155,14 @@ sudo apt-get install tesseract-ocr-deu
 ### 1. Install Dependencies
 
 **For EasyOCR (recommended):**
+
 ```bash
 cd receipts-manager
 pip install -r requirements.txt
 ```
 
 **For Tesseract:**
+
 ```bash
 # Install Tesseract system package first (see above)
 pip install pytesseract pillow
@@ -167,6 +181,7 @@ python ocr_service.py path/to/receipt.jpg tesseract
 ```
 
 Example output:
+
 ```
 Processing receipt with easyocr...
 ------------------------------------------------------------
@@ -229,7 +244,7 @@ def test_ocr(image_path, engine='easyocr'):
     print(f"Testing OCR with {engine}")
     print(f"Image: {image_path}")
     print(f"{'='*60}\n")
-    
+
     try:
         # Extract data
         data = extract_receipt_data(
@@ -237,25 +252,25 @@ def test_ocr(image_path, engine='easyocr'):
             engine=engine,
             languages=['en', 'nl', 'el', 'lv']  # Your languages
         )
-        
+
         # Display results
         print("✅ OCR Successful!\n")
-        
+
         print(f"Shop:          {data.get('shop', 'N/A')}")
         print(f"Date:          {data.get('purchase_date', 'N/A')}")
-        
+
         if data.get('total_amount'):
             print(f"Total:         €{data['total_amount']:.2f}")
         else:
             print(f"Total:         N/A")
-        
+
         print(f"\nItems found:   {len(data.get('items', []))}")
         for i, item in enumerate(data.get('items', [])[:5], 1):
             print(f"  {i}. {item['name']:<30} €{item['price']}")
-        
+
         if len(data.get('items', [])) > 5:
             print(f"  ... and {len(data['items']) - 5} more items")
-        
+
         print(f"\n{'-'*60}")
         print("Raw text (first 500 chars):")
         print(f"{'-'*60}")
@@ -263,13 +278,13 @@ def test_ocr(image_path, engine='easyocr'):
         print(raw[:500])
         if len(raw) > 500:
             print("...\n[truncated]")
-        
+
         print(f"\n{'='*60}")
         print("✅ Test PASSED")
         print(f"{'='*60}\n")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"\n❌ Test FAILED")
         print(f"Error: {e}")
@@ -282,15 +297,16 @@ if __name__ == "__main__":
         print("Usage: python test_ocr.py <image_path> [engine]")
         print("  engine: easyocr (default) or tesseract")
         sys.exit(1)
-    
+
     image = sys.argv[1]
     engine = sys.argv[2] if len(sys.argv) > 2 else "easyocr"
-    
+
     success = test_ocr(image, engine)
     sys.exit(0 if success else 1)
 ```
 
 Run the test:
+
 ```bash
 python test_ocr.py receipt.jpg
 ```
@@ -298,22 +314,27 @@ python test_ocr.py receipt.jpg
 ### Test Cases
 
 #### Test Case 1: Perfect Receipt
+
 - **Input:** Clear, well-lit photo of printed receipt
 - **Expected:** All fields extracted correctly
 
 #### Test Case 2: Poor Quality
+
 - **Input:** Blurry or dark photo
 - **Expected:** Some fields may be "N/A", manual editing required
 
 #### Test Case 3: Faded Thermal Receipt
+
 - **Input:** Old thermal receipt with faded text
 - **Expected:** May fail to extract text
 
 #### Test Case 4: Multilingual Receipt
+
 - **Input:** Receipt with mixed languages (Dutch + English)
 - **Expected:** Both languages recognized with proper configuration
 
 #### Test Case 5: Handwritten Receipt
+
 - **Input:** Handwritten receipt or notes
 - **Expected:** Lower accuracy, likely needs manual correction
 
@@ -350,6 +371,7 @@ echo "===================================="
 ```
 
 Make executable and run:
+
 ```bash
 chmod +x test_all_receipts.sh
 ./test_all_receipts.sh
@@ -366,25 +388,25 @@ from ocr_service import extract_receipt_data
 
 def benchmark(image_path):
     engines = ['easyocr', 'tesseract']
-    
+
     print(f"\nBenchmarking: {image_path}")
     print("=" * 60)
-    
+
     for engine in engines:
         try:
             start = time.time()
             data = extract_receipt_data(image_path, engine=engine)
             elapsed = time.time() - start
-            
+
             print(f"\n{engine.upper()}:")
             print(f"  Time:  {elapsed:.2f}s")
             print(f"  Shop:  {data.get('shop', 'N/A')[:30]}")
             print(f"  Date:  {data.get('purchase_date', 'N/A')}")
             print(f"  Items: {len(data.get('items', []))}")
-            
+
         except Exception as e:
             print(f"\n{engine.upper()}: FAILED - {e}")
-    
+
     print("\n" + "=" * 60)
 
 # Usage
@@ -396,6 +418,7 @@ benchmark('receipt.jpg')
 ## 🎨 Using OCR in the Web Interface
 
 ### Method 1: Drag and Drop
+
 1. Open the Receipt Manager web interface
 2. Drag a receipt image into the upload area
 3. The OCR will automatically process the image
@@ -404,6 +427,7 @@ benchmark('receipt.jpg')
 6. Click "Save Receipt"
 
 ### Method 2: File Upload
+
 1. Click the "Choose File" button
 2. Select your receipt image
 3. OCR processes automatically
@@ -427,6 +451,7 @@ benchmark('receipt.jpg')
 ### Image Quality
 
 ✅ **Good practices:**
+
 - **Good lighting** - Natural daylight or bright indoor lighting
 - **Straight angle** - Hold camera directly above receipt
 - **In focus** - Ensure text is sharp and readable
@@ -437,6 +462,7 @@ benchmark('receipt.jpg')
 ### Receipt Condition
 
 ✅ **What works best:**
+
 - **Clean receipts** - Avoid stains or tears
 - **Printed receipts** - Better than handwritten notes
 - **Dark text on light background** - Most reliable
@@ -467,20 +493,20 @@ def preprocess_receipt(image_path, output_path):
     """Enhance receipt image for better OCR."""
     # Read image
     img = cv2.imread(image_path)
-    
+
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
+
     # Reduce noise
     denoised = cv2.fastNlMeansDenoising(gray)
-    
+
     # Increase contrast
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     enhanced = clahe.apply(denoised)
-    
+
     # Binarize (black and white)
     _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
+
     # Save processed image
     cv2.imwrite(output_path, binary)
     return output_path
@@ -497,21 +523,25 @@ data = extract_receipt_data(processed)
 ### EasyOCR Issues
 
 **"Module not found: easyocr"**
+
 ```bash
 pip install easyocr pillow numpy
 ```
 
 **"Downloading model files..." (first run)**
+
 - This is normal on first use
 - Models are cached for future use (~500MB download)
 - Subsequent runs will be much faster
 
 **"CUDA not available" warning**
+
 - This is normal if you don't have a GPU
 - OCR will use CPU (still works fine, just slower)
 - For GPU support: `pip install torch torchvision`
 
 **Very slow first run**
+
 - EasyOCR downloads language models on first use
 - This only happens once
 - Cached models make future runs fast
@@ -519,42 +549,50 @@ pip install easyocr pillow numpy
 ### Tesseract Issues
 
 **"TesseractNotFoundError"**
+
 - Tesseract is not installed or not in PATH
 - Install using instructions above
 - On Windows, you may need to set the path:
+
   ```python
   import pytesseract
   pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
   ```
 
 **"Failed to load language"**
+
 - Language pack not installed
 - Install using instructions above for your OS
 
 ### Poor OCR Accuracy
 
 **If extracted text is gibberish:**
+
 1. Check image quality (see tips above)
 2. Try the other OCR engine (EasyOCR vs Tesseract)
 3. Ensure correct language codes are configured
 4. Preprocess the image (see preprocessing section)
 
 **If shop name is wrong:**
+
 - OCR picks the first substantial text line
 - Manually edit the field after extraction
 - Shop name will be remembered for future receipts
 
 **If date is wrong:**
+
 - Multiple date formats are supported
 - If OCR fails, it defaults to today's date
 - Manually correct and save
 
 **If items are missing:**
+
 - OCR looks for price patterns (numbers with 2 decimals)
 - Some receipts have unusual formatting
 - Add items manually if needed
 
 **If total amount is wrong:**
+
 - OCR looks for the largest amount or "total" keyword
 - Verify the amount manually
 - Some receipts list subtotals that may confuse the parser
@@ -566,6 +604,7 @@ pip install easyocr pillow numpy
 ### EasyOCR Language Codes
 
 Common languages for European receipts:
+
 - `'en'` - English
 - `'nl'` - Dutch (Nederlands)
 - `'el'` - Greek (Ελληνικά)
@@ -577,15 +616,17 @@ Common languages for European receipts:
 - `'pt'` - Portuguese (Português)
 
 **Multilingual family setup (English, Dutch, Greek, Latvian):**
+
 ```python
 ocr_service = OCRService(engine="easyocr", languages=['en', 'nl', 'el', 'lv'])
 ```
 
-Full list: https://www.jaided.ai/easyocr/
+Full list: <https://www.jaided.ai/easyocr/>
 
 ### Tesseract Language Codes
 
 Use 3-letter ISO codes:
+
 - `'eng'` - English
 - `'nld'` - Dutch
 - `'ell'` - Greek
@@ -653,7 +694,7 @@ from ocr_service import extract_receipt_data
 
 # Extract data
 data = extract_receipt_data(
-    'receipt.jpg', 
+    'receipt.jpg',
     engine='easyocr',
     languages=['en', 'nl', 'el', 'lv']
 )
@@ -705,7 +746,7 @@ If you encounter issues:
 2. ✅ Test with the command-line tool first (`python ocr_service.py receipt.jpg`)
 3. ✅ Verify your image quality (see tips above)
 4. ✅ Try the other OCR engine
-5. ✅ Check the GitHub issues: https://github.com/SaVaGi-eu/receipts-manager/issues
+5. ✅ Check the GitHub issues: <https://github.com/SaVaGi-eu/receipts-manager/issues>
 6. ✅ Create a new issue with:
    - Your OS (macOS, Linux, Windows)
    - OCR engine used (EasyOCR or Tesseract)

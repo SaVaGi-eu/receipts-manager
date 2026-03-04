@@ -7,23 +7,27 @@
 #### "Python 3 is not installed"
 
 **Mac:**
-1. Download Python from https://www.python.org/downloads/
+
+1. Download Python from <https://www.python.org/downloads/>
 2. Install the .pkg file
 3. Verify: Open Terminal and run `python3 --version`
 4. Should show Python 3.8 or higher
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt update
 sudo apt install python3 python3-venv python3-pip
 ```
 
 **Linux (Fedora):**
+
 ```bash
 sudo dnf install python3 python3-pip
 ```
 
 **Linux (Arch):**
+
 ```bash
 sudo pacman -S python python-pip
 ```
@@ -31,6 +35,7 @@ sudo pacman -S python python-pip
 #### "Permission denied" when running scripts
 
 **Mac/Linux:**
+
 ```bash
 cd receipt_manager
 chmod +x run.command run.sh
@@ -44,6 +49,7 @@ Port 5000 is being used by another application.
 
 **Solution 1 - Stop the other app:**
 Find what's using port 5000:
+
 ```bash
 # Mac/Linux
 lsof -i :5000
@@ -53,18 +59,23 @@ kill -9 <PID>
 
 **Solution 2 - Change port:**
 Edit `app.py`, find line 685:
+
 ```python
 app.run(host='127.0.0.1', port=5000, debug=False)
 ```
+
 Change to:
+
 ```python
 app.run(host='127.0.0.1', port=5001, debug=False)
 ```
-Then visit http://127.0.0.1:5001
+
+Then visit <http://127.0.0.1:5001>
 
 #### Virtual environment creation fails
 
 Delete existing venv and retry:
+
 ```bash
 cd receipt_manager
 rm -rf venv
@@ -74,6 +85,7 @@ rm -rf venv
 #### Dependencies won't install
 
 Upgrade pip first:
+
 ```bash
 cd receipt_manager
 source venv/bin/activate  # Mac/Linux
@@ -88,6 +100,7 @@ pip install -r requirements.txt
 #### "Invalid file type"
 
 Only these formats are supported:
+
 - PDF (.pdf)
 - JPEG (.jpg, .jpeg)
 - PNG (.png)
@@ -101,6 +114,7 @@ Maximum file size is 50MB.
 **Solution:** Compress the file or split into multiple pages.
 
 **To change limit:** Edit `app.py` line 19:
+
 ```python
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 ```
@@ -108,6 +122,7 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 #### Upload succeeds but no file appears
 
 Check:
+
 1. File actually saved? Look in `_Receipts/` or brand/project folders
 2. Check terminal for errors
 3. Verify disk space available
@@ -117,6 +132,7 @@ Check:
 You're trying to upload a duplicate.
 
 **Solutions:**
+
 - Use different purchase date
 - Change shop/documentation name
 - Delete the existing item first
@@ -131,11 +147,14 @@ You're trying to upload a duplicate.
 Check if `data/data.json` exists and is not empty.
 
 **Recovery:**
+
 1. Look in `data/backups/` for recent backup
 2. Copy the most recent backup:
+
    ```bash
    cp data/backups/data_backup_YYYYMMDD_HHMMSS.json data/data.json
    ```
+
 3. Restart the app
 
 #### JSON import fails
@@ -143,6 +162,7 @@ Check if `data/data.json` exists and is not empty.
 **Error: "Invalid JSON structure"**
 
 The JSON file must have this structure:
+
 ```json
 {
   "receipts": [...],
@@ -152,6 +172,7 @@ The JSON file must have this structure:
 ```
 
 **Solution:**
+
 - Check the JSON is valid (use jsonlint.com)
 - Ensure it has receipts and items arrays
 - Don't manually edit unless you know the structure
@@ -159,6 +180,7 @@ The JSON file must have this structure:
 #### Data corrupted after crash
 
 Restore from backup:
+
 ```bash
 cd receipt_manager/data
 ls -lt backups/  # List backups, newest first
@@ -179,6 +201,7 @@ Files were moved, renamed, or deleted outside the app.
 Find and move files back to their original paths listed in the banner.
 
 **Option 2 - Delete affected items:**
+
 1. Note the IDs with 🔴 indicators
 2. Delete those items (this removes the references)
 3. Re-upload the receipts if you have them
@@ -189,11 +212,13 @@ Edit `data/data.json` and remove the affected items from the "items" array.
 #### Files exist but still marked as missing
 
 **Possible causes:**
+
 - Wrong path in data.json
 - File permissions issue
 - Case-sensitive filesystem (Mac/Linux)
 
 **Debug:**
+
 1. Open `data/data.json`
 2. Find the item with issues
 3. Check `receipt_relative_path` value
@@ -215,6 +240,7 @@ The file is missing. Red 🔴 indicator should be visible.
 **For multi-item receipts:** Files stay in `_Receipts/` and are not renamed.
 
 **For single-item receipts:** Check terminal for errors. Possible causes:
+
 - Target file already exists
 - Permission issue
 - Disk full
@@ -222,11 +248,13 @@ The file is missing. Red 🔴 indicator should be visible.
 #### Delete removes item but file remains
 
 This shouldn't happen. Check:
+
 1. Terminal for errors
 2. File permissions
 3. Disk errors
 
 **Manual cleanup:**
+
 ```bash
 # Find orphaned files (files not referenced in data.json)
 cd receipt_manager
@@ -240,10 +268,12 @@ cd receipt_manager
 #### Dark mode not activating
 
 Check your system settings:
+
 - **Mac:** System Preferences → General → Appearance
 - **Linux:** Depends on desktop environment (GNOME, KDE, etc.)
 
 **Force dark mode:** Edit `style.css`, add at top:
+
 ```css
 :root {
     color-scheme: dark;
@@ -257,6 +287,7 @@ Click **⚙️ Columns** button and enable the hidden columns.
 #### Table not displaying correctly
 
 Browser compatibility issue. Update your browser:
+
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
@@ -279,6 +310,7 @@ This is intentional to prevent filesystem errors. The warning notifies you.
 Search is case-insensitive but looks for partial matches.
 
 **Check:**
+
 - No typos
 - Search looks in: brand, model, location, project, shop, documentation, users
 - Doesn't search in: ID, receipt group ID, dates
@@ -286,10 +318,12 @@ Search is case-insensitive but looks for partial matches.
 #### Filters showing "0 items"
 
 Either:
+
 - No items match the criteria
 - Filters are too restrictive
 
 **Reset all filters:**
+
 1. Clear search box
 2. Set all dropdowns to "All..."
 3. Click refresh
@@ -303,6 +337,7 @@ Either:
 Expected with 50,000+ items. Performance degrades with very large datasets.
 
 **Solutions:**
+
 - Archive old items (export → delete → import when needed)
 - Split into multiple databases by year/project
 - Use filters to reduce visible items
@@ -314,6 +349,7 @@ First run installs dependencies (1-2 minutes normal).
 Subsequent runs should be fast (<2 seconds).
 
 **If always slow:**
+
 - Check disk speed (HDD vs SSD)
 - Check available RAM
 - Close other applications
@@ -325,14 +361,16 @@ Subsequent runs should be fast (<2 seconds).
 #### "Cannot connect" or "Unable to load"
 
 Check:
-1. App is running (terminal shows "Running on http://127.0.0.1:5000")
-2. Correct URL: http://127.0.0.1:5000 (not localhost, not https)
+
+1. App is running (terminal shows "Running on <http://127.0.0.1:5000>")
+2. Correct URL: <http://127.0.0.1:5000> (not localhost, not https)
 3. No firewall blocking
 4. Port 5000 not blocked
 
 #### Dialogs not appearing
 
 JavaScript error. Check browser console:
+
 1. Press F12
 2. Click "Console" tab
 3. Look for red errors
@@ -341,6 +379,7 @@ JavaScript error. Check browser console:
 #### Buttons not working
 
 Clear browser cache:
+
 - Chrome: Ctrl+Shift+Delete → Clear cached images and files
 - Firefox: Ctrl+Shift+Delete → Cached Web Content
 - Safari: Cmd+Option+E
@@ -356,6 +395,7 @@ System Preferences → Security & Privacy → Firewall → Firewall Options
 → Allow Python to accept incoming connections
 
 **Linux:**
+
 ```bash
 # UFW
 sudo ufw allow 5000/tcp
@@ -371,9 +411,11 @@ By design! This app is localhost-only for security.
 
 **To enable network access (not recommended):**
 Edit `app.py` line 685:
+
 ```python
 app.run(host='0.0.0.0', port=5000, debug=False)
 ```
+
 ⚠️ **Warning:** This exposes the app to your entire network without authentication.
 
 ---
@@ -385,6 +427,7 @@ app.run(host='0.0.0.0', port=5000, debug=False)
 Unfortunately, if both `data.json` and backups are gone, data cannot be recovered.
 
 **Prevention:**
+
 - Regular exports (JSON) to external drive
 - Use Time Machine (Mac) or backup tools
 - Keep receipts in a separate backup location
@@ -392,6 +435,7 @@ Unfortunately, if both `data.json` and backups are gone, data cannot be recovere
 #### Backup files are corrupted
 
 Try older backups. They're timestamped:
+
 ```bash
 ls -lt data/backups/
 ```
@@ -407,6 +451,7 @@ Try each from newest to oldest until you find a working one.
 **Warning:** Only for development, shows detailed errors.
 
 Edit `app.py` line 685:
+
 ```python
 app.run(host='127.0.0.1', port=5000, debug=True)
 ```
@@ -414,6 +459,7 @@ app.run(host='127.0.0.1', port=5000, debug=True)
 ### Check Python Errors
 
 Look at terminal output when issue occurs. Errors show:
+
 - File paths involved
 - Error type (FileNotFoundError, PermissionError, etc.)
 - Line numbers in code
@@ -423,6 +469,7 @@ Look at terminal output when issue occurs. Errors show:
 ```bash
 python3 -m json.tool data/data.json > /dev/null
 ```
+
 If no output = valid JSON. If error = corrupted.
 
 ### Reset to Fresh Install
@@ -454,6 +501,7 @@ If you've tried everything above and still have issues:
 ### Reporting Issues
 
 Include:
+
 - Operating system and version
 - Python version: `python3 --version`
 - Flask version: `pip show Flask`
@@ -466,6 +514,7 @@ Include:
 ## Prevention Tips
 
 ✅ **Do:**
+
 - Use Export JSON regularly for backups
 - Keep receipts in separate backup location
 - Update browser regularly
@@ -473,6 +522,7 @@ Include:
 - Use the app's edit/delete functions
 
 ❌ **Don't:**
+
 - Manually move/rename files in filesystem
 - Edit `data.json` directly (unless you know what you're doing)
 - Delete the backups folder

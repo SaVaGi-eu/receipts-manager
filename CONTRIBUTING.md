@@ -13,18 +13,21 @@ Thank you for your interest in contributing! This document provides guidelines a
 ### Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/SaVaGi-eu/receipts-manager.git
    cd receipts-manager
    ```
 
 2. **Create virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install --upgrade pip
    pip install -r requirements.txt
@@ -32,11 +35,13 @@ Thank you for your interest in contributing! This document provides guidelines a
    ```
 
 4. **Install pre-commit hooks**
+
    ```bash
    pre-commit install
    ```
 
 5. **Verify setup**
+
    ```bash
    pytest
    black --check .
@@ -50,39 +55,49 @@ Thank you for your interest in contributing! This document provides guidelines a
 We use several tools to maintain code quality:
 
 #### Formatting
+
 - **Black**: Code formatter (line length: 120)
+
   ```bash
   black .
   ```
 
 - **isort**: Import sorter
+
   ```bash
   isort .
   ```
 
 #### Linting
+
 - **Flake8**: Style checker
+
   ```bash
   flake8 .
   ```
 
 - **Pylint**: Static analyzer (optional)
+
   ```bash
   pylint app.py
   ```
 
 - **Mypy**: Type checker (optional)
+
   ```bash
   mypy .
   ```
 
 #### Security
+
 - **Bandit**: Security issue scanner
+
   ```bash
   bandit -r . -c pyproject.toml
   ```
 
 - **Safety**: Dependency vulnerability checker
+
   ```bash
   safety check
   ```
@@ -147,6 +162,7 @@ footer (optional)
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation
@@ -156,6 +172,7 @@ footer (optional)
 - `chore`: Maintenance
 
 **Examples:**
+
 ```
 feat(ocr): add support for Dutch language
 fix(api): resolve path traversal vulnerability
@@ -176,10 +193,10 @@ docs(readme): update installation instructions
 def test_feature_name():
     # Arrange
     expected = "value"
-    
+
     # Act
     result = function_under_test()
-    
+
     # Assert
     assert result == expected
 ```
@@ -193,6 +210,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting process.
 ### Security Checklist
 
 Before submitting:
+
 - [ ] No hardcoded secrets
 - [ ] Input validation implemented
 - [ ] File paths validated
@@ -202,6 +220,7 @@ Before submitting:
 ## 📬 Pull Request Process
 
 1. **Create a branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -212,6 +231,7 @@ Before submitting:
    - Follow coding standards
 
 3. **Run checks locally**
+
    ```bash
    pytest
    black --check .
@@ -220,15 +240,18 @@ Before submitting:
    ```
 
 4. **Commit changes**
+
    ```bash
    git add .
    git commit -m "feat: your feature description"
    ```
 
 5. **Push and create PR**
+
    ```bash
    git push origin feature/your-feature-name
    ```
+
    Then create a pull request on GitHub
 
 ### PR Checklist
@@ -267,6 +290,7 @@ Before submitting:
 ## 💬 Questions?
 
 Feel free to:
+
 - Open an issue for discussion
 - Ask in pull request comments
 - Check existing issues and PRs

@@ -18,11 +18,11 @@ We take the security of receipts-manager seriously. If you discover a security v
 
 1. **DO NOT** open a public GitHub issue
 2. Use GitHub's Security Advisories:
-   - Go to: https://github.com/SaVaGi-eu/receipts-manager/security/advisories
+   - Go to: <https://github.com/SaVaGi-eu/receipts-manager/security/advisories>
    - Click "New draft security advisory"
    - Provide detailed information about the vulnerability
 
-3. Alternatively, email: 101175436+v-giannakopoulos@users.noreply.github.com
+3. Alternatively, email: <101175436+v-giannakopoulos@users.noreply.github.com>
    - Subject: "[SECURITY] Receipts Manager Vulnerability"
    - Include: Description, reproduction steps, potential impact
 
@@ -46,6 +46,7 @@ We take the security of receipts-manager seriously. If you discover a security v
 ### 🎁 Recognition
 
 We appreciate security researchers and will:
+
 - Credit you in the security advisory (if desired)
 - Acknowledge your contribution in release notes
 - Keep you informed throughout the fix process
@@ -55,21 +56,25 @@ We appreciate security researchers and will:
 When using receipts-manager:
 
 ### 🔐 Access Control
+
 - Run with least-privilege user accounts
 - Use strong authentication for production deployments
 - Restrict network access appropriately
 
 ### 📁 Data Protection
+
 - Store receipts in encrypted storage when possible
 - Regular backups of receipt data
 - Proper file permissions on data directories
 
 ### 🔄 Updates
+
 - Keep dependencies up-to-date (Dependabot enabled)
 - Monitor security advisories
 - Apply security patches promptly
 
 ### 🐳 Container Security
+
 - Use official Docker images only
 - Scan images for vulnerabilities regularly
 - Don't run containers as root
@@ -95,6 +100,6 @@ This project implements:
 
 ## Contact
 
-For security concerns: 101175436+v-giannakopoulos@users.noreply.github.com
+For security concerns: <101175436+v-giannakopoulos@users.noreply.github.com>
 
-For general issues: https://github.com/SaVaGi-eu/receipts-manager/issues
+For general issues: <https://github.com/SaVaGi-eu/receipts-manager/issues>

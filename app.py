@@ -4,21 +4,22 @@ Receipt & Warranty Manager (standalone, no Flask)
 Integrated with config.py for dynamic path resolution
 """
 import json
-import shutil
+import logging
+import mimetypes
+import os
 import re
+import shutil
 import threading
 import time
-import os
-import logging
 from datetime import datetime, timedelta
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs, unquote
-import mimetypes
+from urllib.parse import parse_qs, unquote, urlparse
+
+from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
 
 # Internal imports (config and OCR)
 from ocr_service import extract_receipt_data
-from config import DATA_ROOT, DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR, DATA_FILE
 
 # Basic configuration
 PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
@@ -27,17 +28,14 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 # Allowed CORS origins
-ALLOWED_ORIGINS = {
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8765"
-}
+ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8765"}
 
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("receipt-manager")
 
 data_lock = threading.Lock()
+
 
 # ---------- Security helpers ----------
 def sanitize_header_value(value: str) -> str:
@@ -48,16 +46,17 @@ def sanitize_header_value(value: str) -> str:
     if not value:
         return ""
     # Remove \r, \n, and other control characters
-    sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(value))
+    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(value))
     # Also handle Unicode characters that could fold into newlines
-    sanitized = sanitized.replace('\u0085', '').replace('\u2028', '').replace('\u2029', '')
+    sanitized = sanitized.replace("\u0085", "").replace("\u2028", "").replace("\u2029", "")
     return sanitized
+
 
 def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
     """
     SECURITY: Resolve a user-supplied relative path against root safely.
     Returns the resolved Path if it is contained within root, otherwise None.
-    
+
     This function validates paths through multiple layers:
     1. Rejects empty paths
     2. Decodes percent-encoding
@@ -67,14 +66,14 @@ def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
     """
     if not rel_path:
         return None
-    
+
     # Decode percent-encoding
     rel = unquote(rel_path)
-    
+
     # SECURITY: Reject absolute paths and path separators
     if rel.startswith("/") or rel.startswith("\\\\") or ".." in rel:
         return None
-    
+
     # SECURITY: Reject paths with .. components by checking parts
     try:
         path_parts = Path(rel).parts
@@ -82,59 +81,61 @@ def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
             return None
     except Exception:
         return None
-    
+
     # SECURITY: Resolve paths with explicit error handling
     try:
         root_resolved = root.resolve(strict=False)
     except Exception:
         return None
-    
+
     try:
         # Construct candidate path
         candidate_path = root / rel
         candidate = candidate_path.resolve(strict=False)
     except Exception:
         return None
-    
+
     # SECURITY: Explicit containment check that CodeQL can track
     try:
         if not candidate.is_relative_to(root_resolved):
             return None
     except Exception:
         return None
-    
+
     return candidate
+
 
 def validate_path_within_root(path: Path, root: Path) -> bool:
     """
     SECURITY: Explicitly validate that a path is within root.
     Returns True if path is safely contained within root, False otherwise.
-    
+
     This is a helper for CodeQL to track path validation through data flow.
     """
     if path is None or root is None:
         return False
-    
+
     try:
         resolved_path = path.resolve(strict=False)
     except Exception:
         return False
-    
+
     try:
         resolved_root = root.resolve(strict=False)
     except Exception:
         return False
-    
+
     try:
         return resolved_path.is_relative_to(resolved_root)
     except Exception:
         return False
 
+
 def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) -> Path:
     """
     SECURITY: Move src -> dst_dir/dst_name safely with comprehensive validation.
     Returns the final destination Path on success, raises exceptions on failure.
-    
+
     Validation steps:
     1. Verify source exists and is a file
     2. Sanitize destination filename (no path separators or ..)
@@ -206,6 +207,7 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
 
     return final_dst
 
+
 # ---------- Utility functions ----------
 def sanitize_filename(text, max_length=50):
     if not text or text == "N/A":
@@ -217,6 +219,7 @@ def sanitize_filename(text, max_length=50):
     if len(text) > max_length:
         text = text[:max_length].rstrip("-")
     return text or "unnamed"
+
 
 def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     """
@@ -233,6 +236,7 @@ def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     if max_length > 0 and len(name) > max_length:
         name = name[:max_length]
     return name or "file"
+
 
 def format_date_for_filename(date_str):
     try:
@@ -281,6 +285,7 @@ def calculate_guarantee_end_date(purchase_date, duration, unit):
     except Exception:
         return "N/A"
 
+
 def load_data():
     if not DATA_FILE.exists():
         return {"receipts": [], "items": [], "next_id": 1}
@@ -293,6 +298,7 @@ def load_data():
     except Exception:
         return {"receipts": [], "items": [], "next_id": 1}
 
+
 def save_data(data):
     try:
         new_content = json.dumps(data, indent=2, ensure_ascii=False)
@@ -302,10 +308,7 @@ def save_data(data):
                 existing.pop("integrity_issues", None)
                 new_cmp = json.loads(new_content)
                 new_cmp.pop("integrity_issues", None)
-                changed = (
-                    json.dumps(new_cmp, sort_keys=True)
-                    != json.dumps(existing, sort_keys=True)
-                )
+                changed = json.dumps(new_cmp, sort_keys=True) != json.dumps(existing, sort_keys=True)
             except Exception:
                 changed = True
         else:
@@ -329,6 +332,7 @@ def save_data(data):
         logger.exception("Save error")
         return False
 
+
 def generate_receipt_group_id(data):
     ids = [r["receipt_group_id"] for r in data.get("receipts", [])]
     numbers = []
@@ -337,6 +341,7 @@ def generate_receipt_group_id(data):
         if m:
             numbers.append(int(m.group(1)))
     return f"RG-{(max(numbers, default=0)+1):04d}"
+
 
 def build_single_item_filename(item, receipt, ext):
     parts = [
@@ -357,6 +362,7 @@ def build_single_item_filename(item, receipt, ext):
     # Final safety normalization on the full filename
     full = sanitize_full_filename(full, 200)
     return full
+
 
 def build_multi_item_filename(receipt, ext):
     parts = [
@@ -397,13 +403,14 @@ def get_storage_directory(item):
             result = STORAGE_DIR / safe_brand
         except Exception:
             return STORAGE_DIR / "default"
-    
+
     # SECURITY: Validate result is within STORAGE_DIR
     if not validate_path_within_root(result, STORAGE_DIR):
         # Fallback to safe default
         return STORAGE_DIR / "default"
-    
+
     return result
+
 
 def verify_file_integrity(data):
     """
@@ -415,7 +422,7 @@ def verify_file_integrity(data):
         rel = item.get("receipt_relative_path")
         if not rel:
             continue
-        
+
         # SECURITY: Construct path safely
         try:
             full = Path(rel)
@@ -423,11 +430,11 @@ def verify_file_integrity(data):
                 full = DATA_ROOT / rel
         except Exception:
             continue
-        
+
         # Validate path before checking existence
         if not validate_path_within_root(full, DATA_ROOT):
             continue
-        
+
         # Now safe to check existence
         try:
             if not full.exists():
@@ -441,8 +448,9 @@ def verify_file_integrity(data):
                 )
         except Exception:
             pass
-    
+
     return issues
+
 
 def integrity_worker():
     while True:
@@ -454,6 +462,7 @@ def integrity_worker():
                 save_data(data)
         except Exception:
             logger.exception("Integrity worker error")
+
 
 def _parse_multipart_file(body: bytes, content_type: str, field_name: str = "file"):
     if not content_type or "multipart/form-data" not in content_type:
@@ -487,8 +496,10 @@ def _parse_multipart_file(body: bytes, content_type: str, field_name: str = "fil
         return filename, raw_content, part_ctype
     return None, None, None
 
+
 def _today_ymmmdd():
     return datetime.now().strftime("%Y-%b-%d")
+
 
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
@@ -573,7 +584,7 @@ class Handler(BaseHTTPRequestHandler):
 
         # SECURITY: Serve static files with path validation
         if path.startswith("/static/"):
-            rel = path[len("/static/"):]
+            rel = path[len("/static/") :]
             candidate = safe_resolve_within(STATIC_DIR, rel)
             if not candidate or not candidate.exists() or not candidate.is_file():
                 self._set_headers(404, "text/plain")
@@ -652,27 +663,52 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/export/csv":
             import csv
             from io import StringIO
+
             with data_lock:
                 data = load_data()
                 output = StringIO()
                 writer = csv.writer(output)
-                writer.writerow([
-                    "Item ID", "Receipt Group ID", "Brand", "Model", "Location", "Users",
-                    "Project", "Shop", "Purchase Date", "Documentation", "Guarantee Duration",
-                    "Guarantee Unit", "Guarantee End Date", "Receipt Filename", "Receipt Path"
-                ])
+                writer.writerow(
+                    [
+                        "Item ID",
+                        "Receipt Group ID",
+                        "Brand",
+                        "Model",
+                        "Location",
+                        "Users",
+                        "Project",
+                        "Shop",
+                        "Purchase Date",
+                        "Documentation",
+                        "Guarantee Duration",
+                        "Guarantee Unit",
+                        "Guarantee End Date",
+                        "Receipt Filename",
+                        "Receipt Path",
+                    ]
+                )
                 receipts_map = {r["receipt_group_id"]: r for r in data.get("receipts", [])}
                 for item in data.get("items", []):
                     r = receipts_map.get(item["receipt_group_id"], {})
-                    writer.writerow([
-                        item["id"], item["receipt_group_id"], item.get("brand", ""),
-                        item.get("model", ""), item.get("location", ""),
-                        ";".join(item.get("users", [])), item.get("project", ""),
-                        r.get("shop", ""), r.get("purchase_date", ""), r.get("documentation", ""),
-                        item.get("guarantee_duration", 0), item.get("guarantee_unit", "days"),
-                        item.get("guarantee_end_date", ""), r.get("receipt_filename", ""),
-                        item.get("receipt_relative_path", "")
-                    ])
+                    writer.writerow(
+                        [
+                            item["id"],
+                            item["receipt_group_id"],
+                            item.get("brand", ""),
+                            item.get("model", ""),
+                            item.get("location", ""),
+                            ";".join(item.get("users", [])),
+                            item.get("project", ""),
+                            r.get("shop", ""),
+                            r.get("purchase_date", ""),
+                            r.get("documentation", ""),
+                            item.get("guarantee_duration", 0),
+                            item.get("guarantee_unit", "days"),
+                            item.get("guarantee_end_date", ""),
+                            r.get("receipt_filename", ""),
+                            item.get("receipt_relative_path", ""),
+                        ]
+                    )
                 csv_data = output.getvalue()
                 self._set_headers(200, "text/csv; charset=utf-8")
                 self.wfile.write(csv_data.encode("utf-8"))
@@ -692,7 +728,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._set_headers(404, "text/plain")
                     self.wfile.write(b"File not found")
                     return
-                
+
                 suffix = target.suffix.lower()
                 file_content_types = {
                     ".pdf": "application/pdf",
@@ -703,7 +739,7 @@ class Handler(BaseHTTPRequestHandler):
                     ".webp": "image/webp",
                 }
                 ctype = file_content_types.get(suffix, "application/octet-stream")
-                
+
                 # SECURITY: Triple sanitization for Content-Disposition
                 # 1. Sanitize filename (remove path separators, limit length)
                 safe_filename_step1 = sanitize_full_filename(target.name, 100)
@@ -711,7 +747,7 @@ class Handler(BaseHTTPRequestHandler):
                 safe_filename_step2 = sanitize_header_value(safe_filename_step1)
                 # 3. Sanitize content type
                 ctype_safe = sanitize_header_value(ctype)
-                
+
                 self.send_response(200)
                 self.send_header("Content-Type", ctype_safe)
                 # SECURITY: Build header value with pre-sanitized components
@@ -762,32 +798,32 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 ext = ".bin"
                 safe_base = "upload"
-            
+
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             upload_dir = RECEIPTS_DIR / "uploads"
-            
+
             try:
                 upload_dir.mkdir(parents=True, exist_ok=True)
             except Exception:
                 self._set_headers(500)
                 self.wfile.write(b'{"success":false,"error":"Cannot create upload directory"}')
                 return
-            
+
             saved_name = f"{ts}_{safe_base}{ext}"
-            
+
             try:
                 saved_path = upload_dir / saved_name
             except Exception:
                 self._set_headers(400)
                 self.wfile.write(b'{"success":false,"error":"Invalid filename"}')
                 return
-            
+
             # SECURITY: Validate path before writing
             if not validate_path_within_root(saved_path, RECEIPTS_DIR):
                 self._set_headers(400)
                 self.wfile.write(b'{"success":false,"error":"Invalid upload path"}')
                 return
-            
+
             try:
                 saved_path.write_bytes(file_bytes)
             except Exception as e:
@@ -804,17 +840,13 @@ class Handler(BaseHTTPRequestHandler):
             # Run OCR extraction (best-effort)
             ocr_data = {"shop": "N/A", "purchase_date": "N/A", "total_amount": None, "items": []}
             try:
-                ocr_result = extract_receipt_data(
-                    str(saved_path),
-                    engine="easyocr",
-                    languages=["en", "nl", "el", "lv"]
-                )
+                ocr_result = extract_receipt_data(str(saved_path), engine="easyocr", languages=["en", "nl", "el", "lv"])
                 ocr_data = {
                     "shop": ocr_result.get("shop", "N/A"),
                     "purchase_date": ocr_result.get("purchase_date", _today_ymmmdd()),
                     "total_amount": ocr_result.get("total_amount"),
                     "items": ocr_result.get("items", [])[:3],
-                    "raw_text": ocr_result.get("raw_text", "")[:500]
+                    "raw_text": ocr_result.get("raw_text", "")[:500],
                 }
             except Exception:
                 logger.exception("OCR extraction failed")
@@ -855,7 +887,7 @@ class Handler(BaseHTTPRequestHandler):
                     "item_id": item_id,
                     "receipt_filename": saved_name,
                     "receipt_relative_path": rel_path,
-                    "ocr_data": ocr_data
+                    "ocr_data": ocr_data,
                 }
                 self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
@@ -913,7 +945,7 @@ class Handler(BaseHTTPRequestHandler):
                 items_in_group = [i for i in data["items"] if i["receipt_group_id"] == item["receipt_group_id"]]
                 is_multi = len(items_in_group) > 1
                 old_rel_path = item.get("receipt_relative_path")
-                
+
                 # SECURITY: Build old_path and validate
                 old_path = None
                 if old_rel_path:
@@ -923,7 +955,7 @@ class Handler(BaseHTTPRequestHandler):
                             old_path = None
                     except Exception:
                         old_path = None
-                
+
                 needs_move = False
 
                 def u(field, dest):
@@ -959,9 +991,7 @@ class Handler(BaseHTTPRequestHandler):
                     item["guarantee_unit"] = updates["guarantee_unit"]
 
                 item["guarantee_end_date"] = calculate_guarantee_end_date(
-                    receipt["purchase_date"],
-                    item.get("guarantee_duration", 0),
-                    item.get("guarantee_unit", "days")
+                    receipt["purchase_date"], item.get("guarantee_duration", 0), item.get("guarantee_unit", "days")
                 )
 
                 if needs_move and old_path and old_path.exists():
@@ -977,7 +1007,7 @@ class Handler(BaseHTTPRequestHandler):
                         receipt["receipt_filename"] = new_name
                         receipt["receipt_relative_path"] = rel
                         item["receipt_relative_path"] = rel
-                        
+
                         # Clean up empty directory
                         try:
                             if old_path.parent.exists() and not any(old_path.parent.iterdir()):
@@ -1043,7 +1073,7 @@ class Handler(BaseHTTPRequestHandler):
                                     return
                         except Exception:
                             pass  # Path construction failed, continue with data cleanup
-                
+
                 # Remove item and possibly receipt
                 data["items"] = [i for i in data["items"] if i["id"] != item_id]
                 # If no items remain for the receipt, remove receipt
@@ -1057,6 +1087,7 @@ class Handler(BaseHTTPRequestHandler):
         self._set_headers(404)
         self.wfile.write(b'{"error":"not found"}')
 
+
 # ---------- Server bootstrap ----------
 def run_server():
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
@@ -1066,6 +1097,7 @@ def run_server():
     except KeyboardInterrupt:
         logger.info("Shutting down server")
         server.server_close()
+
 
 if __name__ == "__main__":
     # Ensure directories exist

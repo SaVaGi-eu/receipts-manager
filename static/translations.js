@@ -3,7 +3,7 @@
     // To modify translations, edit the text inside the quotes below
     // Each language (en, el, nl, lv) has the same keys
     // Keep {count} placeholders unchanged - they get replaced with numbers
-    
+
     const translations = {
       en: {
         appTitle: '🧾 Receipt & Warranty Manager',

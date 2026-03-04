@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Unified `install.sh` installer for all platforms
 - Comprehensive documentation (CONTRIBUTING.md, LICENSE, etc.)
 - Development tooling (.editorconfig, .pre-commit-config.yaml, pyproject.toml)
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changelog to track version history
 
 ### Changed
+
 - Reorganized repository structure with platforms/ directory
 - Updated README with simplified installation instructions
 - Simplified run.sh and run.command to be wrappers for install.sh
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved macOS Electron app build process
 
 ### Removed
+
 - Obsolete build scripts (build_macos_app.sh, build_macos_pyinstaller.sh, etc.)
 - Root-level Docker files (moved to platforms/docker/)
 - py2app setup.py (switched to Electron-based approach)
@@ -31,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-03-03
 
 ### Added
+
 - Initial release
 - Receipt scanning with OCR (Tesseract and EasyOCR)
 - Warranty tracking with expiration alerts
@@ -47,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Backup and restore functionality
 
 ### Technical
+
 - Flask backend (Python 3.8+)
 - Electron frontend for macOS
 - SQLite-like JSON database

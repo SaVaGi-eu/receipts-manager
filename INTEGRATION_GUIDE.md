@@ -70,7 +70,7 @@ def do_POST(self):
             self._set_headers(500)
             self.wfile.write(b'{"success":false,"error":"OCR not available"}')
             return
-        
+
         try:
             # Get image data from request
             length = int(self.headers.get("Content-Length", "0") or "0")
@@ -78,10 +78,10 @@ def do_POST(self):
                 self._set_headers(400)
                 self.wfile.write(b'{"success":false,"error":"No image data"}')
                 return
-            
+
             # Read the uploaded file
             content = self.rfile.read(length)
-            
+
             # Parse multipart form data to extract image
             boundary = self.headers.get('Content-Type', '').split('boundary=')[-1]
             if boundary:
@@ -92,22 +92,22 @@ def do_POST(self):
                         # Extract image data
                         image_data = part.split(b'\r\n\r\n', 1)[-1]
                         image_data = image_data.rsplit(b'\r\n', 1)[0]
-                        
+
                         # Save temporarily
                         temp_path = RECEIPTS_DIR / "temp_ocr_image.jpg"
                         with open(temp_path, 'wb') as f:
                             f.write(image_data)
-                        
+
                         # Process with OCR
                         result = extract_receipt_data(
                             str(temp_path),
                             engine=OCR_ENGINE,
                             languages=OCR_LANGUAGES
                         )
-                        
+
                         # Clean up temp file
                         temp_path.unlink(missing_ok=True)
-                        
+
                         # Return results
                         self._set_headers(200)
                         self.wfile.write(json.dumps({
@@ -115,12 +115,12 @@ def do_POST(self):
                             "data": result
                         }).encode('utf-8'))
                         return
-            
+
             # If we got here, couldn't parse image
             self._set_headers(400)
             self.wfile.write(b'{"success":false,"error":"Could not extract image"}')
             return
-            
+
         except Exception as e:
             self._set_headers(500)
             error_msg = {"success": False, "error": str(e)}
@@ -159,9 +159,9 @@ Add this to your receipt form (before or after existing fields):
     <label for="receipt-image" class="form-label">
         Receipt Image (Optional - for OCR)
     </label>
-    <input 
-        type="file" 
-        id="receipt-image" 
+    <input
+        type="file"
+        id="receipt-image"
         accept="image/*"
         class="form-control"
     >
@@ -185,23 +185,23 @@ Add this JavaScript at the bottom of your HTML or in your existing app.js:
 // Initialize OCR when page loads
 document.addEventListener('DOMContentLoaded', function() {
     const imageInput = document.getElementById('receipt-image');
-    
+
     if (imageInput && window.OCRHandler) {
         imageInput.addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            
+
             // Show processing status
             const statusDiv = document.getElementById('ocr-status');
             const statusText = document.getElementById('ocr-status-text');
             statusDiv.style.display = 'block';
             statusDiv.className = 'alert alert-info';
             statusText.textContent = 'Processing receipt image...';
-            
+
             try {
                 // Process with OCR
                 const data = await OCRHandler.processImage(file);
-                
+
                 // Fill form fields
                 if (data.shop) {
                     document.getElementById('shop-input').value = data.shop;
@@ -213,16 +213,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // You can use this for validation or display
                     console.log('Total amount:', data.total_amount);
                 }
-                
+
                 // Show success
                 statusDiv.className = 'alert alert-success';
                 statusText.textContent = 'Receipt processed! Review and edit the extracted information.';
-                
+
                 // Hide after 5 seconds
                 setTimeout(() => {
                     statusDiv.style.display = 'none';
                 }, 5000);
-                
+
             } catch (error) {
                 statusDiv.className = 'alert alert-danger';
                 statusText.textContent = 'OCR failed: ' + error.message;
@@ -236,11 +236,13 @@ document.addEventListener('DOMContentLoaded', function() {
 ## Step 6: Test the Integration
 
 1. **Start the server:**
+
    ```bash
    python app.py
    ```
 
 2. **Open in browser:**
+
    ```
    http://127.0.0.1:5000
    ```
@@ -255,21 +257,25 @@ document.addEventListener('DOMContentLoaded', function() {
 ## Troubleshooting
 
 ### OCR endpoint returns 500 error
+
 - Check that OCR libraries are installed: `pip list | grep -i ocr`
 - Check console for error messages: `python app.py`
 - Test OCR directly: `python ocr_service.py test.jpg`
 
 ### Form fields don't populate
+
 - Open browser console (F12) and check for JavaScript errors
 - Verify `ocr.js` is loaded: check Network tab in browser DevTools
 - Check that field IDs match (shop-input, purchase-date-input, etc.)
 
 ### OCR is slow
+
 - First run downloads models (~500MB for EasyOCR)
 - Subsequent runs are much faster
 - Consider using Tesseract if EasyOCR is too slow
 
 ### Poor accuracy
+
 - Check image quality (see OCR_SETUP.md for tips)
 - Try the other OCR engine
 - Configure correct languages in app.py
@@ -279,6 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
 For a complete, ready-to-use version, you can replace your `app.py` with the enhanced version.
 
 The enhanced version includes:
+
 - ✅ OCR endpoint (`/api/ocr/process`)
 - ✅ Image upload handling
 - ✅ Error handling and logging

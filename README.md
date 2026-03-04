@@ -22,11 +22,13 @@ chmod +x install.sh
 The installer will detect your system and offer appropriate options:
 
 ### macOS Users
+
 1. 📦 **Build macOS Application** - Creates a native `.app` with DMG installer
 2. 🐳 **Build Docker Container** - Run in Docker
 3. 💻 **Run Directly** - Development mode (web server)
 
-### Linux Users  
+### Linux Users
+
 1. 🐳 **Build Docker Container** - Run in Docker
 2. 💻 **Run Directly** - Development mode (web server)
 
@@ -60,6 +62,7 @@ The installer will detect your system and offer appropriate options:
 </p>
 
 The macOS app includes:
+
 - ✅ Python runtime bundled
 - ✅ All dependencies included
 - ✅ Tesseract OCR with multilingual support
@@ -68,11 +71,13 @@ The macOS app includes:
 - ✅ First-time setup wizard
 
 **Requirements:**
+
 - macOS 10.15 (Catalina) or later
 - 200 MB disk space
 - Apple Silicon (M1/M2/M3) or Intel
 
 **Building:**
+
 ```bash
 ./install.sh  # Choose option 1
 ```
@@ -130,6 +135,7 @@ receipts-manager/
 ## 🌐 Multilingual Support
 
 Supported OCR languages:
+
 - 🇬🇧 **English** (eng)
 - 🇳🇱 **Dutch** (nld)
 - 🇬🇷 **Greek** (ell)
@@ -142,15 +148,18 @@ Additional languages can be added by installing the corresponding Tesseract lang
 ## 💻 System Requirements
 
 ### macOS App
+
 - macOS 10.15+ (Catalina or later)
 - 200 MB disk space
 - Apple Silicon (M1/M2/M3) or Intel
 
 ### Docker
+
 - Docker Desktop or Docker Engine
 - 500 MB disk space
 
 ### Direct Execution
+
 - Python 3.8 or higher
 - Tesseract OCR 4.0+ (optional, for OCR features)
 - 200 MB disk space
@@ -160,22 +169,26 @@ Additional languages can be added by installing the corresponding Tesseract lang
 ## 📚 Documentation
 
 ### User Guides
+
 - 🚀 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
 - 📝 [Workflows](WORKFLOWS.md) - Common usage patterns
 - 🔍 [OCR Setup](OCR_SETUP.md) - Configure OCR for best results
 - 🔗 [Integration Guide](INTEGRATION_GUIDE.md) - API and integrations
 
 ### Deployment
+
 - 🐳 [Docker Guide](docs/DOCKER.md) - Docker deployment
 - 🍎 [macOS Build](platforms/macos/README.md) - Building the macOS app
 
 ### Development
+
 - 🤝 [Contributing](CONTRIBUTING.md) - How to contribute
 - 🏛️ [Project Structure](STRUCTURE.md) - Codebase overview
 - 🔧 [Troubleshooting](TROUBLESHOOTING.md) - Common issues
 - 📜 [Changelog](CHANGELOG.md) - Version history
 
 ### Reference
+
 - ⚙️ [Environment Variables](.env.example) - Configuration options
 - 🔒 [Security Policy](SECURITY.md) - Security and reporting
 - 📜 [Full Documentation](docs/README.md) - Complete docs index
