@@ -23,7 +23,7 @@ safety>=2.3.5
 pre-commit>=3.5.0
 
 # Documentation
-sphinx>=7.2.6
+sphinx==7.2.5  # Python 3.8 compatible - 7.2.6+ drops 3.8 support
 sphinx-rtd-theme>=2.0.0
 
 # Utilities
