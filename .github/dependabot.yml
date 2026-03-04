@@ -1,0 +1,66 @@
+# Dependabot configuration for automated dependency updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    reviewers:
+      - "v-giannakopoulos"
+    # Group minor and patch updates together
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    reviewers:
+      - "v-giannakopoulos"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/platforms/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    reviewers:
+      - "v-giannakopoulos"
