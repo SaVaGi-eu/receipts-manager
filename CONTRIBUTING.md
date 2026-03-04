@@ -1,184 +1,91 @@
-# Contributing to Receipt Manager
+# Contributing to Receipts Manager
 
-Thank you for your interest in contributing to Receipt Manager! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing! This document provides guidelines and setup instructions.
 
-## Table of Contents
-
-- [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
-- [Code Style](#code-style)
-- [Testing](#testing)
-- [Submitting Changes](#submitting-changes)
-- [Reporting Issues](#reporting-issues)
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
-Before you begin, ensure you have:
-
-- Python 3.8 or higher
-- Node.js 16 or higher (for macOS builds)
+- Python 3.9, 3.10, 3.11, or 3.12
 - Git
-- Tesseract OCR (for OCR features)
-- Docker (optional, for container testing)
+- Tesseract OCR (for receipt scanning)
 
-### Fork and Clone
+### Development Setup
 
-1. Fork the repository on GitHub
-2. Clone your fork:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/SaVaGi-eu/receipts-manager.git
+   cd receipts-manager
+   ```
 
-```bash
-git clone https://github.com/YOUR_USERNAME/receipts-manager.git
-cd receipts-manager
-```
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-3. Add upstream remote:
+3. **Install dependencies**
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
+   ```
 
-```bash
-git remote add upstream https://github.com/SaVaGi-eu/receipts-manager.git
-```
+4. **Install pre-commit hooks**
+   ```bash
+   pre-commit install
+   ```
 
-## Development Setup
+5. **Verify setup**
+   ```bash
+   pytest
+   black --check .
+   flake8 .
+   ```
 
-### Quick Setup
+## 🔧 Development Workflow
 
-Use the installer in development mode:
+### Code Quality Tools
 
-```bash
-chmod +x install.sh
-./install.sh
-# Choose option: Run Application Directly
-```
+We use several tools to maintain code quality:
 
-### Manual Setup
+#### Formatting
+- **Black**: Code formatter (line length: 120)
+  ```bash
+  black .
+  ```
 
-If you prefer manual setup:
+- **isort**: Import sorter
+  ```bash
+  isort .
+  ```
 
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+#### Linting
+- **Flake8**: Style checker
+  ```bash
+  flake8 .
+  ```
 
-# Install dependencies
-pip install -r requirements.txt
+- **Pylint**: Static analyzer (optional)
+  ```bash
+  pylint app.py
+  ```
 
-# Install development dependencies
-pip install -r requirements-dev.txt  # Create this file if it doesn't exist
-pip install pre-commit black flake8 isort pytest
+- **Mypy**: Type checker (optional)
+  ```bash
+  mypy .
+  ```
 
-# Set up pre-commit hooks
-pre-commit install
+#### Security
+- **Bandit**: Security issue scanner
+  ```bash
+  bandit -r . -c pyproject.toml
+  ```
 
-# Copy environment template
-cp .env.example .env
-
-# Run the application
-python app.py
-```
-
-### Development Environment Variables
-
-Create a `.env` file (copy from `.env.example`) and customize:
-
-```bash
-DEBUG=true
-LOG_LEVEL=DEBUG
-PORT=8765
-DATA_DIR=./data_dev
-STORAGE_DIR=./storage_dev
-```
-
-## Code Style
-
-### Python
-
-We follow [PEP 8](https://pep8.org/) with some modifications:
-
-- **Line length**: 120 characters (not 80)
-- **Formatter**: Black
-- **Import sorter**: isort
-- **Linter**: flake8
-
-#### Auto-formatting
-
-```bash
-# Format all Python files
-black .
-
-# Sort imports
-isort .
-
-# Check code style
-flake8 .
-```
-
-### JavaScript (Electron)
-
-- **Indentation**: 2 spaces
-- **Semicolons**: Required
-- **Quotes**: Single quotes for strings
-
-### Commit Messages
-
-Follow conventional commits:
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
-
-**Examples:**
-
-```
-feat(ocr): Add support for Greek language
-
-fix(ui): Correct date formatting in receipt list
-
-docs: Update installation instructions
-
-chore(deps): Update Flask to 3.0.0
-```
-
-## Project Structure
-
-```
-receipts-manager/
-├── app.py                  # Main Flask application
-├── config.py               # Configuration management
-├── ocr_service.py          # OCR processing logic
-├── check_deps.py           # Dependency checker
-├── requirements.txt        # Python dependencies
-├── .env.example            # Environment variables template
-├── .editorconfig           # Editor configuration
-├── .pre-commit-config.yaml # Pre-commit hooks
-├── pyproject.toml          # Python project config
-│
-├── templates/              # Jinja2 HTML templates
-├── static/                 # CSS, JavaScript, images
-│
-├── platforms/
-│   ├── macos/              # macOS Electron app
-│   └── docker/             # Docker configuration
-│
-├── tests/                  # Test files
-├── docs/                   # Additional documentation
-└── data/                   # Runtime data (not in git)
-```
-
-## Testing
+- **Safety**: Dependency vulnerability checker
+  ```bash
+  safety check
+  ```
 
 ### Running Tests
 
@@ -186,177 +93,187 @@ receipts-manager/
 # Run all tests
 pytest
 
-# Run with coverage
+# With coverage
 pytest --cov=. --cov-report=html
 
-# Run specific test file
-pytest tests/test_ocr_service.py
+# Specific test file
+pytest tests/test_app.py
 
-# Run with verbose output
+# Verbose output
 pytest -v
 ```
 
-### Writing Tests
+### Pre-commit Hooks
 
-Create test files in the `tests/` directory:
-
-```python
-# tests/test_example.py
-import pytest
-from app import app
-
-@pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
-
-def test_homepage(client):
-    response = client.get('/')
-    assert response.status_code == 200
-```
-
-## Submitting Changes
-
-### Before Submitting
-
-1. **Update from upstream:**
+Pre-commit hooks run automatically before each commit:
 
 ```bash
-git fetch upstream
-git rebase upstream/main
-```
-
-2. **Run pre-commit checks:**
-
-```bash
+# Run manually on all files
 pre-commit run --all-files
+
+# Update hooks
+pre-commit autoupdate
+
+# Skip hooks (not recommended)
+git commit --no-verify
 ```
 
-3. **Test your changes:**
+## 📝 Coding Standards
 
-```bash
-pytest
+### Python Style
+
+- Follow PEP 8 guidelines
+- Line length: 120 characters
+- Use type hints where appropriate
+- Write docstrings for public functions/classes
+
+### Security Guidelines
+
+1. **Input Validation**: Always validate and sanitize user input
+2. **Path Safety**: Use `safe_resolve_within()` for file operations
+3. **No Secrets**: Never commit API keys, passwords, or tokens
+4. **Dependencies**: Keep dependencies updated
+
+### Git Commit Messages
+
+Follow conventional commits:
+
+```
+type(scope): subject
+
+body (optional)
+
+footer (optional)
 ```
 
-4. **Update documentation** if needed
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `style`: Formatting
+- `refactor`: Code restructuring
+- `test`: Adding tests
+- `chore`: Maintenance
 
-### Creating a Pull Request
-
-1. Push to your fork:
-
-```bash
-git push origin feature/your-feature-name
+**Examples:**
+```
+feat(ocr): add support for Dutch language
+fix(api): resolve path traversal vulnerability
+docs(readme): update installation instructions
 ```
 
-2. Go to GitHub and create a Pull Request
+## 🧪 Testing Requirements
 
-3. Fill in the PR template:
-   - **Description**: What does this PR do?
-   - **Motivation**: Why is this change needed?
-   - **Testing**: How was this tested?
-   - **Screenshots**: For UI changes
-   - **Breaking changes**: Any breaking changes?
+### Test Coverage
 
-4. Link related issues: `Closes #123`
+- Minimum 80% code coverage
+- All new features must include tests
+- Bug fixes should include regression tests
 
-### PR Review Process
-
-- Maintainers will review your PR
-- Address any feedback
-- Once approved, it will be merged
-
-## Reporting Issues
-
-### Bug Reports
-
-When reporting bugs, include:
-
-- **Description**: Clear description of the bug
-- **Steps to reproduce**: Detailed steps
-- **Expected behavior**: What should happen
-- **Actual behavior**: What actually happens
-- **Environment**:
-  - OS: macOS 14.0, Ubuntu 22.04, etc.
-  - Python version: 3.11.5
-  - Installation method: Direct, Docker, or macOS app
-- **Logs**: Any relevant error messages
-- **Screenshots**: If applicable
-
-### Feature Requests
-
-When requesting features, include:
-
-- **Description**: Clear description of the feature
-- **Use case**: Why is this needed?
-- **Proposed solution**: How should it work?
-- **Alternatives**: Other approaches considered
-
-## Development Tips
-
-### Debugging
+### Test Structure
 
 ```python
-# Enable debug mode in .env
-DEBUG=true
-LOG_LEVEL=DEBUG
+def test_feature_name():
+    # Arrange
+    expected = "value"
+    
+    # Act
+    result = function_under_test()
+    
+    # Assert
+    assert result == expected
 ```
 
-### Hot Reload
+## 🔒 Security
 
-Flask's debug mode enables auto-reload:
+### Reporting Vulnerabilities
 
-```bash
-export FLASK_ENV=development
-python app.py
-```
+See [SECURITY.md](SECURITY.md) for vulnerability reporting process.
 
-### Database Reset
+### Security Checklist
 
-```bash
-# Backup first!
-cp data/database/data.json data/database/data.json.backup
+Before submitting:
+- [ ] No hardcoded secrets
+- [ ] Input validation implemented
+- [ ] File paths validated
+- [ ] Security tests included
+- [ ] Dependencies scanned
 
-# Remove database
-rm data/database/data.json
+## 📬 Pull Request Process
 
-# App will create fresh database on next start
-```
+1. **Create a branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-### Testing Docker Locally
+2. **Make changes**
+   - Write tests
+   - Update documentation
+   - Follow coding standards
 
-```bash
-cd platforms/docker
-docker-compose build
-docker-compose up
-```
+3. **Run checks locally**
+   ```bash
+   pytest
+   black --check .
+   flake8 .
+   bandit -r .
+   ```
 
-### Testing macOS Build
+4. **Commit changes**
+   ```bash
+   git add .
+   git commit -m "feat: your feature description"
+   ```
 
-```bash
-cd platforms/macos
-npm install
-npm run build
-```
+5. **Push and create PR**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+   Then create a pull request on GitHub
 
-## Code of Conduct
+### PR Checklist
 
-Be respectful and constructive:
+- [ ] Tests pass locally
+- [ ] Code follows style guidelines
+- [ ] Documentation updated
+- [ ] Commit messages follow convention
+- [ ] No merge conflicts
+- [ ] Security considerations addressed
 
-- Be welcoming to newcomers
-- Respect differing viewpoints
-- Accept constructive criticism gracefully
-- Focus on what's best for the community
+## 🤝 Code Review
 
-## Questions?
+### What to Expect
 
-- **Jira Board**: [RM Project](https://savagi.atlassian.net/jira/software/c/projects/RM/boards/42)
-- **GitHub Issues**: [Create an issue](https://github.com/SaVaGi-eu/receipts-manager/issues)
-- **Discussions**: Use GitHub Discussions for questions
+- Reviews within 48 hours (usually faster)
+- Constructive feedback
+- Requests for changes if needed
+- Approval and merge
 
-## License
+### Review Criteria
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+- Code quality and style
+- Test coverage
+- Security implications
+- Performance impact
+- Documentation completeness
+
+## 📚 Resources
+
+- [Python Style Guide (PEP 8)](https://pep8.org/)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [GitHub Flow](https://guides.github.com/introduction/flow/)
+- [Security Best Practices](SECURITY.md)
+
+## 💬 Questions?
+
+Feel free to:
+- Open an issue for discussion
+- Ask in pull request comments
+- Check existing issues and PRs
+
+## 📄 License
+
+By contributing, you agree that your contributions will be licensed under the project's license.
 
 ---
 
