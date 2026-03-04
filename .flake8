@@ -17,12 +17,12 @@ exclude =
     .mypy_cache
 
 # Ignore specific rules that conflict with black or are too strict
-ignore =
-    E203,  # whitespace before ':' (conflicts with black)
-    E501,  # line too long (handled by black)
-    W503,  # line break before binary operator (conflicts with black)
-    E402,  # module level import not at top of file (sometimes needed)
-    F401,  # imported but unused (handled by other tools)
+# E203: whitespace before ':' (conflicts with black)
+# E501: line too long (handled by black)
+# W503: line break before binary operator (conflicts with black)
+# E402: module level import not at top of file (sometimes needed)
+# F401: imported but unused (handled by other tools)
+ignore = E203,E501,W503,E402,F401
 
 # Complexity settings
 max-complexity = 15
