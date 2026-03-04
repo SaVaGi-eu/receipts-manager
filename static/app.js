@@ -57,6 +57,9 @@
       'project', 'shop', 'purchase_date', 'documentation', 'guarantee_end_date', 'file', 'actions'
     ]);
 
+    // ===== NEW: User tags management (Requirement 6) =====
+    let userTags = [];
+
     const API = {
       data: '/api/data',
       suggestions: '/api/suggestions',
@@ -119,6 +122,7 @@
         suggestions = await fetchJson(API.suggestions);
         populateDataLists();
         populateFilterDropdowns();
+        populateExistingReceipts(); // NEW: Populate existing receipt dropdown (Requirement 4)
       } catch (err) { console.error('Error loading suggestions:', err); }
     }
 
@@ -154,6 +158,22 @@
             .map(u => `<option value="${String(u).replace(/"/g, '&quot;')}">${u}</option>`).join('');
         userFilter.value = current;
       }
+    }
+
+    // ===== NEW: Populate existing receipts dropdown (Requirement 4) =====
+    function populateExistingReceipts() {
+      const select = $('existingReceiptSelect');
+      if (!select) return;
+      
+      const rmap = receiptMap();
+      const options = Array.from(rmap.values())
+        .sort((a, b) => String(b.purchase_date || '').localeCompare(String(a.purchase_date || '')))
+        .map(r => {
+          const label = `${r.shop || 'Unknown'} - ${r.purchase_date || 'No date'} - ${r.receipt_group_id}`;
+          return `<option value="${r.receipt_group_id}">${label}</option>`;
+        }).join('');
+      
+      select.innerHTML = `<option value="">-- Choose existing receipt --</option>` + options;
     }
 
     function receiptMap() {
@@ -291,6 +311,7 @@
       catch (err) { console.error('Integrity check failed:', err); await loadData(); }
     }
 
+    // ===== NEW: Modal file upload handler (Requirement 2) =====
     async function handleFile(file) {
       if (!file) return;
       const formData = new FormData();
@@ -300,55 +321,202 @@
         if (!resp.ok) { alert(`Upload failed: ${await resp.text()}`); return; }
         const result = await resp.json();
         if (!result.success) { alert(`Upload failed: ${result.error || 'Unknown error'}`); return; }
-        showOcrModal(result);
+        showOcrModal(result, 'new');
       } catch (err) { console.error('Upload error:', err); alert(`Upload failed: ${err.message}`); }
-      finally { const fi = $('fileInput'); if (fi) fi.value = ''; }
+      finally { const fi = $('modalFileInput'); if (fi) fi.value = ''; }
     }
 
-    function showOcrModal(uploadResult) {
+    // ===== NEW: Enhanced modal display with mode support (Requirements 3, 5) =====
+    function showOcrModal(uploadResult, mode = 'new') {
       const modal = $('ocrModal'); if (!modal) return;
-      const ocr = uploadResult.ocr_data || {};
-      $('modalItemId').value         = uploadResult.item_id;
-      $('modalReceiptGroupId').value = uploadResult.receipt_group_id;
-      $('modalShop').value           = ocr.shop || '';
+      const ocr = uploadResult?.ocr_data || {};
+      
+      // Set mode
+      $('modalMode').value = mode;
+      $('modalItemId').value = mode === 'new' ? (uploadResult?.item_id || '') : '';
+      $('modalReceiptGroupId').value = uploadResult?.receipt_group_id || '';
+
+      // Update modal title based on mode (Requirement 3)
+      const modalTitle = $('modalTitle');
+      if (modalTitle) {
+        if (mode === 'new') {
+          modalTitle.textContent = '📄 Add New Receipt';
+        } else if (mode === 'existing') {
+          modalTitle.textContent = '📎 Add Item to Existing Receipt';
+        } else if (mode === 'edit') {
+          modalTitle.textContent = '✏️ Edit Item';
+        }
+      }
+
+      // Populate fields
+      $('modalShop').value = ocr.shop || '';
       const pd = ocr.purchase_date || '';
       if (pd && pd !== 'N/A') {
         try { $('modalPurchaseDate').value = new Date(pd.replace(/-/g, ' ')).toISOString().split('T')[0]; }
         catch { $('modalPurchaseDate').value = ''; }
-      }
+      } else { $('modalPurchaseDate').value = ''; }
+      $('modalDocumentation').value = ocr.documentation || '';
       $('modalWarranty').value = '';
-      $('modalBrand').value = ''; $('modalModel').value = ''; $('modalLocation').value = '';
-      $('modalProject').value = ''; $('modalDocumentation').value = ''; $('modalUsers').value = '';
+      $('modalBrand').value = ''; 
+      $('modalModel').value = ''; 
+      $('modalLocation').value = '';
+      $('modalProject').value = '';
+      
+      // Clear user tags
+      userTags = [];
+      renderUserTags();
+
+      // Set field readonly state (Requirement 5)
+      const isExisting = mode === 'existing';
+      $('modalShop').readOnly = isExisting;
+      $('modalPurchaseDate').readOnly = isExisting;
+      $('modalDocumentation').readOnly = isExisting;
+      if (isExisting) {
+        $('modalShop').classList.add('readonly');
+        $('modalPurchaseDate').classList.add('readonly');
+        $('modalDocumentation').classList.add('readonly');
+      } else {
+        $('modalShop').classList.remove('readonly');
+        $('modalPurchaseDate').classList.remove('readonly');
+        $('modalDocumentation').classList.remove('readonly');
+      }
+
+      // Show/hide upload section based on mode
+      const uploadSection = qs('.upload-select-section');
+      if (uploadSection) {
+        uploadSection.style.display = (mode === 'edit') ? 'none' : 'block';
+      }
+
+      // Items preview
       const itemsPreview = $('modalItemsPreview');
-      const itemsList    = $('modalItemsList');
+      const itemsList = $('modalItemsList');
       if (ocr.items && ocr.items.length > 0) {
         itemsList.innerHTML = ocr.items.map(i => `<li>${i.name} - ${i.price}</li>`).join('');
         itemsPreview.style.display = 'block';
       } else { itemsPreview.style.display = 'none'; }
+      
       modal.style.display = 'flex';
+    }
+
+    // ===== NEW: Open modal for new receipt (Requirement 1) =====
+    function openNewReceiptModal() {
+      // Reset form
+      $('ocrForm').reset();
+      $('modalMode').value = 'new';
+      $('modalItemId').value = '';
+      $('modalReceiptGroupId').value = '';
+      $('existingReceiptSelect').value = '';
+      
+      userTags = [];
+      renderUserTags();
+      
+      // Update title
+      const modalTitle = $('modalTitle');
+      if (modalTitle) modalTitle.textContent = '📄 Add New Receipt';
+      
+      // Show upload section
+      const uploadSection = qs('.upload-select-section');
+      if (uploadSection) uploadSection.style.display = 'block';
+      
+      // Enable all fields
+      $('modalShop').readOnly = false;
+      $('modalPurchaseDate').readOnly = false;
+      $('modalDocumentation').readOnly = false;
+      $('modalShop').classList.remove('readonly');
+      $('modalPurchaseDate').classList.remove('readonly');
+      $('modalDocumentation').classList.remove('readonly');
+      
+      // Hide items preview
+      $('modalItemsPreview').style.display = 'none';
+      
+      $('ocrModal').style.display = 'flex';
+    }
+
+    // ===== NEW: Handle existing receipt selection (Requirements 4, 5) =====
+    function handleExistingReceiptSelect(e) {
+      const receiptGroupId = e.target.value;
+      if (!receiptGroupId) return;
+      
+      // Clear file input to prevent conflicts
+      const fileInput = $('modalFileInput');
+      if (fileInput) fileInput.value = '';
+      
+      // Find the receipt
+      const receipt = allData.receipts.find(r => r.receipt_group_id === receiptGroupId);
+      if (!receipt) {
+        alert('Receipt not found');
+        return;
+      }
+      
+      // Populate with receipt data (Requirement 5)
+      const result = {
+        receipt_group_id: receipt.receipt_group_id,
+        ocr_data: {
+          shop: receipt.shop,
+          purchase_date: receipt.purchase_date,
+          documentation: receipt.documentation
+        }
+      };
+      
+      showOcrModal(result, 'existing');
     }
 
     function closeOcrModal() {
       const modal = $('ocrModal');
-      if (modal) { modal.style.display = 'none'; $('ocrForm').reset(); }
+      if (modal) { 
+        modal.style.display = 'none'; 
+        $('ocrForm').reset(); 
+        $('existingReceiptSelect').value = '';
+        const fileInput = $('modalFileInput');
+        if (fileInput) fileInput.value = '';
+        userTags = [];
+        renderUserTags();
+      }
     }
+
+    // ===== NEW: User tags functionality (Requirement 6) =====
+    function addUserTag(username) {
+      const trimmed = username.trim();
+      if (!trimmed || userTags.includes(trimmed)) return;
+      userTags.push(trimmed);
+      renderUserTags();
+      $('userTagInput').value = '';
+    }
+
+    function removeUserTag(username) {
+      userTags = userTags.filter(u => u !== username);
+      renderUserTags();
+    }
+
+    function renderUserTags() {
+      const container = $('userTags');
+      if (!container) return;
+      container.innerHTML = userTags.map(user => 
+        `<span class="user-tag">
+          ${user}
+          <span class="tag-remove" onclick="removeUserTag('${user.replace(/'/g, "\\'")}')">×</span>
+        </span>`
+      ).join('');
+    }
+
+    // Make removeUserTag globally accessible
+    window.removeUserTag = removeUserTag;
 
     async function saveOcrData(e) {
       e.preventDefault();
-      const itemId         = parseInt($('modalItemId').value);
+      const mode = $('modalMode').value;
+      let itemId = parseInt($('modalItemId').value);
       const receiptGroupId = $('modalReceiptGroupId').value;
-      if (!itemId || !receiptGroupId) { alert('Invalid item or receipt ID'); return; }
 
-      const shop          = $('modalShop').value.trim();
-      const purchaseDate  = $('modalPurchaseDate').value;
-      const warranty      = parseInt($('modalWarranty').value) || 0;
-      const brand         = $('modalBrand').value.trim()         || 'N/A';
-      const model         = $('modalModel').value.trim()         || 'N/A';
-      const location      = $('modalLocation').value.trim()      || 'N/A';
-      const project       = $('modalProject').value.trim()       || 'N/A';
+      const shop = $('modalShop').value.trim();
+      const purchaseDate = $('modalPurchaseDate').value;
+      const warranty = parseInt($('modalWarranty').value) || 0;
+      const brand = $('modalBrand').value.trim() || 'N/A';
+      const model = $('modalModel').value.trim() || 'N/A';
+      const location = $('modalLocation').value.trim() || 'N/A';
+      const project = $('modalProject').value.trim() || 'N/A';
       const documentation = $('modalDocumentation').value.trim() || 'N/A';
-      const usersInput    = $('modalUsers').value.trim();
-      const users         = usersInput ? usersInput.split(',').map(u => u.trim()).filter(Boolean) : [];
+      const users = userTags.length > 0 ? userTags : [];
 
       if (!shop || !purchaseDate) { alert('Shop and Purchase Date are required'); return; }
 
@@ -358,6 +526,14 @@
         const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         formattedDate = `${d.getFullYear()}-${months[d.getMonth()]}-${String(d.getDate()).padStart(2,'0')}`;
       } catch { /* keep original */ }
+
+      // For existing receipt mode, we need to create a new item
+      if (mode === 'existing' && !itemId) {
+        // Generate a temporary ID - the server will assign the real one
+        itemId = allData.next_id || 1;
+      }
+
+      if (!itemId || !receiptGroupId) { alert('Invalid item or receipt ID'); return; }
 
       try {
         const resp = await fetchJson(API.updateItem(itemId), {
@@ -378,7 +554,8 @@
         });
         if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
         closeOcrModal();
-        await loadData(); await loadSuggestions();
+        await loadData(); 
+        await loadSuggestions();
       } catch (err) { console.error('Save error:', err); alert(`Save failed: ${err.message}`); }
     }
 
@@ -388,15 +565,19 @@
       const receipt = allData.receipts.find(r => r.receipt_group_id === item.receipt_group_id);
       if (!receipt) { alert('Receipt not found'); return; }
 
-      $('modalItemId').value         = item.id;
+      $('modalItemId').value = item.id;
       $('modalReceiptGroupId').value = item.receipt_group_id;
-      $('modalShop').value           = receipt.shop          !== 'N/A' ? receipt.shop          : '';
-      $('modalBrand').value          = item.brand            !== 'N/A' ? item.brand            : '';
-      $('modalModel').value          = item.model            !== 'N/A' ? item.model            : '';
-      $('modalLocation').value       = item.location         !== 'N/A' ? item.location         : '';
-      $('modalProject').value        = item.project          !== 'N/A' ? item.project          : '';
-      $('modalDocumentation').value  = receipt.documentation !== 'N/A' ? receipt.documentation : '';
-      $('modalUsers').value          = (item.users || []).join(', ');
+      $('modalMode').value = 'edit';
+      $('modalShop').value = receipt.shop !== 'N/A' ? receipt.shop : '';
+      $('modalBrand').value = item.brand !== 'N/A' ? item.brand : '';
+      $('modalModel').value = item.model !== 'N/A' ? item.model : '';
+      $('modalLocation').value = item.location !== 'N/A' ? item.location : '';
+      $('modalProject').value = item.project !== 'N/A' ? item.project : '';
+      $('modalDocumentation').value = receipt.documentation !== 'N/A' ? receipt.documentation : '';
+      
+      // Populate user tags
+      userTags = Array.isArray(item.users) ? item.users : [];
+      renderUserTags();
 
       const warranty = item.guarantee_unit === 'months' ? (item.guarantee_duration || 0) : 0;
       $('modalWarranty').value = warranty > 0 ? warranty : '';
@@ -406,6 +587,22 @@
         try { $('modalPurchaseDate').value = new Date(pd.replace(/-/g, ' ')).toISOString().split('T')[0]; }
         catch { $('modalPurchaseDate').value = ''; }
       } else { $('modalPurchaseDate').value = ''; }
+
+      // Enable all fields for edit mode (shared fields affect all items)
+      $('modalShop').readOnly = false;
+      $('modalPurchaseDate').readOnly = false;
+      $('modalDocumentation').readOnly = false;
+      $('modalShop').classList.remove('readonly');
+      $('modalPurchaseDate').classList.remove('readonly');
+      $('modalDocumentation').classList.remove('readonly');
+
+      // Update title
+      const modalTitle = $('modalTitle');
+      if (modalTitle) modalTitle.textContent = '✏️ Edit Item';
+
+      // Hide upload section
+      const uploadSection = qs('.upload-select-section');
+      if (uploadSection) uploadSection.style.display = 'none';
 
       $('modalItemsPreview').style.display = 'none';
       $('ocrModal').style.display = 'flex';
@@ -468,35 +665,69 @@
         window.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false)
       );
 
-      const dropZone  = $('dropZone');
-      const fileInput = $('fileInput');
-      if (dropZone && fileInput) {
-        const browseLink = qs('.browse-link');
-        if (browseLink) browseLink.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fileInput.click(); });
-        dropZone.addEventListener('click',     e => { if (!e.target.classList.contains('browse-link')) fileInput.click(); });
-        dropZone.addEventListener('dragover',  () => dropZone.classList.add('drag-over'));
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-        dropZone.addEventListener('drop',      e => { dropZone.classList.remove('drag-over'); const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f); });
-        fileInput.addEventListener('change',   e => { const f = e.target.files?.[0]; if (f) handleFile(f); });
+      // ===== NEW: Modal drop zone and file input (Requirement 2) =====
+      const modalDropZone = $('modalDropZone');
+      const modalFileInput = $('modalFileInput');
+      if (modalDropZone && modalFileInput) {
+        const browseLink = modalDropZone.querySelector('.browse-link');
+        if (browseLink) browseLink.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); modalFileInput.click(); });
+        modalDropZone.addEventListener('click', e => { if (!e.target.classList.contains('browse-link')) modalFileInput.click(); });
+        modalDropZone.addEventListener('dragover', () => modalDropZone.classList.add('drag-over'));
+        modalDropZone.addEventListener('dragleave', () => modalDropZone.classList.remove('drag-over'));
+        modalDropZone.addEventListener('drop', e => { 
+          modalDropZone.classList.remove('drag-over'); 
+          const f = e.dataTransfer?.files?.[0]; 
+          if (f) {
+            // Clear existing receipt selection (mutual exclusivity)
+            $('existingReceiptSelect').value = '';
+            handleFile(f); 
+          }
+        });
+        modalFileInput.addEventListener('change', e => { 
+          const f = e.target.files?.[0]; 
+          if (f) {
+            // Clear existing receipt selection (mutual exclusivity)
+            $('existingReceiptSelect').value = '';
+            handleFile(f); 
+          }
+        });
       }
 
-      bind('searchInput',   'input',  filterAndRender);
-      bind('projectFilter', 'change', filterAndRender);
-      bind('statusFilter',  'change', filterAndRender);
-      bind('userFilter',    'change', filterAndRender);
-      bind('refreshBtn',    'click',  () => { loadData(); loadSuggestions(); });
-      bind('exportJsonBtn', 'click',  exportJson);
-      bind('exportCsvBtn',  'click',  exportCsv);
-      bind('importBtn',     'click',  () => $('importInput')?.click());
-      bind('importInput',   'change', handleImport);
-      bind('recheckBtn',    'click',  recheckIntegrity);
-      bind('closeBannerBtn','click',  () => { const b = $('integrityBanner'); if (b) b.style.display = 'none'; });
-      bind('columnToggleBtn','click', () => { const p = $('columnPanel'); if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; });
-      bind('closeColumnPanel','click',() => { const p = $('columnPanel'); if (p) p.style.display = 'none'; });
+      // ===== NEW: Existing receipt selection (Requirement 4) =====
+      bind('existingReceiptSelect', 'change', handleExistingReceiptSelect);
 
-      bind('closeModal',  'click',  closeOcrModal);
-      bind('cancelModal', 'click',  closeOcrModal);
-      bind('ocrForm',     'submit', saveOcrData);
+      // ===== NEW: User tag input (Requirement 6) =====
+      const userTagInput = $('userTagInput');
+      if (userTagInput) {
+        userTagInput.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const value = userTagInput.value.trim();
+            if (value) addUserTag(value);
+          }
+        });
+      }
+
+      // ===== NEW: Add New Receipt button (Requirement 1) =====
+      bind('addReceiptBtn', 'click', openNewReceiptModal);
+
+      bind('searchInput', 'input', filterAndRender);
+      bind('projectFilter', 'change', filterAndRender);
+      bind('statusFilter', 'change', filterAndRender);
+      bind('userFilter', 'change', filterAndRender);
+      bind('refreshBtn', 'click', () => { loadData(); loadSuggestions(); });
+      bind('exportJsonBtn', 'click', exportJson);
+      bind('exportCsvBtn', 'click', exportCsv);
+      bind('importBtn', 'click', () => $('importInput')?.click());
+      bind('importInput', 'change', handleImport);
+      bind('recheckBtn', 'click', recheckIntegrity);
+      bind('closeBannerBtn', 'click', () => { const b = $('integrityBanner'); if (b) b.style.display = 'none'; });
+      bind('columnToggleBtn', 'click', () => { const p = $('columnPanel'); if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; });
+      bind('closeColumnPanel', 'click', () => { const p = $('columnPanel'); if (p) p.style.display = 'none'; });
+
+      bind('closeModal', 'click', closeOcrModal);
+      bind('cancelModal', 'click', closeOcrModal);
+      bind('ocrForm', 'submit', saveOcrData);
 
       const modal = $('ocrModal');
       if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeOcrModal(); });
