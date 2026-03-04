@@ -18,9 +18,13 @@ const APP_NAME = "Receipt Manager";
 const SETTINGS_DIR = path.join(app.getPath('home'), 'Library', 'Application Support', APP_NAME);
 const SETTINGS_FILE = path.join(SETTINGS_DIR, 'settings.json');
 
+console.log('[Electron] Starting Receipt Manager...');
+console.log('[Electron] Settings file:', SETTINGS_FILE);
+
 // ── Ensure only one instance of the app runs ──────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
+  console.log('[Electron] Another instance is already running. Exiting.');
   app.quit();
 } else {
   app.on('second-instance', (event, argv, workingDirectory) => {
@@ -51,19 +55,34 @@ function killPortProcess(port) {
 function getAppDir() {
   if (!app.isPackaged) {
     // In development, go up two levels from platforms/macos/ to reach root
-    return path.join(__dirname, '..', '..');
+    const dir = path.join(__dirname, '..', '..');
+    console.log('[Electron] Running in development mode, app dir:', dir);
+    return dir;
   }
   // When packaged, extraResources are in Contents/Resources/
+  console.log('[Electron] Running in packaged mode, resources path:', process.resourcesPath);
   return process.resourcesPath;
 }
 
 // ── Settings management ───────────────────────────────────────────────────
 function getSavedDataPath() {
-  if (!fs.existsSync(SETTINGS_FILE)) return null;
+  console.log('[Settings] Checking for saved data path...');
+  if (!fs.existsSync(SETTINGS_FILE)) {
+    console.log('[Settings] Settings file does not exist:', SETTINGS_FILE);
+    return null;
+  }
   try {
-    const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    const content = fs.readFileSync(SETTINGS_FILE, 'utf8');
+    console.log('[Settings] Settings file content:', content);
+    const settings = JSON.parse(content);
     const chosen = settings.data_directory;
-    if (chosen && fs.existsSync(chosen)) return chosen;
+    console.log('[Settings] Configured data directory:', chosen);
+    if (chosen && fs.existsSync(chosen)) {
+      console.log('[Settings] ✓ Data directory exists and is accessible');
+      return chosen;
+    } else {
+      console.log('[Settings] ✗ Data directory does not exist or is not accessible');
+    }
   } catch (e) {
     console.error('[Settings] Error reading settings:', e);
   }
@@ -71,8 +90,12 @@ function getSavedDataPath() {
 }
 
 function saveSettings(dataPath) {
+  console.log('[Settings] Saving data path:', dataPath);
   try {
-    if (!fs.existsSync(SETTINGS_DIR)) fs.mkdirSync(SETTINGS_DIR, { recursive: true });
+    if (!fs.existsSync(SETTINGS_DIR)) {
+      console.log('[Settings] Creating settings directory:', SETTINGS_DIR);
+      fs.mkdirSync(SETTINGS_DIR, { recursive: true });
+    }
     const settings = {
       data_directory: dataPath,
       app_name: APP_NAME,
@@ -80,9 +103,10 @@ function saveSettings(dataPath) {
       updated_at: new Date().toISOString()
     };
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+    console.log('[Settings] ✓ Settings saved successfully');
     return true;
   } catch (e) {
-    console.error('[Settings] Error saving settings:', e);
+    console.error('[Settings] ✗ Error saving settings:', e);
     return false;
   }
 }
@@ -91,6 +115,7 @@ function saveSettings(dataPath) {
 async function promptForDataFolder() {
   const defaultPath = path.join(app.getPath('documents'), 'Receipts Manager');
 
+  console.log('[FolderPicker] Showing folder picker dialog...');
   const result = await dialog.showMessageBox(mainWindow, {
     type: 'question',
     buttons: ['Choose Folder...', 'Use Default (Documents)'],
@@ -103,8 +128,10 @@ async function promptForDataFolder() {
 
   let chosenPath = null;
   if (result.response === 1) {
+    console.log('[FolderPicker] User chose default location:', defaultPath);
     chosenPath = defaultPath;
   } else {
+    console.log('[FolderPicker] User wants to choose custom location...');
     const pickResult = await dialog.showOpenDialog(mainWindow, {
       title: 'Select Data Storage Folder',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
@@ -112,17 +139,23 @@ async function promptForDataFolder() {
     });
     if (!pickResult.canceled && pickResult.filePaths.length > 0) {
       chosenPath = pickResult.filePaths[0];
+      console.log('[FolderPicker] User selected:', chosenPath);
+    } else {
+      console.log('[FolderPicker] User cancelled folder selection');
     }
   }
 
   if (chosenPath) {
     if (!fs.existsSync(chosenPath)) {
       try {
+        console.log('[FolderPicker] Creating directory structure...');
         fs.mkdirSync(chosenPath, { recursive: true });
         // Create subdirs immediately to verify writability
         fs.mkdirSync(path.join(chosenPath, 'database'), { recursive: true });
         fs.mkdirSync(path.join(chosenPath, 'storage'), { recursive: true });
+        console.log('[FolderPicker] ✓ Directory structure created successfully');
       } catch (e) {
+        console.error('[FolderPicker] ✗ Error creating directory:', e);
         await dialog.showMessageBox(mainWindow, {
           type: 'error',
           title: 'Folder Error',
@@ -143,6 +176,7 @@ async function promptForDataFolder() {
 
 // ── Show "Location Required" page when user cancels ───────────────────────
 function showLocationRequiredPage() {
+  console.log('[UI] Showing location required page');
   const html = `<!DOCTYPE html>
   <html>
   <head>
@@ -215,6 +249,7 @@ function showLocationRequiredPage() {
 
 // ── Find Python ───────────────────────────────────────────────────────────
 function findPython() {
+  console.log('[Python] Searching for Python executable...');
   const appDir = getAppDir();
   const possiblePaths = [
     path.join(appDir, 'venv', 'bin', 'python3'),
@@ -224,28 +259,42 @@ function findPython() {
     '/usr/bin/python3',
     'python3'
   ];
+  
   for (const pyPath of possiblePaths) {
+    console.log('[Python] Checking:', pyPath);
     if (pyPath === 'python3' || fs.existsSync(pyPath)) {
-      console.log('[Python] Found at:', pyPath);
+      console.log('[Python] ✓ Found at:', pyPath);
       return pyPath;
     }
   }
+  
+  console.error('[Python] ✗ Python 3 not found in any expected location');
   startupError = 'Python 3 not found. Please install Python 3 from python.org';
   return null;
 }
 
 // ── Start server ──────────────────────────────────────────────────────────
 function startFlask(dataPath) {
+  console.log('[Server] Starting Python backend...');
+  console.log('[Server] Data path:', dataPath);
+  
   const pythonPath = findPython();
   if (!pythonPath) return false;
 
   const appDir = getAppDir();
   const appPath = path.join(appDir, 'app.py');
 
+  console.log('[Server] App directory:', appDir);
+  console.log('[Server] Looking for app.py at:', appPath);
+
   if (!fs.existsSync(appPath)) {
+    console.error('[Server] ✗ app.py not found at:', appPath);
     startupError = `Cannot find app.py at: ${appPath}`;
     return false;
   }
+
+  console.log('[Server] ✓ app.py found');
+  console.log('[Server] Starting with DATA_DIR:', dataPath);
 
   try {
     flaskProcess = spawn(pythonPath, [appPath], {
@@ -257,15 +306,33 @@ function startFlask(dataPath) {
       }
     });
 
-    flaskProcess.stdout.on('data', d => console.log('[Server]', d.toString().trim()));
+    console.log('[Server] ✓ Process spawned with PID:', flaskProcess.pid);
+
+    flaskProcess.stdout.on('data', d => {
+      const msg = d.toString().trim();
+      console.log('[Server STDOUT]', msg);
+    });
+    
     flaskProcess.stderr.on('data', d => {
       const msg = d.toString().trim();
-      console.error('[Server]', msg);
-      if (msg.includes('Error') || msg.includes('Traceback')) startupError = msg;
+      console.log('[Server STDERR]', msg);
+      if (msg.includes('Error') || msg.includes('Traceback')) {
+        startupError = msg;
+      }
+    });
+
+    flaskProcess.on('error', (err) => {
+      console.error('[Server] Process error:', err);
+      startupError = `Process error: ${err.message}`;
+    });
+
+    flaskProcess.on('exit', (code, signal) => {
+      console.log(`[Server] Process exited with code ${code} and signal ${signal}`);
     });
 
     return true;
   } catch (err) {
+    console.error('[Server] Exception starting server:', err);
     startupError = `Exception starting server: ${err.message}`;
     return false;
   }
@@ -273,38 +340,59 @@ function startFlask(dataPath) {
 
 // ── Standard Boilerplate (Wait / Load / Error) ────────────────────────────
 function waitForFlask(url, retries, callback, errorCallback) {
+  console.log(`[Server] Waiting for server to respond... (${retries} retries left)`);
   const req = http.get(url, (res) => {
     res.resume();
     if (res.statusCode < 500) {
-      console.log('[Electron] Server is ready!');
+      console.log('[Server] ✓ Server is ready! Status:', res.statusCode);
       callback();
     } else {
-      if (retries <= 0) { errorCallback(`Server error: ${res.statusCode}`); return; }
+      console.log('[Server] Server responded with error status:', res.statusCode);
+      if (retries <= 0) { 
+        errorCallback(`Server error: ${res.statusCode}`); 
+        return; 
+      }
       setTimeout(() => waitForFlask(url, retries - 1, callback, errorCallback), 500);
     }
   });
-  req.setTimeout(2000, () => req.destroy());
-  req.on('error', () => {
-    if (retries <= 0) { errorCallback(startupError || 'Server timeout'); return; }
+  req.setTimeout(2000, () => {
+    console.log('[Server] Request timeout, retrying...');
+    req.destroy();
+  });
+  req.on('error', (err) => {
+    console.log('[Server] Connection error:', err.message);
+    if (retries <= 0) { 
+      errorCallback(startupError || 'Server timeout'); 
+      return; 
+    }
     setTimeout(() => waitForFlask(url, retries - 1, callback, errorCallback), 500);
   });
 }
 
 function loadAppWithRetry(retriesLeft) {
+  console.log(`[UI] Loading application... (${retriesLeft} retries left)`);
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.loadURL(FLASK_URL);
-  mainWindow.webContents.once('did-fail-load', () => {
-    if (retriesLeft > 0) setTimeout(() => loadAppWithRetry(retriesLeft - 1), 1000);
-    else showErrorPage('Failed to load application page.');
+  mainWindow.webContents.once('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[UI] Failed to load:', errorCode, errorDescription);
+    if (retriesLeft > 0) {
+      setTimeout(() => loadAppWithRetry(retriesLeft - 1), 1000);
+    } else {
+      showErrorPage('Failed to load application page.');
+    }
+  });
+  mainWindow.webContents.once('did-finish-load', () => {
+    console.log('[UI] ✓ Application loaded successfully');
   });
 }
 
 function showErrorPage(errorMessage) {
+  console.error('[UI] Showing error page:', errorMessage);
   const html = `<html><body style="font-family:sans-serif;padding:50px;">
     <h1 style="color:#d32f2f">Startup Error</h1>
-    <pre style="background:#eee;padding:20px;">${errorMessage}</pre>
-    <p>Please try running from Terminal to see detailed logs.</p>
-    <button onclick="location.reload()">Retry</button>
+    <pre style="background:#eee;padding:20px;white-space:pre-wrap;word-wrap:break-word;">${errorMessage}</pre>
+    <p>Please check the Console.app logs for more details (search for "Receipt Manager" or "Electron").</p>
+    <button onclick="location.reload()" style="padding:10px 20px;font-size:16px;cursor:pointer;">Retry</button>
   </body></html>`;
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -314,6 +402,7 @@ function showErrorPage(errorMessage) {
 // ── Helper: poll backend until /api/data responds ─────────────────────────
 function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
   const checkUrl = new URL('/api/data', url).toString();
+  console.log('[Backend] Polling for backend readiness:', checkUrl);
   return new Promise((resolve, reject) => {
     const start = Date.now();
 
@@ -323,13 +412,16 @@ function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
         res.on('data', () => {});
         res.on('end', () => {});
         if (res.statusCode === 200) {
+          console.log('[Backend] ✓ Backend is ready!');
           resolve();
         } else {
+          console.log('[Backend] Backend responded with status:', res.statusCode);
           retryOrTimeout();
         }
       });
 
-      req.on('error', () => {
+      req.on('error', (err) => {
+        console.log('[Backend] Connection error:', err.message);
         retryOrTimeout();
       });
 
@@ -340,6 +432,7 @@ function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
 
       function retryOrTimeout() {
         if (Date.now() - start >= timeoutMs) {
+          console.error('[Backend] ✗ Timeout waiting for backend');
           reject(new Error(`Backend did not respond within ${timeoutMs}ms`));
         } else {
           setTimeout(attempt, intervalMs);
@@ -353,8 +446,11 @@ function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
 
 // ── createWindow ───────────────────────────────────────────────────────────
 function createWindow() {
+  console.log('[Window] Creating application window...');
+  
   // If a window already exists, focus it and return
   if (mainWindow) {
+    console.log('[Window] Window already exists, focusing...');
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
     return;
@@ -372,12 +468,15 @@ function createWindow() {
     }
   });
 
-  // Open DevTools in development for debugging
-  //if (process.env.NODE_ENV !== 'production') {
-    //try {
-      //mainWindow.webContents.openDevTools({ mode: 'detach' });
-    //} catch (e) {}
-  //}
+  console.log('[Window] ✓ Window created');
+
+  // ALWAYS open DevTools for debugging
+  try {
+    console.log('[DevTools] Opening developer tools...');
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } catch (e) {
+    console.error('[DevTools] Could not open developer tools:', e);
+  }
 
   const loadingHtml = `<html><body style="background:#764ba2;color:white;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
     <div style="border:4px solid rgba(255,255,255,.3);border-top:4px solid white;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;"></div>
@@ -388,12 +487,14 @@ function createWindow() {
 
   // Prevent external links from opening inside the app
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log('[Window] Opening external URL:', url);
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
   // Listen for custom protocol to handle "Select Location" button click
   mainWindow.webContents.on('will-navigate', async (event, url) => {
+    console.log('[Window] Navigation event:', url);
     if (url === 'app://select-location' && waitingForLocation) {
       event.preventDefault();
       waitingForLocation = false;
@@ -418,11 +519,21 @@ function createWindow() {
     }
   });
 
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => { 
+    console.log('[Window] Window closed');
+    mainWindow = null; 
+  });
 }
 
 // ── Main Entry ─────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
+  console.log('═'.repeat(60));
+  console.log('[App] Receipt Manager starting...');
+  console.log('[App] Electron version:', process.versions.electron);
+  console.log('[App] Node version:', process.versions.node);
+  console.log('[App] Packaged:', app.isPackaged);
+  console.log('═'.repeat(60));
+
   // Create the window first
   createWindow();
 
@@ -438,30 +549,54 @@ app.whenReady().then(async () => {
   // 1. Data Directory resolution
   let dataPath = getSavedDataPath();
   if (!dataPath) {
+    console.log('[App] No saved data path found, prompting user...');
     // First time - prompt for location
     dataPath = await promptForDataFolder();
     if (!dataPath) {
       // User cancelled initial selection - show the location required page
+      console.log('[App] User cancelled folder selection, showing location required page');
       waitingForLocation = true;
       showLocationRequiredPage();
       return; // Stop here, wait for user to click button
     }
   }
 
+  console.log('[App] ✓ Data path configured:', dataPath);
+
   // 2. Start backend
+  console.log('[App] Cleaning up port', PORT);
   killPortProcess(PORT);
   await new Promise(r => setTimeout(r, 500));
 
   if (!startFlask(dataPath) && startupError) {
+    console.error('[App] ✗ Failed to start backend');
     showErrorPage(startupError);
   } else {
-    waitForFlask(FLASK_URL, 60, () => loadAppWithRetry(5), (err) => showErrorPage(err));
+    console.log('[App] Backend started, waiting for it to be ready...');
+    waitForFlask(FLASK_URL, 60, () => {
+      console.log('[App] Backend ready, loading application UI...');
+      loadAppWithRetry(5);
+    }, (err) => {
+      console.error('[App] Backend failed to start:', err);
+      showErrorPage(err);
+    });
   }
 }).catch(err => {
+  console.error('[App] Fatal error during startup:', err);
   dialog.showErrorBox('Startup Error', err.message);
 });
 
 app.on('window-all-closed', () => {
-  if (flaskProcess) flaskProcess.kill('SIGTERM');
+  console.log('[App] All windows closed');
+  if (flaskProcess) {
+    console.log('[App] Terminating backend process...');
+    flaskProcess.kill('SIGTERM');
+  }
   app.quit();
 });
+
+app.on('will-quit', () => {
+  console.log('[App] Application quitting...');
+});
+
+console.log('[Electron] electron-main.js loaded successfully');
