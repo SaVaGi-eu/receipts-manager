@@ -1,232 +1,320 @@
-    // ===== Internationalization (i18n) =====
-    // 📝 TRANSLATION GUIDE:
-    // To modify translations, edit the text inside the quotes below
-    // Each language (en, el, nl, lv) has the same keys
-    // Keep {count} placeholders unchanged - they get replaced with numbers
+// ===== Internationalization (i18n) =====
+// 📝 TRANSLATION GUIDE:
+// To modify translations, edit the text inside the quotes below
+// Each language (en, el, nl, lv) has the same keys
+// Keep {count} placeholders unchanged - they get replaced with numbers
 
-    const translations = {
-      en: {
-        appTitle: '🧾 Receipt & Warranty Manager',
-        language: 'Language:',
-        itemCount: '{count} items',
-        dragDrop: 'Drag & Drop receipt file here or',
-        clickBrowse: 'click to browse',
-        supported: 'Supported: PDF, JPG, PNG (max 50MB)',
-        search: '🔍 Search...',
-        allProjects: 'All Projects',
-        allStatuses: 'All Statuses',
-        statusActive: 'Active',
-        statusExpiring: 'Expiring Soon',
-        statusExpired: 'Expired',
-        allUsers: 'All Users',
-        addReceipt: "📝 Add Receipt",
-        refresh: '🔄 Refresh',
-        columns: '🔧 Columns',
-        exportJson: '⬇ JSON',
-        exportCsv: '⬇ CSV',
-        import: '⬆ Import',
-        toggleColumns: 'Toggle Columns',
-        colId: 'ID',
-        colGroup: 'Group',
-        colBrand: 'Brand',
-        colModel: 'Model',
-        colLocation: 'Location',
-        colUsers: 'Users',
-        colProject: 'Project',
-        colShop: 'Shop',
-        colPurchaseDate: 'Purchase Date',
-        colDocumentation: 'Document Type',
-        colGuaranteeEnd: 'Guarantee End',
-        colFile: 'File',
-        colActions: 'Actions',
-        noItems: 'No items yet. Upload a receipt to get started!',
-        verifyReceipt: '📄 Verify Receipt Data',
-        verifyInfo: 'Please verify the extracted information and make corrections if needed.',
-        labelShop: 'Shop/Store',
-        labelPurchaseDate: 'Purchase Date',
-        labelWarranty: 'Warranty (months)',
-        warrantyPlaceholder: '24',
-        labelBrand: 'Brand',
-        labelModel: 'Model',
-        labelLocation: 'Location',
-        labelProject: 'Project',
-        labelDocumentation: 'Documentation',
-        labelUsers: 'Users (comma-separated)',
-        usersPlaceholder: 'John, Jane, Bob',
-        detectedItems: '📦 Detected Items (preview)',
-        cancel: 'Cancel',
-        saveReceipt: 'Save Receipt',
-        edit: 'Edit',
-        delete: 'Delete',
-        recheck: 'Re-check',
-        integrityIssues: '{count} integrity issue(s) detected.'
-      },
-      el: {
-        appTitle: '🧾 Διαχείριση Αποδείξεων & Εγγυήσεων',
-        language: 'Γλώσσα:',
-        itemCount: '{count} στοιχεία',
-        dragDrop: 'Σύρετε και αποθέστε το αρχείο απόδειξης εδώ ή',
-        clickBrowse: 'κάντε κλικ για αναζήτηση',
-        supported: 'Υποστηρίζονται: PDF, JPG, PNG (μέγιστο 50MB)',
-        search: '🔍 Αναζήτηση...',
-        allProjects: 'Όλα τα Έργα',
-        allStatuses: 'Όλες οι Καταστάσεις',
-        statusActive: 'Ενεργό',
-        statusExpiring: 'Λήγει Σύντομα',
-        statusExpired: 'Έχει Λήξει',
-        allUsers: 'Όλοι οι Χρήστες',
-        addReceipt: "📝 Προσθήκη Απόδειξης",
-        refresh: '🔄 Ανανέωση',
-        columns: '🔧 Στήλες',
-        exportJson: '⬇ JSON',
-        exportCsv: '⬇ CSV',
-        import: '⬆ Εισαγωγή',
-        toggleColumns: 'Εναλλαγή Στηλών',
-        colId: 'ID',
-        colGroup: 'Ομάδα',
-        colBrand: 'Μάρκα',
-        colModel: 'Μοντέλο',
-        colLocation: 'Τοποθεσία',
-        colUsers: 'Χρήστες',
-        colProject: 'Έργο',
-        colShop: 'Κατάστημα',
-        colPurchaseDate: 'Ημερομηνία Αγοράς',
-        colDocumentation: 'Είδος Εγγράφου',
-        colGuaranteeEnd: 'Λήξη Εγγύησης',
-        colFile: 'Αρχείο',
-        colActions: 'Ενέργειες',
-        noItems: 'Δεν υπάρχουν ακόμη στοιχεία. Ανεβάστε μια απόδειξη για να ξεκινήσετε!',
-        verifyReceipt: '📄 Επαλήθευση Δεδομένων Απόδειξης',
-        verifyInfo: 'Παρακαλώ επαληθεύστε τις εξαγόμενες πληροφορίες και κάντε διορθώσεις εάν χρειάζεται.',
-        labelShop: 'Κατάστημα',
-        labelPurchaseDate: 'Ημερομηνία Αγοράς',
-        labelWarranty: 'Εγγύηση (μήνες)',
-        warrantyPlaceholder: '24',
-        labelBrand: 'Μάρκα',
-        labelModel: 'Μοντέλο',
-        labelLocation: 'Τοποθεσία',
-        labelProject: 'Έργο',
-        labelDocumentation: 'Τεκμηρίωση',
-        labelUsers: 'Χρήστες (διαχωρισμένοι με κόμμα)',
-        usersPlaceholder: 'Γιάννης, Μαρία, Κώστας',
-        detectedItems: '📦 Ανιχνευμένα Στοιχεία (προεπισκόπηση)',
-        cancel: 'Ακύρωση',
-        saveReceipt: 'Αποθήκευση Απόδειξης',
-        edit: 'Επεξεργασία',
-        delete: 'Διαγραφή',
-        recheck: 'Επανέλεγχος',
-        integrityIssues: '{count} πρόβλημα(-τα) ακεραιότητας εντοπίστηκαν.'
-      },
-      nl: {
-        appTitle: '🧾 Bonnetjes & Garantie Beheer',
-        language: 'Taal:',
-        itemCount: '{count} items',
-        dragDrop: 'Sleep bonnetje hier of',
-        clickBrowse: 'klik om te bladeren',
-        supported: 'Ondersteund: PDF, JPG, PNG (max 50MB)',
-        search: '🔍 Zoeken...',
-        allProjects: 'Alle Projecten',
-        allStatuses: 'Alle Statussen',
-        statusActive: 'Actief',
-        statusExpiring: 'Verloopt Binnenkort',
-        statusExpired: 'Verlopen',
-        allUsers: 'Alle Gebruikers',
-        addReceipt: "📝 Bon Toevoegen",
-        refresh: '🔄 Vernieuwen',
-        columns: '🔧 Kolommen',
-        exportJson: '⬇ JSON',
-        exportCsv: '⬇ CSV',
-        import: '⬆ Importeren',
-        toggleColumns: 'Kolommen Wisselen',
-        colId: 'ID',
-        colGroup: 'Groep',
-        colBrand: 'Merk',
-        colModel: 'Model',
-        colLocation: 'Locatie',
-        colUsers: 'Gebruikers',
-        colProject: 'Project',
-        colShop: 'Winkel',
-        colPurchaseDate: 'Aankoopdatum',
-        colDocumentation: 'Document type',
-        colGuaranteeEnd: 'Garantie Einde',
-        colFile: 'Bestand',
-        colActions: 'Acties',
-        noItems: 'Nog geen items. Upload een bonnetje om te beginnen!',
-        verifyReceipt: '📄 Bongegevens Verifiëren',
-        verifyInfo: 'Controleer de geëxtraheerde informatie en breng indien nodig correcties aan.',
-        labelShop: 'Winkel',
-        labelPurchaseDate: 'Aankoopdatum',
-        labelWarranty: 'Garantie (maanden)',
-        warrantyPlaceholder: '24',
-        labelBrand: 'Merk',
-        labelModel: 'Model',
-        labelLocation: 'Locatie',
-        labelProject: 'Project',
-        labelDocumentation: 'Documentatie',
-        labelUsers: 'Gebruikers (door komma gescheiden)',
-        usersPlaceholder: 'Jan, Piet, Klaas',
-        detectedItems: '📦 Gedetecteerde Items (voorbeeld)',
-        cancel: 'Annuleren',
-        saveReceipt: 'Bon Opslaan',
-        edit: 'Bewerken',
-        delete: 'Verwijderen',
-        recheck: 'Opnieuw Controleren',
-        integrityIssues: '{count} integriteitsproble(e)m(en) gedetecteerd.'
-      },
-      lv: {
-        appTitle: '🧾 Kvīšu & Garantiju Pārvaldība',
-        language: 'Valoda:',
-        itemCount: '{count} vienības',
-        dragDrop: 'Velciet kvīti šeit vai',
-        clickBrowse: 'noklikšķiniet, lai pārlūkotu',
-        supported: 'Atbalstīts: PDF, JPG, PNG (maks. 50MB)',
-        search: '🔍 Meklēt...',
-        allProjects: 'Visi Projekti',
-        allStatuses: 'Visi Statusi',
-        statusActive: 'Aktīvs',
-        statusExpiring: 'Drīz Beigsies',
-        statusExpired: 'Beidzies',
-        allUsers: 'Visi Lietotāji',
-        addReceipt: "📝 Pievienot Čeku",
-        refresh: '🔄 Atsvaidzināt',
-        columns: '🔧 Kolonnas',
-        exportJson: '⬇ JSON',
-        exportCsv: '⬇ CSV',
-        import: '⬆ Importēt',
-        toggleColumns: 'Pārslēgt Kolonnas',
-        colId: 'ID',
-        colGroup: 'Grupa',
-        colBrand: 'Zīmols',
-        colModel: 'Modelis',
-        colLocation: 'Atrašanās vieta',
-        colUsers: 'Lietotāji',
-        colProject: 'Projekts',
-        colShop: 'Veikals',
-        colPurchaseDate: 'Pirkuma Datums',
-        colDocumentation: 'Dokument veids',
-        colGuaranteeEnd: 'Garantijas Beigas',
-        colFile: 'Fails',
-        colActions: 'Darbības',
-        noItems: 'Vēl nav vienību. Augšupielādējiet kvīti, lai sāktu!',
-        verifyReceipt: '📄 Verificēt Kvīts Datus',
-        verifyInfo: 'Lūdzu, pārbaudiet izvilkto informāciju un veiciet labojumus, ja nepieciešams.',
-        labelShop: 'Veikals',
-        labelPurchaseDate: 'Pirkuma Datums',
-        labelWarranty: 'Garantija (mēneši)',
-        warrantyPlaceholder: '24',
-        labelBrand: 'Zīmols',
-        labelModel: 'Modelis',
-        labelLocation: 'Atrašanās vieta',
-        labelProject: 'Projekts',
-        labelDocumentation: 'Dokumentācija',
-        labelUsers: 'Lietotāji (atdalīti ar komatu)',
-        usersPlaceholder: 'Jānis, Anna, Pēteris',
-        detectedItems: '📦 Atklātie Vienumi (priekšskatījums)',
-        cancel: 'Atcelt',
-        saveReceipt: 'Saglabāt Kvīti',
-        edit: 'Rediģēt',
-        delete: 'Dzēst',
-        recheck: 'Pārbaudīt Vēlreiz',
-        integrityIssues: '{count} integritātes problēma(-as) konstatēta(-as).'
+const translations = {
+  en: {
+    appTitle: '🧾 Receipt & Warranty Manager',
+    language: 'Language:',
+    itemCount: '{count} items',
+    dragDrop: 'Drag & Drop receipt file here or',
+    clickBrowse: 'click to browse',
+    supported: 'Supported: PDF, JPG, PNG (max 50MB)',
+    search: '🔍 Search...',
+    allProjects: 'All Projects',
+    allStatuses: 'All Statuses',
+    statusActive: 'Active',
+    statusExpiring: 'Expiring Soon',
+    statusExpired: 'Expired',
+    allUsers: 'All Users',
+    addReceipt: "📝 Add Receipt",
+    refresh: '🔄 Refresh',
+    columns: '🔧 Columns',
+    exportJson: '⬇ JSON',
+    exportCsv: '⬇ CSV',
+    import: '⬆ Import',
+    toggleColumns: 'Toggle Columns',
+    colId: 'ID',
+    colGroup: 'Group',
+    colBrand: 'Brand',
+    colModel: 'Model',
+    colLocation: 'Location',
+    colUsers: 'Users',
+    colProject: 'Project',
+    colShop: 'Shop',
+    colPurchaseDate: 'Purchase Date',
+    colDocumentation: 'Document Type',
+    colGuaranteeEnd: 'Guarantee End',
+    colFile: 'File',
+    colActions: 'Actions',
+    noItems: 'No items yet. Upload a receipt to get started!',
+    verifyReceipt: '📄 Verify Receipt Data',
+    verifyInfo: 'Please verify the extracted information and make corrections if needed.',
+    labelShop: 'Shop/Store',
+    labelPurchaseDate: 'Purchase Date',
+    labelWarranty: 'Warranty (months)',
+    warrantyPlaceholder: '24',
+    labelBrand: 'Brand',
+    labelModel: 'Model',
+    labelLocation: 'Location',
+    labelProject: 'Project',
+    labelDocumentation: 'Documentation',
+    labelUsers: 'Users (comma-separated)',
+    usersPlaceholder: 'John, Jane, Bob',
+    detectedItems: '📦 Detected Items (preview)',
+    cancel: 'Cancel',
+    saveReceipt: 'Save Receipt',
+    edit: 'Edit',
+    delete: 'Delete',
+    recheck: 'Re-check',
+    integrityIssues: '{count} integrity issue(s) detected.',
+    or: 'OR',
+    selectReceiptOption: '-- Choose existing receipt --'
+  },
+  el: {
+    appTitle: '🧾 Διαχείριση Αποδείξεων & Εγγυήσεων',
+    language: 'Γλώσσα:',
+    itemCount: '{count} στοιχεία',
+    dragDrop: 'Σύρετε και αποθέστε το αρχείο απόδειξης εδώ ή',
+    clickBrowse: 'κάντε κλικ για αναζήτηση',
+    supported: 'Υποστηρίζονται: PDF, JPG, PNG (μέγιστο 50MB)',
+    search: '🔍 Αναζήτηση...',
+    allProjects: 'Όλα τα Έργα',
+    allStatuses: 'Όλες οι Καταστάσεις',
+    statusActive: 'Ενεργό',
+    statusExpiring: 'Λήγει Σύντομα',
+    statusExpired: 'Έχει Λήξει',
+    allUsers: 'Όλοι οι Χρήστες',
+    addReceipt: "📝 Προσθήκη Απόδειξης",
+    refresh: '🔄 Ανανέωση',
+    columns: '🔧 Στήλες',
+    exportJson: '⬇ JSON',
+    exportCsv: '⬇ CSV',
+    import: '⬆ Εισαγωγή',
+    toggleColumns: 'Εναλλαγή Στηλών',
+    colId: 'ID',
+    colGroup: 'Ομάδα',
+    colBrand: 'Μάρκα',
+    colModel: 'Μοντέλο',
+    colLocation: 'Τοποθεσία',
+    colUsers: 'Χρήστες',
+    colProject: 'Έργο',
+    colShop: 'Κατάστημα',
+    colPurchaseDate: 'Ημερομηνία Αγοράς',
+    colDocumentation: 'Είδος Εγγράφου',
+    colGuaranteeEnd: 'Λήξη Εγγύησης',
+    colFile: 'Αρχείο',
+    colActions: 'Ενέργειες',
+    noItems: 'Δεν υπάρχουν ακόμη στοιχεία. Ανεβάστε μια απόδειξη για να ξεκινήσετε!',
+    verifyReceipt: '📄 Επαλήθευση Δεδομένων Απόδειξης',
+    verifyInfo: 'Παρακαλώ επαληθεύστε τις εξαγόμενες πληροφορίες και κάντε διορθώσεις εάν χρειάζεται.',
+    labelShop: 'Κατάστημα',
+    labelPurchaseDate: 'Ημερομηνία Αγοράς',
+    labelWarranty: 'Εγγύηση (μήνες)',
+    warrantyPlaceholder: '24',
+    labelBrand: 'Μάρκα',
+    labelModel: 'Μοντέλο',
+    labelLocation: 'Τοποθεσία',
+    labelProject: 'Έργο',
+    labelDocumentation: 'Τεκμηρίωση',
+    labelUsers: 'Χρήστες (διαχωρισμένοι με κόμμα)',
+    usersPlaceholder: 'Γιάννης, Μαρία, Κώστας',
+    detectedItems: '📦 Ανιχνευμένα Στοιχεία (προεπισκόπηση)',
+    cancel: 'Ακύρωση',
+    saveReceipt: 'Αποθήκευση Απόδειξης',
+    edit: 'Επεξεργασία',
+    delete: 'Διαγραφή',
+    recheck: 'Επανέλεγχος',
+    integrityIssues: '{count} πρόβλημα(-τα) ακεραιότητας εντοπίστηκαν.',
+    or: 'Ή',
+    selectReceiptOption: '-- Επιλέξτε υπάρχουσα απόδειξη --'
+  },
+  nl: {
+    appTitle: '🧾 Bonnetjes & Garantie Beheer',
+    language: 'Taal:',
+    itemCount: '{count} items',
+    dragDrop: 'Sleep bonnetje hier of',
+    clickBrowse: 'klik om te bladeren',
+    supported: 'Ondersteund: PDF, JPG, PNG (max 50MB)',
+    search: '🔍 Zoeken...',
+    allProjects: 'Alle Projecten',
+    allStatuses: 'Alle Statussen',
+    statusActive: 'Actief',
+    statusExpiring: 'Verloopt Binnenkort',
+    statusExpired: 'Verlopen',
+    allUsers: 'Alle Gebruikers',
+    addReceipt: "📝 Bon Toevoegen",
+    refresh: '🔄 Vernieuwen',
+    columns: '🔧 Kolommen',
+    exportJson: '⬇ JSON',
+    exportCsv: '⬇ CSV',
+    import: '⬆ Importeren',
+    toggleColumns: 'Kolommen Wisselen',
+    colId: 'ID',
+    colGroup: 'Groep',
+    colBrand: 'Merk',
+    colModel: 'Model',
+    colLocation: 'Locatie',
+    colUsers: 'Gebruikers',
+    colProject: 'Project',
+    colShop: 'Winkel',
+    colPurchaseDate: 'Aankoopdatum',
+    colDocumentation: 'Document type',
+    colGuaranteeEnd: 'Garantie Einde',
+    colFile: 'Bestand',
+    colActions: 'Acties',
+    noItems: 'Nog geen items. Upload een bonnetje om te beginnen!',
+    verifyReceipt: '📄 Bongegevens Verifiëren',
+    verifyInfo: 'Controleer de geëxtraheerde informatie en breng indien nodig correcties aan.',
+    labelShop: 'Winkel',
+    labelPurchaseDate: 'Aankoopdatum',
+    labelWarranty: 'Garantie (maanden)',
+    warrantyPlaceholder: '24',
+    labelBrand: 'Merk',
+    labelModel: 'Model',
+    labelLocation: 'Locatie',
+    labelProject: 'Project',
+    labelDocumentation: 'Documentatie',
+    labelUsers: 'Gebruikers (door komma gescheiden)',
+    usersPlaceholder: 'Jan, Piet, Klaas',
+    detectedItems: '📦 Gedetecteerde Items (voorbeeld)',
+    cancel: 'Annuleren',
+    saveReceipt: 'Bon Opslaan',
+    edit: 'Bewerken',
+    delete: 'Verwijderen',
+    recheck: 'Opnieuw Controleren',
+    integrityIssues: '{count} integriteitsproble(e)m(en) gedetecteerd.',
+    or: 'OF',
+    selectReceiptOption: '-- Kies bestaand bonnetje --'
+  },
+  lv: {
+    appTitle: '🧾 Kvīšu & Garantiju Pārvaldība',
+    language: 'Valoda:',
+    itemCount: '{count} vienības',
+    dragDrop: 'Velciet kvīti šeit vai',
+    clickBrowse: 'noklikšķiniet, lai pārlūkotu',
+    supported: 'Atbalstīts: PDF, JPG, PNG (maks. 50MB)',
+    search: '🔍 Meklēt...',
+    allProjects: 'Visi Projekti',
+    allStatuses: 'Visi Statusi',
+    statusActive: 'Aktīvs',
+    statusExpiring: 'Drīz Beigsies',
+    statusExpired: 'Beidzies',
+    allUsers: 'Visi Lietotāji',
+    addReceipt: "📝 Pievienot Čeku",
+    refresh: '🔄 Atsvaidzināt',
+    columns: '🔧 Kolonnas',
+    exportJson: '⬇ JSON',
+    exportCsv: '⬇ CSV',
+    import: '⬆ Importēt',
+    toggleColumns: 'Pārslēgt Kolonnas',
+    colId: 'ID',
+    colGroup: 'Grupa',
+    colBrand: 'Zīmols',
+    colModel: 'Modelis',
+    colLocation: 'Atrašanās vieta',
+    colUsers: 'Lietotāji',
+    colProject: 'Projekts',
+    colShop: 'Veikals',
+    colPurchaseDate: 'Pirkuma Datums',
+    colDocumentation: 'Dokument veids',
+    colGuaranteeEnd: 'Garantijas Beigas',
+    colFile: 'Fails',
+    colActions: 'Darbības',
+    noItems: 'Vēl nav vienību. Augšupielādējiet kvīti, lai sāktu!',
+    verifyReceipt: '📄 Verificēt Kvīts Datus',
+    verifyInfo: 'Lūdzu, pārbaudiet izvilkto informāciju un veiciet labojumus, ja nepieciešams.',
+    labelShop: 'Veikals',
+    labelPurchaseDate: 'Pirkuma Datums',
+    labelWarranty: 'Garantija (mēneši)',
+    warrantyPlaceholder: '24',
+    labelBrand: 'Zīmols',
+    labelModel: 'Modelis',
+    labelLocation: 'Atrašanās vieta',
+    labelProject: 'Projekts',
+    labelDocumentation: 'Dokumentācija',
+    labelUsers: 'Lietotāji (atdalīti ar komatu)',
+    usersPlaceholder: 'Jānis, Anna, Pēteris',
+    detectedItems: '📦 Atklātie Vienumi (priekšskatījums)',
+    cancel: 'Atcelt',
+    saveReceipt: 'Saglabāt Kvīti',
+    edit: 'Rediģēt',
+    delete: 'Dzēst',
+    recheck: 'Pārbaudīt Vēlreiz',
+    integrityIssues: '{count} integritātes problēma(-as) konstatēta(-as).',
+    or: 'VAI',
+    selectReceiptOption: '-- Izvēlieties esošo kvīti --'
+  }
+};
+
+// ===== Translation Implementation =====
+let currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+
+function translatePage() {
+  const lang = translations[currentLanguage] || translations.en;
+  
+  // Translate elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (lang[key]) {
+      // Handle special cases with placeholders
+      if (key === 'itemCount') {
+        const count = el.textContent.match(/\d+/)?.[0] || '0';
+        el.textContent = lang[key].replace('{count}', count);
+      } else if (key === 'integrityIssues') {
+        const count = el.textContent.match(/\d+/)?.[0] || '0';
+        el.textContent = lang[key].replace('{count}', count);
+      } else {
+        el.textContent = lang[key];
       }
-    };
+    }
+  });
+  
+  // Translate placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (lang[key]) {
+      el.placeholder = lang[key];
+    }
+  });
+  
+  // Update document title
+  if (lang.appTitle) {
+    document.title = lang.appTitle;
+  }
+}
+
+function changeLanguage(langCode) {
+  if (translations[langCode]) {
+    currentLanguage = langCode;
+    localStorage.setItem('selectedLanguage', langCode);
+    translatePage();
+  }
+}
+
+// Initialize translations when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    translatePage();
+    
+    // Setup language selector
+    const langSelect = document.getElementById('languageSelect');
+    if (langSelect) {
+      langSelect.value = currentLanguage;
+      langSelect.addEventListener('change', (e) => {
+        changeLanguage(e.target.value);
+      });
+    }
+  });
+} else {
+  translatePage();
+  
+  // Setup language selector
+  const langSelect = document.getElementById('languageSelect');
+  if (langSelect) {
+    langSelect.value = currentLanguage;
+    langSelect.addEventListener('change', (e) => {
+      changeLanguage(e.target.value);
+    });
+  }
+}
+
+// Export for use in other scripts
+if (typeof window !== 'undefined') {
+  window.translations = translations;
+  window.currentLanguage = currentLanguage;
+  window.changeLanguage = changeLanguage;
+  window.translatePage = translatePage;
+}
