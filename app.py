@@ -537,7 +537,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type_safe)
         csp = (
             "default-src 'self'; "
-            "script-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
             "style-src 'self'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
