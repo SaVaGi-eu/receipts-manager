@@ -1,7 +1,7 @@
-    let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-
+    // Use translation system from translations.js (imported via window)
     function t(key, params = {}) {
-      let text = translations[currentLanguage]?.[key] || translations['en'][key] || key;
+      const lang = window.currentLanguage || 'en';
+      let text = translations[lang]?.[key] || translations['en'][key] || key;
       Object.keys(params).forEach(param => {
         text = text.replace(`{${param}}`, params[param]);
       });
@@ -9,20 +9,10 @@
     }
 
     function updateUI() {
-      // Update all elements with data-i18n attribute
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (el.tagName === 'INPUT' && el.type !== 'button' && el.type !== 'submit') {
-          return; // Skip input fields text content
-        }
-        el.textContent = t(key);
-      });
-
-      // Update placeholders
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        el.placeholder = t(key);
-      });
+      // Let translations.js handle the main translation
+      if (typeof window.translatePage === 'function') {
+        window.translatePage();
+      }
 
       // Update item count
       const count = allData.items?.length || 0;
@@ -35,18 +25,6 @@
       document.querySelectorAll('.btn-edit').forEach(btn => btn.textContent = t('edit'));
       document.querySelectorAll('.btn-delete').forEach(btn => btn.textContent = t('delete'));
     }
-
-    function changeLanguage(lang) {
-      currentLanguage = lang;
-      localStorage.setItem('preferredLanguage', lang);
-      updateUI();
-    }
-
-    // Initialize language selector
-    document.getElementById('languageSelect').value = currentLanguage;
-    document.getElementById('languageSelect').addEventListener('change', (e) => {
-      changeLanguage(e.target.value);
-    });
 
     // ===== Original Application Logic =====
     let allData = { receipts: [], items: [], next_id: 1, integrity_issues: [] };
