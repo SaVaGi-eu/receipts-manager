@@ -11,11 +11,6 @@ function t(key, options = {}) {
   return i18next.t(key, options);
 }
 
-// Export early so it's available
-if (typeof window !== 'undefined') {
-  window.t = t;
-}
-
 // Wait for i18next libraries to load from CDN
 function initializeI18next() {
   if (typeof i18next === 'undefined') {
@@ -50,7 +45,7 @@ function initializeI18next() {
       }
       console.log('[i18n] i18next initialized with language:', i18next.language);
       
-      // Set up all global exports before translating
+      // Set up all global exports
       setupGlobalExports();
       
       // Now translate the page
@@ -78,8 +73,8 @@ function translatePage() {
   
   console.log('[i18n] Translating page to:', i18next.language);
   
-  // Update document title
-  document.title = t('appTitle');
+  // Update document title - use i18next.t directly to bypass any wrapper
+  document.title = i18next.t('appTitle');
   
   // Translate elements with data-i18n attribute
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -87,7 +82,8 @@ function translatePage() {
     if (el.tagName === 'INPUT' && el.type !== 'button' && el.type !== 'submit') {
       return; // Skip input fields text content
     }
-    const translated = t(key);
+    // Use i18next.t directly instead of calling t()
+    const translated = i18next.t(key);
     if (translated !== key) {
       el.textContent = translated;
     }
@@ -96,7 +92,8 @@ function translatePage() {
   // Translate placeholders
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
-    const translated = t(key);
+    // Use i18next.t directly
+    const translated = i18next.t(key);
     if (translated !== key) {
       el.placeholder = translated;
     }
