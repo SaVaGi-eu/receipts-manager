@@ -2,27 +2,51 @@
 // Using i18next for internationalization
 // Documentation: https://www.i18next.com
 
-// Wait for i18next to load from CDN and be initialized
-if (typeof i18next === 'undefined') {
-  console.error('i18next not loaded! Make sure the CDN script is included in HTML.');
-} else if (typeof i18nextHttpBackend === 'undefined') {
-  console.error('i18next-http-backend not loaded! Make sure the CDN script is included in HTML.');
-} else {
-  // i18next is already initialized in the HTML with the backend
-  // We just need to wait for it to be ready
-  i18next.on('initialized', function() {
-    console.log('[i18n] i18next initialized with language:', i18next.language);
-    translatePage();
-    // Emit ready event for app.js to start
-    window.dispatchEvent(new Event('i18nextReady'));
-  });
-  
-  // If already initialized, trigger immediately
-  if (i18next.isInitialized) {
-    console.log('[i18n] i18next already initialized');
-    translatePage();
-    window.dispatchEvent(new Event('i18nextReady'));
+// Wait for i18next libraries to load from CDN
+function initializeI18next() {
+  if (typeof i18next === 'undefined') {
+    console.error('[i18n] i18next not loaded! Make sure the CDN script is included in HTML.');
+    return;
   }
+  
+  if (typeof i18nextHttpBackend === 'undefined') {
+    console.error('[i18n] i18next-http-backend not loaded! Make sure the CDN script is included in HTML.');
+    return;
+  }
+
+  console.log('[i18n] Initializing i18next...');
+  
+  // Initialize i18next with HTTP backend
+  i18next
+    .use(i18nextHttpBackend)
+    .init({
+      lng: localStorage.getItem('selectedLanguage') || 'en',
+      fallbackLng: 'en',
+      debug: false,
+      backend: {
+        loadPath: '/static/i18n/{{lng}}.json'
+      },
+      interpolation: {
+        escapeValue: false
+      }
+    }, function(err, t) {
+      if (err) {
+        console.error('[i18n] Initialization error:', err);
+        return;
+      }
+      console.log('[i18n] i18next initialized with language:', i18next.language);
+      translatePage();
+      // Emit ready event for app.js to start
+      window.dispatchEvent(new Event('i18nextReady'));
+    });
+}
+
+// Start initialization when this script loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeI18next);
+} else {
+  // DOM already loaded, init immediately
+  initializeI18next();
 }
 
 // Translation function wrapper
@@ -98,15 +122,7 @@ function changeLanguage(langCode) {
   });
 }
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    setupLanguageSelector();
-  });
-} else {
-  setupLanguageSelector();
-}
-
+// Setup language selector
 function setupLanguageSelector() {
   const langSelect = document.getElementById('languageSelect');
   if (langSelect) {
@@ -114,6 +130,13 @@ function setupLanguageSelector() {
       changeLanguage(e.target.value);
     });
   }
+}
+
+// Initialize language selector when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupLanguageSelector);
+} else {
+  setupLanguageSelector();
 }
 
 // Export for use in other scripts
