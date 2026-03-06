@@ -1,5 +1,12 @@
 /* ===== CUSTOM ADDITIONS FOR NEW FEATURES ===== */
 
+/* RM-74: Red asterisks for required fields */
+.required-asterisk {
+  color: #f44336;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
 /* Fix 1: Red Add Receipt button styling */
 .btn-add-receipt {
   padding: 0.6rem 1.2rem;
