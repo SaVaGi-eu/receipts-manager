@@ -1,20 +1,20 @@
-    // Use translation system from translations.js (imported via window)
+    // Use translation system from i18next (loaded via CDN and i18n.js)
     function t(key, params = {}) {
-      const lang = window.currentLanguage || 'en';
-      let text = translations[lang]?.[key] || translations['en'][key] || key;
-      Object.keys(params).forEach(param => {
-        text = text.replace(`{${param}}`, params[param]);
-      });
-      return text;
+      // Use i18next if available
+      if (typeof window.t === 'function' && window.t !== t) {
+        return window.t(key, params);
+      }
+      // Fallback if i18next not loaded yet
+      return key;
     }
 
     function updateUI() {
-      // Let translations.js handle the main translation
+      // Let i18n.js handle the main translation
       if (typeof window.translatePage === 'function') {
         window.translatePage();
       }
 
-      // Update item count
+      // Update item count with proper pluralization
       const count = allData.items?.length || 0;
       const itemCountEl = document.getElementById('itemCount');
       if (itemCountEl) {
@@ -722,9 +722,20 @@
         else { currentSort.column = col; currentSort.direction = 'asc'; }
         updateSortIndicators(); filterAndRender();
       }));
+
+      // Listen for language change events to update dynamic content
+      window.addEventListener('languageChanged', () => {
+        filterAndRender();
+        populateFilterDropdowns();
+      });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      updateUI();
-      loadData(); loadSuggestions(); setupEventListeners();
+      // Wait a bit for i18next to initialize
+      setTimeout(() => {
+        updateUI();
+        loadData(); 
+        loadSuggestions(); 
+        setupEventListeners();
+      }, 100);
     });
