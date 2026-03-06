@@ -1,13 +1,5 @@
     // Use translation system from i18next (loaded via CDN and i18n.js)
-    function t(key, params = {}) {
-      // Use i18next if available
-      if (typeof window.t === 'function' && window.t !== t) {
-        return window.t(key, params);
-      }
-      // Fallback if i18next not loaded yet
-      console.warn('[app] i18next not ready, returning key:', key);
-      return key;
-    }
+    // No local t() function - use window.t directly which is set by i18n.js
 
     function updateUI() {
       console.log('[app] Updating UI');
@@ -19,13 +11,15 @@
       // Update item count with proper pluralization
       const count = allData.items?.length || 0;
       const itemCountEl = document.getElementById('itemCount');
-      if (itemCountEl) {
-        itemCountEl.textContent = t('itemCount', { count });
+      if (itemCountEl && typeof window.t === 'function') {
+        itemCountEl.textContent = window.t('itemCount', { count });
       }
 
       // Update buttons in table
-      document.querySelectorAll('.btn-edit').forEach(btn => btn.textContent = t('edit'));
-      document.querySelectorAll('.btn-delete').forEach(btn => btn.textContent = t('delete'));
+      if (typeof window.t === 'function') {
+        document.querySelectorAll('.btn-edit').forEach(btn => btn.textContent = window.t('edit'));
+        document.querySelectorAll('.btn-delete').forEach(btn => btn.textContent = window.t('delete'));
+      }
     }
 
     // ===== Original Application Logic =====
@@ -87,8 +81,8 @@
         if (banner) {
           const issues = allData.integrity_issues || [];
           banner.style.display = issues.length > 0 ? 'flex' : 'none';
-          if ($('integrityMessage'))
-            $('integrityMessage').textContent = issues.length > 0 ? t('integrityIssues', { count: issues.length }) : '';
+          if ($('integrityMessage') && typeof window.t === 'function')
+            $('integrityMessage').textContent = issues.length > 0 ? window.t('integrityIssues', { count: issues.length }) : '';
         }
         filterAndRender();
       } catch (err) {
@@ -122,6 +116,7 @@
     }
 
     function populateFilterDropdowns() {
+      const t = window.t || (key => key);
       const projectFilter = $('projectFilter');
       if (projectFilter) {
         const current = projectFilter.value;
@@ -144,6 +139,7 @@
     function populateExistingReceipts() {
       const select = $('existingReceiptSelect');
       if (!select) return;
+      const t = window.t || (key => key);
       
       const rmap = receiptMap();
       const options = Array.from(rmap.values())
@@ -224,6 +220,7 @@
     function renderTable(rows) {
       const tbody = $('tableBody');
       if (!tbody) return;
+      const t = window.t || (key => key);
       if (!rows || rows.length === 0) {
         tbody.innerHTML = `<tr class="empty-state"><td colspan="13"><div class="empty-message"><span class="empty-icon">📦</span><p>${t('noItems')}</p></div></td></tr>`;
         if ($('itemCount')) $('itemCount').textContent = t('itemCount', { count: 0 });
