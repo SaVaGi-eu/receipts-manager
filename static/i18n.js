@@ -2,35 +2,33 @@
 // Using i18next for internationalization
 // Documentation: https://www.i18next.com
 
-// Wait for i18next to load from CDN
+// Wait for i18next to load from CDN and be initialized
 if (typeof i18next === 'undefined') {
   console.error('i18next not loaded! Make sure the CDN script is included in HTML.');
+} else if (typeof i18nextHttpBackend === 'undefined') {
+  console.error('i18next-http-backend not loaded! Make sure the CDN script is included in HTML.');
 } else {
-  // Initialize i18next
-  i18next.init({
-    lng: localStorage.getItem('selectedLanguage') || 'en',
-    fallbackLng: 'en',
-    debug: false,
-    backend: {
-      loadPath: '/static/i18n/{{lng}}.json'
-    },
-    interpolation: {
-      escapeValue: false // Not needed for plain JS
-    }
-  }, function(err, t) {
-    if (err) {
-      console.error('i18next initialization failed:', err);
-      return;
-    }
-    // Translate the page once i18next is ready
+  // i18next is already initialized in the HTML with the backend
+  // We just need to wait for it to be ready
+  i18next.on('initialized', function() {
+    console.log('[i18n] i18next initialized with language:', i18next.language);
     translatePage();
+    // Emit ready event for app.js to start
+    window.dispatchEvent(new Event('i18nextReady'));
   });
+  
+  // If already initialized, trigger immediately
+  if (i18next.isInitialized) {
+    console.log('[i18n] i18next already initialized');
+    translatePage();
+    window.dispatchEvent(new Event('i18nextReady'));
+  }
 }
 
 // Translation function wrapper
 function t(key, options = {}) {
-  if (typeof i18next === 'undefined') {
-    console.warn('i18next not available, returning key:', key);
+  if (typeof i18next === 'undefined' || !i18next.isInitialized) {
+    console.warn('[i18n] i18next not ready, returning key:', key);
     return key;
   }
   return i18next.t(key, options);
@@ -38,7 +36,12 @@ function t(key, options = {}) {
 
 // Translate all elements on the page
 function translatePage() {
-  if (typeof i18next === 'undefined') return;
+  if (typeof i18next === 'undefined' || !i18next.isInitialized) {
+    console.warn('[i18n] Cannot translate page, i18next not ready');
+    return;
+  }
+  
+  console.log('[i18n] Translating page to:', i18next.language);
   
   // Update document title
   document.title = t('appTitle');
@@ -49,13 +52,19 @@ function translatePage() {
     if (el.tagName === 'INPUT' && el.type !== 'button' && el.type !== 'submit') {
       return; // Skip input fields text content
     }
-    el.textContent = t(key);
+    const translated = t(key);
+    if (translated !== key) {
+      el.textContent = translated;
+    }
   });
   
   // Translate placeholders
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
-    el.placeholder = t(key);
+    const translated = t(key);
+    if (translated !== key) {
+      el.placeholder = translated;
+    }
   });
   
   // Update language selector
@@ -63,15 +72,22 @@ function translatePage() {
   if (langSelect) {
     langSelect.value = i18next.language;
   }
+  
+  console.log('[i18n] Page translation complete');
 }
 
 // Change language function
 function changeLanguage(langCode) {
-  if (typeof i18next === 'undefined') return;
+  if (typeof i18next === 'undefined' || !i18next.isInitialized) {
+    console.error('[i18n] Cannot change language, i18next not ready');
+    return;
+  }
+  
+  console.log('[i18n] Changing language to:', langCode);
   
   i18next.changeLanguage(langCode, (err, t) => {
     if (err) {
-      console.error('Language change failed:', err);
+      console.error('[i18n] Language change failed:', err);
       return;
     }
     localStorage.setItem('selectedLanguage', langCode);
@@ -85,16 +101,13 @@ function changeLanguage(langCode) {
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    // Setup language selector
-    const langSelect = document.getElementById('languageSelect');
-    if (langSelect) {
-      langSelect.addEventListener('change', (e) => {
-        changeLanguage(e.target.value);
-      });
-    }
+    setupLanguageSelector();
   });
 } else {
-  // DOM already loaded
+  setupLanguageSelector();
+}
+
+function setupLanguageSelector() {
   const langSelect = document.getElementById('languageSelect');
   if (langSelect) {
     langSelect.addEventListener('change', (e) => {

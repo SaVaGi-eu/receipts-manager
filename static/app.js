@@ -5,10 +5,12 @@
         return window.t(key, params);
       }
       // Fallback if i18next not loaded yet
+      console.warn('[app] i18next not ready, returning key:', key);
       return key;
     }
 
     function updateUI() {
+      console.log('[app] Updating UI');
       // Let i18n.js handle the main translation
       if (typeof window.translatePage === 'function') {
         window.translatePage();
@@ -151,7 +153,7 @@
           return `<option value="${r.receipt_group_id}">${label}</option>`;
         }).join('');
       
-      select.innerHTML = `<option value="">-- Choose existing receipt --</option>` + options;
+      select.innerHTML = `<option value="">${t('selectReceiptOption')}</option>` + options;
     }
 
     function receiptMap() {
@@ -730,12 +732,49 @@
       });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      // Wait a bit for i18next to initialize
-      setTimeout(() => {
-        updateUI();
-        loadData(); 
-        loadSuggestions(); 
-        setupEventListeners();
-      }, 100);
+    // Initialize the app
+    function initApp() {
+      console.log('[app] Initializing application');
+      updateUI();
+      loadData(); 
+      loadSuggestions(); 
+      setupEventListeners();
+    }
+
+    // Wait for both DOM and i18next to be ready
+    let domReady = false;
+    let i18nextReady = false;
+
+    function tryInitApp() {
+      if (domReady && i18nextReady) {
+        initApp();
+      }
+    }
+
+    // DOM ready handler
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('[app] DOM ready');
+        domReady = true;
+        tryInitApp();
+      });
+    } else {
+      console.log('[app] DOM already ready');
+      domReady = true;
+    }
+
+    // i18next ready handler
+    window.addEventListener('i18nextReady', () => {
+      console.log('[app] i18next ready');
+      i18nextReady = true;
+      tryInitApp();
     });
+
+    // Fallback timeout in case i18next never fires the event
+    setTimeout(() => {
+      if (!i18nextReady) {
+        console.warn('[app] i18next timeout, initializing anyway');
+        i18nextReady = true;
+        tryInitApp();
+      }
+    }, 2000);
