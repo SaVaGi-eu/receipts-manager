@@ -2,6 +2,20 @@
 // Using i18next for internationalization
 // Documentation: https://www.i18next.com
 
+// Translation function wrapper
+function t(key, options = {}) {
+  if (typeof i18next === 'undefined' || !i18next.isInitialized) {
+    console.warn('[i18n] i18next not ready, returning key:', key);
+    return key;
+  }
+  return i18next.t(key, options);
+}
+
+// Export early so it's available
+if (typeof window !== 'undefined') {
+  window.t = t;
+}
+
 // Wait for i18next libraries to load from CDN
 function initializeI18next() {
   if (typeof i18next === 'undefined') {
@@ -35,7 +49,13 @@ function initializeI18next() {
         return;
       }
       console.log('[i18n] i18next initialized with language:', i18next.language);
+      
+      // Set up all global exports before translating
+      setupGlobalExports();
+      
+      // Now translate the page
       translatePage();
+      
       // Emit ready event for app.js to start
       window.dispatchEvent(new Event('i18nextReady'));
     });
@@ -47,15 +67,6 @@ if (document.readyState === 'loading') {
 } else {
   // DOM already loaded, init immediately
   initializeI18next();
-}
-
-// Translation function wrapper
-function t(key, options = {}) {
-  if (typeof i18next === 'undefined' || !i18next.isInitialized) {
-    console.warn('[i18n] i18next not ready, returning key:', key);
-    return key;
-  }
-  return i18next.t(key, options);
 }
 
 // Translate all elements on the page
@@ -139,16 +150,18 @@ if (document.readyState === 'loading') {
   setupLanguageSelector();
 }
 
-// Export for use in other scripts
-if (typeof window !== 'undefined') {
-  window.t = t;
-  window.changeLanguage = changeLanguage;
-  window.translatePage = translatePage;
-  
-  // For backwards compatibility
-  Object.defineProperty(window, 'currentLanguage', {
-    get: function() {
-      return typeof i18next !== 'undefined' ? i18next.language : 'en';
-    }
-  });
+// Set up global exports
+function setupGlobalExports() {
+  if (typeof window !== 'undefined') {
+    window.t = t;
+    window.changeLanguage = changeLanguage;
+    window.translatePage = translatePage;
+    
+    // For backwards compatibility
+    Object.defineProperty(window, 'currentLanguage', {
+      get: function() {
+        return typeof i18next !== 'undefined' ? i18next.language : 'en';
+      }
+    });
+  }
 }
