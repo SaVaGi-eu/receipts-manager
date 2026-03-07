@@ -3,11 +3,34 @@
 // Current storage configuration (loaded from backend)
 let currentConfig = {
   storageType: 'local',
-  dataFile: '/data/receipts.json'
+  dataFile: null
 };
 
 // Prevent duplicate browse dialogs
 let isBrowsing = false;
+
+/**
+ * Fetch current configuration from backend
+ */
+async function fetchCurrentConfig() {
+  try {
+    const response = await fetch('/api/config');
+    const config = await response.json();
+    
+    if (config.configured) {
+      currentConfig.storageType = config.storage_type || 'local';
+      currentConfig.dataFile = config.data_path || null;
+      return config;
+    } else {
+      currentConfig.storageType = 'none';
+      currentConfig.dataFile = null;
+      return config;
+    }
+  } catch (error) {
+    console.error('[Settings] Failed to fetch config:', error);
+    return null;
+  }
+}
 
 /**
  * Initialize settings modal functionality
@@ -21,10 +44,10 @@ function initSettingsModal() {
 
   // Open settings modal
   if (menuBtn) {
-    menuBtn.addEventListener('click', () => {
+    menuBtn.addEventListener('click', async () => {
       if (menuModal) {
         menuModal.style.display = 'flex';
-        loadCurrentConfig();
+        await loadCurrentConfig();
       }
     });
   }
@@ -104,17 +127,28 @@ function initSettingsModal() {
 /**
  * Load current configuration and display it
  */
-function loadCurrentConfig() {
+async function loadCurrentConfig() {
+  // Fetch latest config from backend
+  const config = await fetchCurrentConfig();
+  
   // Update display elements
   const storageTypeEl = document.getElementById('currentStorageType');
   const storagePathEl = document.getElementById('currentStoragePath');
 
   if (storageTypeEl) {
-    storageTypeEl.textContent = currentConfig.storageType === 'local' ? 'Local' : 'Cloud';
+    if (config && config.configured) {
+      storageTypeEl.textContent = 'Local';
+    } else {
+      storageTypeEl.textContent = 'Not configured';
+    }
   }
 
   if (storagePathEl) {
-    storagePathEl.textContent = currentConfig.dataFile || '/data/receipts.json';
+    if (config && config.configured && config.data_path) {
+      storagePathEl.textContent = config.data_path;
+    } else {
+      storagePathEl.textContent = 'Not configured';
+    }
   }
 }
 
@@ -130,7 +164,7 @@ function openLocationModal() {
 
     // Set current path
     if (localPathInput) {
-      localPathInput.value = currentConfig.dataFile || '/data/receipts.json';
+      localPathInput.value = currentConfig.dataFile || '';
     }
 
     // Initialize location modal handlers if not already done
@@ -268,14 +302,11 @@ async function applyLocationSettings() {
     const result = await response.json();
 
     if (result.success) {
-      // Save to localStorage as well
-      localStorage.setItem('storageConfig', JSON.stringify(currentConfig));
-
       // Show confirmation
       alert('Storage location updated! The application needs to restart for changes to take effect.');
 
       // Update display
-      loadCurrentConfig();
+      await loadCurrentConfig();
 
       // Close modals
       const locationModal = document.getElementById('locationModal');
@@ -296,14 +327,4 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initSettingsModal);
 } else {
   initSettingsModal();
-}
-
-// Load saved config from localStorage on startup
-try {
-  const savedConfig = localStorage.getItem('storageConfig');
-  if (savedConfig) {
-    currentConfig = JSON.parse(savedConfig);
-  }
-} catch (e) {
-  console.warn('[Settings] Failed to load saved config:', e);
 }
