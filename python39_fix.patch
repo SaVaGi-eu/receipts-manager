@@ -1,0 +1,25 @@
+# Python 3.9 Compatibility Fix for app.py
+
+## Changes needed:
+
+1. Add import at top of file (line ~16):
+```python
+from typing import Optional
+```
+
+2. Replace line 55:
+```python
+# OLD:
+def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
+
+# NEW:
+def safe_resolve_within(root: Path, rel_path: str) -> Optional[Path]:
+```
+
+## Apply manually:
+
+Open app.py and make these two changes:
+1. Add `from typing import Optional` after the pathlib import
+2. Change `Path | None` to `Optional[Path]` in the function signature
+
+Then save and rerun the application.
