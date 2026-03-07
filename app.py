@@ -9,6 +9,7 @@ import mimetypes
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -510,10 +511,20 @@ def _open_file_dialog_macos():
     RM-80: Open native macOS file dialog using AppleScript.
     Works on all macOS versions without tkinter dependency.
     Returns selected file path or None if cancelled.
+    Handles paths with spaces and iCloud paths correctly.
     """
     applescript = '''
-    set theFile to choose file with prompt "Select Data File" of type {"json", "public.json"}
-    return POSIX path of theFile
+    try
+        set theFile to choose file with prompt "Select Data File" of type {"json", "public.json"}
+        set posixPath to POSIX path of theFile
+        return posixPath
+    on error errMsg number errNum
+        if errNum is -128 then
+            return "USER_CANCELLED"
+        else
+            return "ERROR: " & errMsg
+        end if
+    end try
     '''
     
     try:
@@ -524,10 +535,26 @@ def _open_file_dialog_macos():
             timeout=60
         )
         
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
+        if result.returncode == 0:
+            path = result.stdout.strip()
+            
+            # Handle user cancellation
+            if path == "USER_CANCELLED":
+                return None
+            
+            # Handle errors
+            if path.startswith("ERROR:"):
+                logger.error(f"AppleScript error: {path}")
+                return None
+            
+            # Validate the returned path exists
+            if path and Path(path).exists():
+                return path
+            else:
+                logger.error(f"Selected path does not exist: {path}")
+                return None
         else:
-            # User cancelled or error
+            logger.error(f"AppleScript failed with code {result.returncode}: {result.stderr}")
             return None
             
     except subprocess.TimeoutExpired:
@@ -793,8 +820,13 @@ class Handler(BaseHTTPRequestHandler):
                 logger.info(f"[Browse] Result: {selected_path}")
                 
                 if selected_path:
-                    self._set_headers(200)
-                    self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
+                    # Validate path exists
+                    if Path(selected_path).exists():
+                        self._set_headers(200)
+                        self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
+                    else:
+                        self._set_headers(200)
+                        self.wfile.write(json.dumps({"success": False, "error": "Selected file does not exist"}).encode("utf-8"))
                 else:
                     self._set_headers(200)
                     self.wfile.write(json.dumps({"success": False, "error": "No file selected"}).encode("utf-8"))
@@ -958,6 +990,33 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # RM-80: Config update endpoint
+        if path == "/api/config/update":
+            try:
+                updates = self._read_json()
+                data_file = updates.get("data_file")
+                
+                if not data_file:
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({"success": False, "error": "Missing data_file parameter"}).encode("utf-8"))
+                    return
+                
+                # Import save_data_path from config
+                from config import save_data_path
+                
+                # Validate and save the path
+                if save_data_path(data_file):
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": True, "message": "Configuration updated. Please restart the application."}).encode("utf-8"))
+                else:
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({"success": False, "error": "Failed to save configuration. Check if the path is valid and writable."}).encode("utf-8"))
+            except Exception as e:
+                logger.exception("Error updating config")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            return
 
         if path == "/api/upload":
             length = int(self.headers.get("Content-Length", 0) or 0)
