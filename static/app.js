@@ -463,6 +463,55 @@ function closeOcrModal() {
   }
 }
 
+// RM-80: Menu modal functions
+function openMenuModal() {
+  const modal = $('menuModal');
+  if (!modal) return;
+  
+  // Update current location display
+  const storageType = $('currentStorageType');
+  const storagePath = $('currentStoragePath');
+  if (storageType) storageType.textContent = 'Local';
+  if (storagePath) storagePath.textContent = '/data/receipts.json';
+  
+  modal.style.display = 'flex';
+}
+
+function closeMenuModal() {
+  const modal = $('menuModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function openLocationModal() {
+  const modal = $('locationModal');
+  if (!modal) return;
+  
+  // Set current selection to local
+  const localRadio = $('storageLocal');
+  if (localRadio) localRadio.checked = true;
+  
+  modal.style.display = 'flex';
+}
+
+function closeLocationModal() {
+  const modal = $('locationModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function applyLocationChange() {
+  const selectedStorage = document.querySelector('input[name="storage"]:checked')?.value;
+  
+  if (selectedStorage === 'cloud') {
+    alert('Cloud storage is coming soon!');
+    return;
+  }
+  
+  // For local storage, just close the modal
+  closeLocationModal();
+  closeMenuModal();
+  alert('Storage location confirmed: Local (/data)');
+}
+
 function addUserTag(username) {
   const trimmed = username.trim();
   if (!trimmed || userTags.includes(trimmed)) return;
@@ -734,31 +783,39 @@ function setupEventListeners() {
     });
   }
 
-  // RM-80: Menu button functionality
-  const menuBtn = $('menuBtn');
-  const menuDropdown = $('menuDropdown');
-  if (menuBtn && menuDropdown) {
-    menuBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      menuDropdown.classList.toggle('hidden');
+  // RM-80: Menu modal event handlers
+  bind('menuBtn', 'click', openMenuModal);
+  bind('closeMenuModal', 'click', closeMenuModal);
+  bind('closeMenuModalBtn', 'click', closeMenuModal);
+  
+  // Menu modal backdrop close
+  const menuModal = $('menuModal');
+  if (menuModal) {
+    menuModal.addEventListener('click', e => {
+      if (e.target === menuModal) closeMenuModal();
     });
-    
-    // Close menu when clicking outside
-    document.addEventListener('click', e => {
-      if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
-        menuDropdown.classList.add('hidden');
-      }
-    });
-    
-    // Handle menu actions
-    const menuBackupBtn = $('menuBackupBtn');
-    const menuRestoreBtn = $('menuRestoreBtn');
-    const menuExportBtn = $('menuExportBtn');
-    
-    if (menuBackupBtn) menuBackupBtn.addEventListener('click', () => { exportJson(); menuDropdown.classList.add('hidden'); });
-    if (menuRestoreBtn) menuRestoreBtn.addEventListener('click', () => { $('importInput')?.click(); menuDropdown.classList.add('hidden'); });
-    if (menuExportBtn) menuExportBtn.addEventListener('click', () => { exportCsv(); menuDropdown.classList.add('hidden'); });
   }
+  
+  // Location change handlers
+  bind('changeLocationBtn', 'click', () => {
+    openLocationModal();
+  });
+  bind('closeLocationModal', 'click', closeLocationModal);
+  bind('cancelLocationChange', 'click', closeLocationModal);
+  bind('applyLocationChange', 'click', applyLocationChange);
+  
+  // Location modal backdrop close
+  const locationModal = $('locationModal');
+  if (locationModal) {
+    locationModal.addEventListener('click', e => {
+      if (e.target === locationModal) closeLocationModal();
+    });
+  }
+  
+  // Menu action buttons
+  bind('menuBackupBtn', 'click', () => { exportJson(); });
+  bind('menuRestoreBtn', 'click', () => { $('importInput')?.click(); });
+  bind('menuExportBtn', 'click', () => { exportCsv(); });
 
   bind('addReceiptBtn', 'click', openNewReceiptModal);
   bind('searchInput', 'input', filterAndRender);
@@ -766,9 +823,6 @@ function setupEventListeners() {
   bind('statusFilter', 'change', filterAndRender);
   bind('userFilter', 'change', filterAndRender);
   bind('refreshBtn', 'click', () => { loadData(); loadSuggestions(); });
-  bind('exportJsonBtn', 'click', exportJson);
-  bind('exportCsvBtn', 'click', exportCsv);
-  bind('importBtn', 'click', () => $('importInput')?.click());
   bind('importInput', 'change', handleImport);
   bind('recheckBtn', 'click', recheckIntegrity);
   bind('closeBannerBtn', 'click', () => { const b = $('integrityBanner'); if (b) b.style.display = 'none'; });
