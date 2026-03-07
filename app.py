@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
@@ -52,7 +53,7 @@ def sanitize_header_value(value: str) -> str:
     return sanitized
 
 
-def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
+def safe_resolve_within(root: Path, rel_path: str) -> Optional[Path]:
     """
     SECURITY: Resolve a user-supplied relative path against root safely.
     Returns the resolved Path if it is contained within root, otherwise None.
