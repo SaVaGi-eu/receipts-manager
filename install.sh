@@ -81,6 +81,51 @@ check_tesseract() {
     fi
 }
 
+# Function to install Tesseract
+install_tesseract() {
+    echo -e "\n${BLUE}═══ Installing Tesseract OCR ═══${NC}\n"
+    
+    case "$OS" in
+        Darwin)
+            if command_exists brew; then
+                echo "Installing Tesseract via Homebrew..."
+                brew install tesseract tesseract-lang
+                echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
+                return 0
+            else
+                echo -e "${RED}Homebrew is required to auto-install Tesseract.${NC}"
+                echo "Install Homebrew from: https://brew.sh"
+                echo "Then run: brew install tesseract tesseract-lang"
+                return 1
+            fi
+            ;;
+        Linux)
+            if command_exists apt-get; then
+                echo "Installing Tesseract via apt-get..."
+                echo "This requires sudo privileges."
+                sudo apt-get update
+                sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-nld tesseract-ocr-ell tesseract-ocr-lav
+                echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
+                return 0
+            elif command_exists yum; then
+                echo "Installing Tesseract via yum..."
+                echo "This requires sudo privileges."
+                sudo yum install -y tesseract tesseract-langpack-eng tesseract-langpack-nld
+                echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
+                return 0
+            else
+                echo -e "${RED}Unable to auto-install Tesseract.${NC}"
+                echo "Please install manually: sudo apt-get install tesseract-ocr"
+                return 1
+            fi
+            ;;
+        *)
+            echo -e "${RED}Unsupported OS for auto-installation.${NC}"
+            return 1
+            ;;
+    esac
+}
+
 # Build macOS App
 build_macos_app() {
     echo -e "\n${BLUE}═══ Building macOS Application ═══${NC}\n"
@@ -99,15 +144,16 @@ build_macos_app() {
         exit 1
     }
 
-    check_tesseract || {
-        echo -e "\n${YELLOW}Tesseract is recommended for OCR.${NC}"
-        echo "Install with: brew install tesseract tesseract-lang"
-        read -p "Continue without Tesseract? (y/N) " -n 1 -r
+    if ! check_tesseract; then
+        echo -e "\n${YELLOW}Tesseract is recommended for OCR functionality.${NC}"
+        read -p "Would you like to install Tesseract now? (Y/n) " -n 1 -r
         echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            install_tesseract || {
+                echo -e "${YELLOW}Continuing without Tesseract. OCR features will be disabled.${NC}"
+            }
         fi
-    }
+    fi
 
     # Detect architecture
     if [[ "$ARCH" == "arm64" ]]; then
@@ -206,17 +252,21 @@ run_direct() {
         exit 1
     }
 
-    check_tesseract || {
-        echo -e "\n${YELLOW}Tesseract is recommended for OCR.${NC}"
-        case "$OS" in
-            Darwin)
-                echo "Install with: brew install tesseract tesseract-lang"
-                ;;
-            Linux)
-                echo "Install with: sudo apt-get install tesseract-ocr"
-                ;;
-        esac
-    }
+    # Check and offer to install Tesseract
+    if ! check_tesseract; then
+        echo ""
+        read -p "Would you like to install Tesseract now for OCR functionality? (Y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            if install_tesseract; then
+                echo -e "${GREEN}Tesseract installed successfully!${NC}"
+            else
+                echo -e "${YELLOW}Continuing without Tesseract. OCR features will be disabled.${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Continuing without Tesseract. OCR features will be disabled.${NC}"
+        fi
+    fi
 
     # Create venv if it doesn't exist
     if [ ! -d "venv" ]; then
