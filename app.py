@@ -692,6 +692,47 @@ def _open_file_dialog():
         return _open_file_dialog_tkinter()
 
 
+def _get_current_config():
+    """
+    RM-80: Get current configuration for frontend display.
+    Returns dict with storage_type, data_path, and configured status.
+    """
+    from config import SETTINGS_FILE
+    
+    # Check for DATA_DIR environment variable first
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir:
+        return {
+            "storage_type": "local",
+            "data_path": env_dir,
+            "configured": True,
+            "source": "environment"
+        }
+    
+    # Check settings.json
+    if SETTINGS_FILE.exists():
+        try:
+            settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            data_dir = settings.get("data_directory")
+            if data_dir:
+                return {
+                    "storage_type": "local",
+                    "data_path": data_dir,
+                    "configured": True,
+                    "source": "settings_file"
+                }
+        except Exception as e:
+            logger.error(f"Error reading settings: {e}")
+    
+    # Not configured
+    return {
+        "storage_type": "none",
+        "data_path": None,
+        "configured": False,
+        "source": "none"
+    }
+
+
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
     """
@@ -810,6 +851,18 @@ class Handler(BaseHTTPRequestHandler):
                     if not chunk:
                         break
                     self.wfile.write(chunk)
+            return
+
+        # RM-80: Get current configuration
+        if path == "/api/config":
+            try:
+                config = _get_current_config()
+                self._set_headers(200)
+                self.wfile.write(json.dumps(config).encode("utf-8"))
+            except Exception as e:
+                logger.exception("Error getting config")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
             return
 
         # RM-80: Path browsing endpoint (cross-platform version)
