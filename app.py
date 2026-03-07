@@ -508,15 +508,14 @@ def _today_ymmmdd():
 
 def _open_file_dialog_macos():
     """
-    RM-80: Open native macOS file dialog using AppleScript.
+    RM-80: Open native macOS directory picker using AppleScript.
     Works on all macOS versions without tkinter dependency.
-    Returns selected file path or None if cancelled.
-    Handles paths with spaces and iCloud paths correctly.
+    Returns selected directory path or None if cancelled.
     """
     applescript = '''
     try
-        set theFile to choose file with prompt "Select Data File" of type {"json", "public.json"}
-        set posixPath to POSIX path of theFile
+        set theFolder to choose folder with prompt "Select Data Directory"
+        set posixPath to POSIX path of theFolder
         return posixPath
     on error errMsg number errNum
         if errNum is -128 then
@@ -547,34 +546,37 @@ def _open_file_dialog_macos():
                 logger.error(f"AppleScript error: {path}")
                 return None
             
-            # Validate the returned path exists
-            if path and Path(path).exists():
+            # Remove trailing slash if present
+            path = path.rstrip('/')
+            
+            # Validate the returned path exists and is a directory
+            if path and Path(path).is_dir():
                 return path
             else:
-                logger.error(f"Selected path does not exist: {path}")
+                logger.error(f"Selected path is not a valid directory: {path}")
                 return None
         else:
             logger.error(f"AppleScript failed with code {result.returncode}: {result.stderr}")
             return None
             
     except subprocess.TimeoutExpired:
-        logger.error("File dialog timed out")
+        logger.error("Directory dialog timed out")
         return None
     except Exception as e:
-        logger.exception(f"Error running AppleScript file dialog: {e}")
+        logger.exception(f"Error running AppleScript directory dialog: {e}")
         return None
 
 
 def _open_file_dialog_linux():
     """
-    RM-80: Open native Linux file dialog using zenity or kdialog.
+    RM-80: Open native Linux directory picker using zenity or kdialog.
     Fallback chain: zenity -> kdialog -> tkinter subprocess
-    Returns selected file path or None if cancelled.
+    Returns selected directory path or None if cancelled.
     """
     # Try zenity first (most common)
     try:
         result = subprocess.run(
-            ['zenity', '--file-selection', '--title=Select Data File', '--file-filter=JSON files (*.json) | *.json', '--file-filter=All files | *'],
+            ['zenity', '--file-selection', '--directory', '--title=Select Data Directory'],
             capture_output=True,
             text=True,
             timeout=60
@@ -589,7 +591,7 @@ def _open_file_dialog_linux():
     # Try kdialog (KDE)
     try:
         result = subprocess.run(
-            ['kdialog', '--getopenfilename', '.', '*.json|JSON files'],
+            ['kdialog', '--getexistingdirectory', '.', 'Select Data Directory'],
             capture_output=True,
             text=True,
             timeout=60
@@ -607,9 +609,9 @@ def _open_file_dialog_linux():
 
 def _open_file_dialog_tkinter():
     """
-    RM-80: Fallback file dialog using tkinter in subprocess.
+    RM-80: Fallback directory picker using tkinter in subprocess.
     Used when platform-specific dialogs are unavailable.
-    Returns selected file path or None if cancelled/error.
+    Returns selected directory path or None if cancelled/error.
     """
     dialog_script = '''
 import sys
@@ -621,18 +623,14 @@ try:
     root.withdraw()
     root.attributes('-topmost', True)
     
-    file_path = filedialog.askopenfilename(
-        title="Select Data File",
-        filetypes=[
-            ("JSON files", "*.json"),
-            ("All files", "*.*")
-        ]
+    dir_path = filedialog.askdirectory(
+        title="Select Data Directory"
     )
     
     root.destroy()
     
-    if file_path:
-        print(file_path)
+    if dir_path:
+        print(dir_path)
         sys.exit(0)
     else:
         sys.exit(1)
@@ -662,7 +660,7 @@ except Exception as e:
             return None
             
     except subprocess.TimeoutExpired:
-        logger.error("File dialog timed out")
+        logger.error("Directory dialog timed out")
         return None
     except Exception as e:
         logger.exception(f"Error running tkinter dialog subprocess: {e}")
@@ -671,9 +669,9 @@ except Exception as e:
 
 def _open_file_dialog():
     """
-    RM-80: Cross-platform file dialog opener.
+    RM-80: Cross-platform directory picker.
     Automatically selects the best method for the current platform.
-    Returns selected file path or None if cancelled.
+    Returns selected directory path or None if cancelled.
     """
     system = platform.system()
     
@@ -865,24 +863,25 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
             return
 
-        # RM-80: Path browsing endpoint (cross-platform version)
+        # RM-80: Directory browsing endpoint (cross-platform version)
         if path == "/api/browse/path":
             try:
-                logger.info("[Browse] Opening file dialog...")
+                logger.info("[Browse] Opening directory dialog...")
                 selected_path = _open_file_dialog()
                 logger.info(f"[Browse] Result: {selected_path}")
                 
                 if selected_path:
-                    # Validate path exists
-                    if Path(selected_path).exists():
+                    # Validate path exists and is a directory
+                    path_obj = Path(selected_path)
+                    if path_obj.exists() and path_obj.is_dir():
                         self._set_headers(200)
                         self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
                     else:
                         self._set_headers(200)
-                        self.wfile.write(json.dumps({"success": False, "error": "Selected file does not exist"}).encode("utf-8"))
+                        self.wfile.write(json.dumps({"success": False, "error": "Selected path is not a valid directory"}).encode("utf-8"))
                 else:
                     self._set_headers(200)
-                    self.wfile.write(json.dumps({"success": False, "error": "No file selected"}).encode("utf-8"))
+                    self.wfile.write(json.dumps({"success": False, "error": "No directory selected"}).encode("utf-8"))
             except Exception as e:
                 logger.exception("Error in browse endpoint")
                 self._set_headers(500)
@@ -1055,13 +1054,13 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"success": False, "error": "Missing data_directory parameter"}).encode("utf-8"))
                     return
                 
-                # Convert to Path and validate
+                # Convert to Path and validate it's a directory
                 dir_path = Path(data_directory)
                 
-                # If it's a file path (ends with .json), extract parent directory
-                if dir_path.is_file() or str(dir_path).endswith('.json'):
-                    dir_path = dir_path.parent
-                    logger.info(f"[Config] Extracted parent directory: {dir_path}")
+                if not dir_path.is_dir():
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({"success": False, "error": "Path is not a valid directory"}).encode("utf-8"))
+                    return
                 
                 # Import save_data_path from config
                 from config import save_data_path
