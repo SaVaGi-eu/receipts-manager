@@ -19,6 +19,7 @@
       if (typeof window.t === 'function') {
         document.querySelectorAll('.btn-edit').forEach(btn => btn.textContent = window.t('edit'));
         document.querySelectorAll('.btn-delete').forEach(btn => btn.textContent = window.t('delete'));
+        document.querySelectorAll('.btn-open').forEach(btn => btn.textContent = window.t('open'));
       }
     }
 
@@ -28,7 +29,7 @@
     let currentSort = { column: 'id', direction: 'asc' };
     let visibleColumns = new Set([
       'id', 'receipt_group_id', 'brand', 'model', 'location', 'users',
-      'project', 'shop', 'purchase_date', 'documentation', 'guarantee_end_date', 'file', 'actions'
+      'project', 'shop', 'purchase_date', 'documentation', 'guarantee_end_date', 'actions'
     ]);
 
     // ===== NEW: User tags management (Requirement 6) =====
@@ -187,7 +188,7 @@
           const hay = [
             r.id, r.receipt_group_id, r.brand, r.model, r.location, r.project,
             r.shop, r.purchase_date, r.documentation, r.guarantee_end_date,
-            normalizeUsers(r.users).join('; '), r.file
+            normalizeUsers(r.users).join('; ')
           ].map(x => String(x || '').toLowerCase()).join(' | ');
           if (!hay.includes(q)) return false;
         }
@@ -211,7 +212,6 @@
           users: it.users || [], project: it.project || '',
           shop: r.shop || '', purchase_date: r.purchase_date || '',
           documentation: r.documentation || '', guarantee_end_date: it.guarantee_end_date || '',
-          file: r.receipt_filename || it.receipt_relative_path || '',
           receipt_relative_path: r.receipt_relative_path || it.receipt_relative_path || ''
         };
       });
@@ -222,14 +222,15 @@
       if (!tbody) return;
       const t = window.t || (key => key);
       if (!rows || rows.length === 0) {
-        tbody.innerHTML = `<tr class="empty-state"><td colspan="13"><div class="empty-message"><span class="empty-icon">📦</span><p>${t('noItems')}</p></div></td></tr>`;
+        tbody.innerHTML = `<tr class="empty-state"><td colspan="12"><div class="empty-message"><span class="empty-icon">📦</span><p>${t('noItems')}</p></div></td></tr>`;
         if ($('itemCount')) $('itemCount').textContent = t('itemCount', { count: 0 });
         return;
       }
       tbody.innerHTML = rows.map(r => {
-        const fileCell = r.receipt_relative_path
-          ? `<a href="${API.fileUrl(r.receipt_relative_path)}" target="_blank" class="file-link" title="${r.receipt_relative_path}">${r.file || r.receipt_relative_path}</a>`
-          : (r.file ? r.file : '');
+        // Add Open button if there's a file
+        const openButton = r.receipt_relative_path
+          ? `<button type="button" class="btn-small btn-open" data-file-path="${r.receipt_relative_path}" title="${r.receipt_relative_path}">${t('open')}</button>`
+          : '';
 
         return `
         <tr>
@@ -244,10 +245,10 @@
           <td data-column="purchase_date">${r.purchase_date ?? ''}</td>
           <td data-column="documentation">${r.documentation ?? ''}</td>
           <td data-column="guarantee_end_date">${r.guarantee_end_date ?? ''}</td>
-          <td data-column="file">${fileCell}</td>
           <td data-column="actions">
-            <button type="button" class="btn-small btn-edit" onclick="editItem(${r.id})">${t('edit')}</button>
-            <button type="button" class="btn-small btn-delete" onclick="deleteItem(${r.id})">${t('delete')}</button>
+            ${openButton}
+            <button type="button" class="btn-small btn-edit" data-item-id="${r.id}">${t('edit')}</button>
+            <button type="button" class="btn-small btn-delete" data-item-id="${r.id}">${t('delete')}</button>
           </td>
         </tr>`;
       }).join('');
@@ -468,16 +469,14 @@
     function renderUserTags() {
       const container = $('userTags');
       if (!container) return;
-      container.innerHTML = userTags.map(user => 
-        `<span class="user-tag">
+      container.innerHTML = userTags.map(user => {
+        const safeUser = user.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `<span class="user-tag">
           ${user}
-          <span class="tag-remove" onclick="removeUserTag('${user.replace(/'/g, "\\'")}')">×</span>
-        </span>`
-      ).join('');
+          <span class="tag-remove" data-user-name="${safeUser}">×</span>
+        </span>`;
+      }).join('');
     }
-
-    // Make removeUserTag globally accessible
-    window.removeUserTag = removeUserTag;
 
     async function saveOcrData(e) {
       e.preventDefault();
@@ -633,14 +632,55 @@
       }
     }
 
-    // Make functions globally accessible
-    window.editItem = editItem;
-    window.deleteItem = deleteItem;
+    function openFile(filePath) {
+      if (!filePath) return;
+      window.open(API.fileUrl(filePath), '_blank');
+    }
 
     function setupEventListeners() {
       ['dragenter','dragover','dragleave','drop'].forEach(ev =>
         window.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false)
       );
+
+      // ===== Event delegation for table buttons (fixes CSP violations) =====
+      const tableBody = $('tableBody');
+      if (tableBody) {
+        tableBody.addEventListener('click', e => {
+          const target = e.target;
+          
+          // Handle Edit button
+          if (target.classList.contains('btn-edit')) {
+            const itemId = parseInt(target.dataset.itemId);
+            if (itemId) editItem(itemId);
+            return;
+          }
+          
+          // Handle Delete button
+          if (target.classList.contains('btn-delete')) {
+            const itemId = parseInt(target.dataset.itemId);
+            if (itemId) deleteItem(itemId);
+            return;
+          }
+          
+          // Handle Open button
+          if (target.classList.contains('btn-open')) {
+            const filePath = target.dataset.filePath;
+            if (filePath) openFile(filePath);
+            return;
+          }
+        });
+      }
+
+      // ===== Event delegation for user tag removal (fixes CSP violations) =====
+      const userTagsContainer = $('userTags');
+      if (userTagsContainer) {
+        userTagsContainer.addEventListener('click', e => {
+          if (e.target.classList.contains('tag-remove')) {
+            const userName = e.target.dataset.userName;
+            if (userName) removeUserTag(userName.replace(/\\'/g, "'"));
+          }
+        });
+      }
 
       // ===== NEW: Modal drop zone and file input (Requirement 2) =====
       const modalDropZone = $('modalDropZone');
