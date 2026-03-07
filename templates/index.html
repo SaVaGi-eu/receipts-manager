@@ -24,14 +24,7 @@
       <h1 data-i18n="appTitle">🧾 Receipt & Warranty Manager</h1>
     </div>
     <div class="header-right">
-      <!-- Language selector stays in header -->
-      <select id="languageSelect" class="language-select">
-        <option value="en">🇬🇧 English</option>
-        <option value="el">🇬🇷 Ελληνικά</option>
-        <option value="nl">🇳🇱 Nederlands</option>
-        <option value="lv">🇱🇻 Latviešu</option>
-      </select>
-      <!-- RM-80: New Menu Button -->
+      <!-- RM-80: Menu Button -->
       <button id="menuBtn" class="btn-secondary" data-i18n="menu">⚙️ Settings</button>
       <span id="itemCount" class="item-count" data-i18n="itemCount">0 items</span>
     </div>
@@ -64,7 +57,6 @@
         <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
         <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
         <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
-        <!-- RM-80: Removed exportJsonBtn, exportCsvBtn, importBtn - moved to menu -->
       </div>
     </section>
 
@@ -141,7 +133,7 @@
   <datalist id="userList"></datalist>
   <datalist id="categoryList"></datalist>
 
-  <!-- ===== Settings/Menu Modal (RM-80: NEW DESIGN) ===== -->
+  <!-- ===== Settings/Menu Modal (RM-80) ===== -->
   <div id="menuModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -150,6 +142,19 @@
       </div>
 
       <div class="modal-body">
+        <!-- Language Selection -->
+        <div class="settings-section">
+          <h3 data-i18n="languageTitle">🌐 Language</h3>
+          <div class="settings-actions">
+            <select id="languageSelect" class="language-select-menu">
+              <option value="en">🇬🇧 English</option>
+              <option value="el">🇬🇷 Ελληνικά</option>
+              <option value="nl">🇳🇱 Nederlands</option>
+              <option value="lv">🇱🇻 Latviešu</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Current Location Display -->
         <div class="settings-section">
           <h3 data-i18n="dataStorageTitle">📁 Data Storage</h3>
@@ -179,7 +184,7 @@
         <div class="settings-section">
           <h3 data-i18n="aboutTitle">ℹ️ About</h3>
           <div class="app-info">
-            <p><strong data-i18n="version">Version:</strong> <span id="appVersion">1.0.0</span></p>
+            <p><strong data-i18n="version">Version:</strong> <span id="appVersion">2.1.0</span></p>
             <p><strong data-i18n="repository">Repository:</strong> <a href="https://github.com/SaVaGi-eu/receipts-manager" target="_blank">GitHub</a></p>
           </div>
         </div>
@@ -194,7 +199,7 @@
   <!-- Hidden file input for import -->
   <input type="file" id="importInput" accept=".json" class="hidden">
 
-  <!-- ===== Location Change Modal (RM-80: Nested modal for location selection) ===== -->
+  <!-- ===== Location Change Modal (RM-80: Storage type & path selection) ===== -->
   <div id="locationModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -203,6 +208,7 @@
       </div>
 
       <div class="modal-body">
+        <!-- Storage Type Selection -->
         <div class="location-options">
           <div class="location-option">
             <input type="radio" id="storageLocal" name="storage" value="local" checked>
@@ -211,7 +217,7 @@
                 <strong>💻 Local Storage</strong>
                 <span class="badge badge-active" data-i18n="active">Active</span>
               </div>
-              <p class="option-description" data-i18n="localStorageDesc">Store data on this computer in the /data folder</p>
+              <p class="option-description" data-i18n="localStorageDesc">Store data on this computer in a folder of your choice</p>
             </label>
           </div>
 
@@ -225,6 +231,16 @@
               <p class="option-description" data-i18n="cloudStorageDesc">Sync data across devices using cloud storage</p>
             </label>
           </div>
+        </div>
+
+        <!-- Local Path Selection (shown when Local is selected) -->
+        <div id="localPathSection" class="local-path-section">
+          <label for="localPathInput" data-i18n="localPathLabel">Local Storage Path:</label>
+          <div class="path-input-group">
+            <input type="text" id="localPathInput" class="path-input" value="/data/receipts.json" placeholder="/data/receipts.json">
+            <button id="browsePathBtn" class="btn-secondary" data-i18n="browse">📁 Browse</button>
+          </div>
+          <p class="form-hint" data-i18n="pathHint">Enter the full path to your receipts.json file (e.g., /home/user/Documents/receipts.json)</p>
         </div>
 
         <div class="info-banner">
