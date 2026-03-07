@@ -24,45 +24,20 @@
       <h1 data-i18n="appTitle">🧾 Receipt & Warranty Manager</h1>
     </div>
     <div class="header-right">
-      <!-- RM-80: Replace language selector with Menu button -->
-      <div class="menu-container">
-        <button id="menuBtn" class="btn-menu" title="Menu">☰ Menu</button>
-        <div id="menuDropdown" class="menu-dropdown hidden">
-          <div class="menu-item menu-header">
-            <strong data-i18n="appVersion">Version</strong>: <span id="appVersion">1.0.0</span>
-          </div>
-          <div class="menu-separator"></div>
-          <div class="menu-item">
-            <label data-i18n="language">Language:</label>
-            <select id="languageSelect" class="menu-select">
-              <option value="en">🇬🇧 English</option>
-              <option value="el">🇬🇷 Ελληνικά</option>
-              <option value="nl">🇳🇱 Nederlands</option>
-              <option value="lv">🇱🇻 Latviešu</option>
-            </select>
-          </div>
-          <div class="menu-separator"></div>
-          <div class="menu-item">
-            <label data-i18n="dataStorage">Data Storage:</label>
-            <select id="storageSelect" class="menu-select">
-              <option value="local" data-i18n="storageLocal">Local</option>
-              <option value="cloud" data-i18n="storageCloud" disabled>Cloud (Coming Soon)</option>
-            </select>
-          </div>
-          <div class="menu-separator"></div>
-          <button id="menuBackupBtn" class="menu-button" data-i18n="backup">📦 Backup</button>
-          <button id="menuRestoreBtn" class="menu-button" data-i18n="restore">📥 Restore</button>
-          <button id="menuExportBtn" class="menu-button" data-i18n="export">📤 Export</button>
-        </div>
-      </div>
+      <!-- Language selector stays in header -->
+      <select id="languageSelect" class="language-select">
+        <option value="en">🇬🇧 English</option>
+        <option value="el">🇬🇷 Ελληνικά</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+        <option value="lv">🇱🇻 Latviešu</option>
+      </select>
+      <!-- RM-80: New Menu Button -->
+      <button id="menuBtn" class="btn-secondary" data-i18n="menu">⚙️ Settings</button>
       <span id="itemCount" class="item-count" data-i18n="itemCount">0 items</span>
     </div>
   </header>
 
   <main class="app-main">
-
-    <!-- ===== REMOVED: Upload section from main page (Requirement 2) ===== -->
-    <!-- Now handled in modal -->
 
     <!-- ===== Toolbar ===== -->
     <section class="toolbar">
@@ -86,14 +61,10 @@
       </div>
 
       <div class="toolbar-right">
-        <!-- Fix 1: Red button with nice icon -->
         <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
         <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
         <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
-        <button id="exportJsonBtn" class="btn-secondary" data-i18n="exportJson">⬇ JSON</button>
-        <button id="exportCsvBtn" class="btn-secondary" data-i18n="exportCsv">⬇ CSV</button>
-        <button id="importBtn" class="btn-secondary" data-i18n="import">⬆ Import</button>
-        <input type="file" id="importInput" accept=".json" class="hidden">
+        <!-- RM-80: Removed exportJsonBtn, exportCsvBtn, importBtn - moved to menu -->
       </div>
     </section>
 
@@ -170,7 +141,105 @@
   <datalist id="userList"></datalist>
   <datalist id="categoryList"></datalist>
 
-  <!-- ===== OCR Verification Modal (REDESIGNED) ===== -->
+  <!-- ===== Settings/Menu Modal (RM-80: NEW DESIGN) ===== -->
+  <div id="menuModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 data-i18n="settingsTitle">⚙️ Settings</h2>
+        <button id="closeMenuModal" class="modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Current Location Display -->
+        <div class="settings-section">
+          <h3 data-i18n="dataStorageTitle">📁 Data Storage</h3>
+          <div class="location-display">
+            <div class="location-info">
+              <label data-i18n="currentLocation">Current Location:</label>
+              <div class="location-value">
+                <span id="currentStorageType" class="storage-badge">Local</span>
+                <code id="currentStoragePath" class="storage-path">/data/receipts.json</code>
+              </div>
+            </div>
+            <button id="changeLocationBtn" class="btn-secondary" data-i18n="changeLocation">📂 Change Location</button>
+          </div>
+        </div>
+
+        <!-- Data Management Actions -->
+        <div class="settings-section">
+          <h3 data-i18n="dataManagementTitle">💾 Data Management</h3>
+          <div class="settings-actions">
+            <button id="menuBackupBtn" class="settings-button" data-i18n="backupData">📦 Backup Data (JSON)</button>
+            <button id="menuRestoreBtn" class="settings-button" data-i18n="restoreData">📥 Restore from Backup</button>
+            <button id="menuExportBtn" class="settings-button" data-i18n="exportCsv">📤 Export to CSV</button>
+          </div>
+        </div>
+
+        <!-- App Info -->
+        <div class="settings-section">
+          <h3 data-i18n="aboutTitle">ℹ️ About</h3>
+          <div class="app-info">
+            <p><strong data-i18n="version">Version:</strong> <span id="appVersion">1.0.0</span></p>
+            <p><strong data-i18n="repository">Repository:</strong> <a href="https://github.com/SaVaGi-eu/receipts-manager" target="_blank">GitHub</a></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="closeMenuModalBtn" class="btn-primary" data-i18n="close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for import -->
+  <input type="file" id="importInput" accept=".json" class="hidden">
+
+  <!-- ===== Location Change Modal (RM-80: Nested modal for location selection) ===== -->
+  <div id="locationModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 data-i18n="changeLocationTitle">📂 Change Storage Location</h2>
+        <button id="closeLocationModal" class="modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="location-options">
+          <div class="location-option">
+            <input type="radio" id="storageLocal" name="storage" value="local" checked>
+            <label for="storageLocal">
+              <div class="option-header">
+                <strong>💻 Local Storage</strong>
+                <span class="badge badge-active" data-i18n="active">Active</span>
+              </div>
+              <p class="option-description" data-i18n="localStorageDesc">Store data on this computer in the /data folder</p>
+            </label>
+          </div>
+
+          <div class="location-option">
+            <input type="radio" id="storageCloud" name="storage" value="cloud" disabled>
+            <label for="storageCloud" class="disabled">
+              <div class="option-header">
+                <strong>☁️ Cloud Storage</strong>
+                <span class="badge badge-coming-soon" data-i18n="comingSoon">Coming Soon</span>
+              </div>
+              <p class="option-description" data-i18n="cloudStorageDesc">Sync data across devices using cloud storage</p>
+            </label>
+          </div>
+        </div>
+
+        <div class="info-banner">
+          <strong>ℹ️ Note:</strong> <span data-i18n="locationChangeWarning">Changing location will require restarting the application</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="cancelLocationChange" class="btn-secondary" data-i18n="cancel">Cancel</button>
+        <button id="applyLocationChange" class="btn-primary" data-i18n="apply">Apply Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== OCR Verification Modal ===== -->
   <div id="ocrModal" class="modal">
     <div class="modal-content modal-wide">
       <div class="modal-header">
@@ -179,9 +248,8 @@
       </div>
 
       <div class="modal-body">
-        <!-- ===== TOP SECTION: Upload OR Select Existing ===== -->
+        <!-- Upload OR Select Existing -->
         <div class="upload-select-section">
-          <!-- Drag & drop in modal -->
           <div id="modalDropZone" class="drop-zone drop-zone-modal">
             <div class="drop-zone-content">
               <span class="drop-icon">📁</span>
@@ -194,12 +262,10 @@
           </div>
           <input type="file" id="modalFileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
 
-          <!-- Fix 2: Removed 'Text' from OR -->
           <div class="or-separator">
             <span data-i18n="or">OR</span>
           </div>
 
-          <!-- Fix 3: Removed label completely -->
           <div class="existing-receipt-section">
             <select id="existingReceiptSelect" class="existing-receipt-select">
               <option value="" data-i18n="selectReceiptOption">-- Choose existing receipt --</option>
@@ -207,13 +273,12 @@
           </div>
         </div>
 
-        <!-- ===== MIDDLE SECTION: Form Fields (RM-76: Reordered) ===== -->
+        <!-- Form Fields -->
         <form id="ocrForm">
           <input type="hidden" id="modalItemId">
           <input type="hidden" id="modalReceiptGroupId">
-          <input type="hidden" id="modalMode"><!-- new|edit|existing -->
+          <input type="hidden" id="modalMode">
 
-          <!-- RM-76: Documentation first (required), then Purchase Date -->
           <div class="form-row">
             <div class="form-group">
               <label for="modalDocumentation"><span data-i18n="labelDocumentation">Documentation</span> <span class="required-asterisk">*</span></label>
@@ -225,7 +290,6 @@
             </div>
           </div>
 
-          <!-- RM-76: Shop/Store moved to second row (left), Warranty on right -->
           <div class="form-row">
             <div class="form-group">
               <label for="modalShop"><span data-i18n="labelShop">Shop/Store</span> <span class="required-asterisk">*</span></label>
@@ -237,7 +301,6 @@
             </div>
           </div>
 
-          <!-- RM-78: Brand and Model are now required -->
           <div class="form-row">
             <div class="form-group">
               <label for="modalBrand"><span data-i18n="labelBrand">Brand</span> <span class="required-asterisk">*</span></label>
@@ -249,7 +312,6 @@
             </div>
           </div>
 
-          <!-- RM-79: Add Category field between Location and Project -->
           <div class="form-row">
             <div class="form-group">
               <label for="modalLocation" data-i18n="labelLocation">Location</label>
@@ -268,7 +330,6 @@
             </div>
           </div>
 
-          <!-- RM-77: Extended Warranty checkbox and conditional fields -->
           <div class="form-group full-width">
             <label>
               <input type="checkbox" id="extendedWarrantyCheckbox">
@@ -276,7 +337,6 @@
             </label>
           </div>
 
-          <!-- RM-77: Conditional extended warranty fields -->
           <div id="extendedWarrantyFields" class="extended-warranty-fields hidden">
             <div class="form-row">
               <div class="form-group">
@@ -296,19 +356,15 @@
             </div>
           </div>
 
-          <!-- Multi-user tag input -->
           <div class="form-group full-width">
             <label data-i18n="labelUsers">Users</label>
             <div id="userTagsContainer" class="tag-input-container">
-              <div id="userTags" class="user-tags">
-                <!-- Tags will be added here dynamically -->
-              </div>
+              <div id="userTags" class="user-tags"></div>
               <input type="text" id="userTagInput" class="tag-input" 
                      data-i18n-placeholder="usersPlaceholder" 
                      placeholder="Type name and press Enter..." 
                      list="userList">
             </div>
-            <!-- Fix 4: Removed hint -->
           </div>
 
           <div id="modalItemsPreview" class="items-preview">
@@ -316,7 +372,6 @@
             <ul id="modalItemsList"></ul>
           </div>
 
-          <!-- Fix 5: Added ⚠️ emoji -->
           <div class="warning-banner">
             ⚠️ <span data-i18n="verifyInfo">Please verify the extracted information and make corrections if needed.</span>
           </div>
@@ -330,11 +385,8 @@
     </div>
   </div>
 
-<!-- Load i18next from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/i18next@23.7.16/i18next.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/i18next-http-backend@2.4.3/i18nextHttpBackend.min.js"></script>
-
-<!-- Load i18n helper and app scripts (i18n.js will initialize i18next) -->
 <script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
 </body>
