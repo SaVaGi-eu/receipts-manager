@@ -1048,23 +1048,31 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/config/update":
             try:
                 updates = self._read_json()
-                data_file = updates.get("data_file")
+                data_directory = updates.get("data_directory")
                 
-                if not data_file:
+                if not data_directory:
                     self._set_headers(400)
-                    self.wfile.write(json.dumps({"success": False, "error": "Missing data_file parameter"}).encode("utf-8"))
+                    self.wfile.write(json.dumps({"success": False, "error": "Missing data_directory parameter"}).encode("utf-8"))
                     return
+                
+                # Convert to Path and validate
+                dir_path = Path(data_directory)
+                
+                # If it's a file path (ends with .json), extract parent directory
+                if dir_path.is_file() or str(dir_path).endswith('.json'):
+                    dir_path = dir_path.parent
+                    logger.info(f"[Config] Extracted parent directory: {dir_path}")
                 
                 # Import save_data_path from config
                 from config import save_data_path
                 
-                # Validate and save the path
-                if save_data_path(data_file):
+                # Validate and save the directory path
+                if save_data_path(str(dir_path)):
                     self._set_headers(200)
                     self.wfile.write(json.dumps({"success": True, "message": "Configuration updated. Please restart the application."}).encode("utf-8"))
                 else:
                     self._set_headers(400)
-                    self.wfile.write(json.dumps({"success": False, "error": "Failed to save configuration. Check if the path is valid and writable."}).encode("utf-8"))
+                    self.wfile.write(json.dumps({"success": False, "error": "Failed to save configuration. Check if the path is a valid directory and writable."}).encode("utf-8"))
             except Exception as e:
                 logger.exception("Error updating config")
                 self._set_headers(500)
