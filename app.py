@@ -9,6 +9,8 @@ import mimetypes
 import os
 import re
 import shutil
+import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timedelta
@@ -502,37 +504,73 @@ def _today_ymmmdd():
     return datetime.now().strftime("%Y-%b-%d")
 
 
-def _open_file_dialog():
+def _open_file_dialog_subprocess():
     """
-    RM-80: Open native file dialog using tkinter.
+    RM-80: Open native file dialog using tkinter in a separate subprocess.
+    This prevents blocking the web server thread.
     Returns selected file path or None if cancelled.
     """
+    # Script to run in subprocess
+    dialog_script = '''
+import sys
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    
+    file_path = filedialog.askopenfilename(
+        title="Select Data File",
+        filetypes=[
+            ("JSON files", "*.json"),
+            ("All files", "*.*")
+        ]
+    )
+    
+    root.destroy()
+    
+    if file_path:
+        print(file_path)
+        sys.exit(0)
+    else:
+        sys.exit(1)
+        
+except ImportError:
+    print("ERROR: tkinter not available", file=sys.stderr)
+    sys.exit(2)
+except Exception as e:
+    print(f"ERROR: {e}", file=sys.stderr)
+    sys.exit(3)
+'''
+    
     try:
-        import tkinter as tk
-        from tkinter import filedialog
-        
-        # Create hidden root window
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        
-        # Open file dialog
-        file_path = filedialog.askopenfilename(
-            title="Select Data File",
-            filetypes=[
-                ("JSON files", "*.json"),
-                ("All files", "*.*")
-            ]
+        # Run in subprocess with timeout
+        result = subprocess.run(
+            [sys.executable, '-c', dialog_script],
+            capture_output=True,
+            text=True,
+            timeout=60  # 60 second timeout
         )
         
-        root.destroy()
-        return file_path if file_path else None
-        
-    except ImportError:
-        logger.error("tkinter not available - file dialog requires tkinter")
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        elif result.returncode == 1:
+            # User cancelled
+            return None
+        elif result.returncode == 2:
+            logger.error("tkinter not available")
+            return None
+        else:
+            logger.error(f"File dialog error: {result.stderr}")
+            return None
+            
+    except subprocess.TimeoutExpired:
+        logger.error("File dialog timed out")
         return None
     except Exception as e:
-        logger.exception(f"Error opening file dialog: {e}")
+        logger.exception(f"Error running file dialog subprocess: {e}")
         return None
 
 
@@ -656,10 +694,13 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
             return
 
-        # RM-80: Path browsing endpoint
+        # RM-80: Path browsing endpoint (subprocess version)
         if path == "/api/browse/path":
             try:
-                selected_path = _open_file_dialog()
+                logger.info("[Browse] Opening file dialog subprocess...")
+                selected_path = _open_file_dialog_subprocess()
+                logger.info(f"[Browse] Result: {selected_path}")
+                
                 if selected_path:
                     self._set_headers(200)
                     self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
