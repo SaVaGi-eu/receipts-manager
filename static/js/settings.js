@@ -33,6 +33,27 @@ async function fetchCurrentConfig() {
 }
 
 /**
+ * Extract directory path from a file path
+ * If the path ends with a filename (e.g., data.json), return the parent directory
+ */
+function extractDirectoryPath(filePath) {
+  if (!filePath) return filePath;
+  
+  // Check if path ends with a file extension
+  const hasFileExtension = /\.[a-zA-Z0-9]+$/.test(filePath);
+  
+  if (hasFileExtension) {
+    // Extract directory by removing the filename
+    const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+    if (lastSlash > 0) {
+      return filePath.substring(0, lastSlash);
+    }
+  }
+  
+  return filePath;
+}
+
+/**
  * Initialize settings modal functionality
  */
 function initSettingsModal() {
@@ -239,8 +260,16 @@ function initLocationModal() {
         if (result.success && result.path) {
           const localPathInput = document.getElementById('localPathInput');
           if (localPathInput) {
-            localPathInput.value = result.path;
-            console.log('[Settings] Path updated to:', result.path);
+            // Extract directory from file path if user selected data.json
+            const directoryPath = extractDirectoryPath(result.path);
+            localPathInput.value = directoryPath;
+            console.log('[Settings] Original path:', result.path);
+            console.log('[Settings] Directory path:', directoryPath);
+            
+            // Show feedback if we extracted a directory
+            if (directoryPath !== result.path) {
+              console.log('[Settings] Extracted parent directory from selected file');
+            }
           }
         } else if (result.error && result.error !== 'No file selected') {
           // Show error only if it's not a cancellation
@@ -275,16 +304,21 @@ function initLocationModal() {
 async function applyLocationSettings() {
   const storageType = document.querySelector('input[name="storage"]:checked')?.value || 'local';
   const localPathInput = document.getElementById('localPathInput');
-  const newPath = localPathInput?.value?.trim();
+  let newPath = localPathInput?.value?.trim();
 
   if (storageType === 'local' && !newPath) {
-    alert('Please provide a valid file path.');
+    alert('Please provide a valid directory path.');
     return;
   }
+
+  // Ensure we're sending a directory path, not a file path
+  newPath = extractDirectoryPath(newPath);
 
   // Update config
   currentConfig.storageType = storageType;
   currentConfig.dataFile = newPath;
+
+  console.log('[Settings] Saving directory path:', newPath);
 
   // Send to backend to update config.py
   try {
@@ -294,7 +328,7 @@ async function applyLocationSettings() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        data_file: newPath,
+        data_directory: newPath,
         storage_type: storageType
       })
     });
