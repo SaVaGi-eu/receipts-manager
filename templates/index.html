@@ -24,14 +24,36 @@
       <h1 data-i18n="appTitle">🧾 Receipt & Warranty Manager</h1>
     </div>
     <div class="header-right">
-      <div class="language-selector">
-        <label data-i18n="language">Language:</label>
-        <select id="languageSelect">
-          <option value="en">🇬🇧 English</option>
-          <option value="el">🇬🇷 Ελληνικά</option>
-          <option value="nl">🇳🇱 Nederlands</option>
-          <option value="lv">🇱🇻 Latviešu</option>
-        </select>
+      <!-- RM-80: Replace language selector with Menu button -->
+      <div class="menu-container">
+        <button id="menuBtn" class="btn-menu" title="Menu">☰ Menu</button>
+        <div id="menuDropdown" class="menu-dropdown hidden">
+          <div class="menu-item menu-header">
+            <strong data-i18n="appVersion">Version</strong>: <span id="appVersion">1.0.0</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <label data-i18n="language">Language:</label>
+            <select id="languageSelect" class="menu-select">
+              <option value="en">🇬🇧 English</option>
+              <option value="el">🇬🇷 Ελληνικά</option>
+              <option value="nl">🇳🇱 Nederlands</option>
+              <option value="lv">🇱🇻 Latviešu</option>
+            </select>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <label data-i18n="dataStorage">Data Storage:</label>
+            <select id="storageSelect" class="menu-select">
+              <option value="local" data-i18n="storageLocal">Local</option>
+              <option value="cloud" data-i18n="storageCloud" disabled>Cloud (Coming Soon)</option>
+            </select>
+          </div>
+          <div class="menu-separator"></div>
+          <button id="menuBackupBtn" class="menu-button" data-i18n="backup">📦 Backup</button>
+          <button id="menuRestoreBtn" class="menu-button" data-i18n="restore">📥 Restore</button>
+          <button id="menuExportBtn" class="menu-button" data-i18n="export">📤 Export</button>
+        </div>
       </div>
       <span id="itemCount" class="item-count" data-i18n="itemCount">0 items</span>
     </div>
@@ -87,12 +109,14 @@
         <label><input type="checkbox" class="col-toggle" data-column="brand" checked> <span data-i18n="colBrand">Brand</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="model" checked> <span data-i18n="colModel">Model</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="location" checked> <span data-i18n="colLocation">Location</span></label>
+        <label><input type="checkbox" class="col-toggle" data-column="category" checked> <span data-i18n="colCategory">Category</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="users" checked> <span data-i18n="colUsers">Users</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="project" checked> <span data-i18n="colProject">Project</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="shop" checked> <span data-i18n="colShop">Shop</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="purchase_date" checked> <span data-i18n="colPurchaseDate">Purchase Date</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="documentation" checked> <span data-i18n="colDocumentation">Documentation</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="guarantee_end_date" checked> <span data-i18n="colGuaranteeEnd">Guarantee End</span></label>
+        <label><input type="checkbox" class="col-toggle" data-column="extended_warranty" checked> <span data-i18n="colExtendedWarranty">Extended Warranty</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="file" checked> <span data-i18n="colFile">File</span></label>
       </div>
     </div>
@@ -108,19 +132,21 @@
               <th data-column="brand" class="sortable"><span data-i18n="colBrand">Brand</span></th>
               <th data-column="model" class="sortable"><span data-i18n="colModel">Model</span></th>
               <th data-column="location" class="sortable"><span data-i18n="colLocation">Location</span></th>
+              <th data-column="category" class="sortable"><span data-i18n="colCategory">Category</span></th>
               <th data-column="users" class="sortable"><span data-i18n="colUsers">Users</span></th>
               <th data-column="project" class="sortable"><span data-i18n="colProject">Project</span></th>
               <th data-column="shop" class="sortable"><span data-i18n="colShop">Shop</span></th>
               <th data-column="purchase_date" class="sortable"><span data-i18n="colPurchaseDate">Purchase Date</span></th>
               <th data-column="documentation" class="sortable"><span data-i18n="colDocumentation">Documentation</span></th>
               <th data-column="guarantee_end_date" class="sortable"><span data-i18n="colGuaranteeEnd">Guarantee End</span></th>
+              <th data-column="extended_warranty" class="sortable"><span data-i18n="colExtendedWarranty">Ext. Warranty</span></th>
               <th data-column="file" class="sortable"><span data-i18n="colFile">File</span></th>
               <th data-column="actions"><span data-i18n="colActions">Actions</span></th>
             </tr>
           </thead>
           <tbody id="tableBody">
             <tr class="empty-state">
-              <td colspan="13">
+              <td colspan="15">
                 <div class="empty-message">
                   <span class="empty-icon">📦</span>
                   <p data-i18n="noItems">No items yet. Click "Add Receipt" to get started!</p>
@@ -142,6 +168,7 @@
   <datalist id="docList"></datalist>
   <datalist id="projectList"></datalist>
   <datalist id="userList"></datalist>
+  <datalist id="categoryList"></datalist>
 
   <!-- ===== OCR Verification Modal (REDESIGNED) ===== -->
   <div id="ocrModal" class="modal">
@@ -210,25 +237,62 @@
             </div>
           </div>
 
+          <!-- RM-78: Brand and Model are now required -->
           <div class="form-row">
             <div class="form-group">
-              <label for="modalBrand" data-i18n="labelBrand">Brand</label>
-              <input type="text" id="modalBrand" list="brandList">
+              <label for="modalBrand"><span data-i18n="labelBrand">Brand</span> <span class="required-asterisk">*</span></label>
+              <input type="text" id="modalBrand" list="brandList" required>
             </div>
             <div class="form-group">
-              <label for="modalModel" data-i18n="labelModel">Model</label>
-              <input type="text" id="modalModel" list="modelList">
+              <label for="modalModel"><span data-i18n="labelModel">Model</span> <span class="required-asterisk">*</span></label>
+              <input type="text" id="modalModel" list="modelList" required>
             </div>
           </div>
 
+          <!-- RM-79: Add Category field between Location and Project -->
           <div class="form-row">
             <div class="form-group">
               <label for="modalLocation" data-i18n="labelLocation">Location</label>
               <input type="text" id="modalLocation" list="locationList">
             </div>
             <div class="form-group">
+              <label for="modalCategory" data-i18n="labelCategory">Category</label>
+              <input type="text" id="modalCategory" list="categoryList">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group full-width">
               <label for="modalProject" data-i18n="labelProject">Project</label>
               <input type="text" id="modalProject" list="projectList">
+            </div>
+          </div>
+
+          <!-- RM-77: Extended Warranty checkbox and conditional fields -->
+          <div class="form-group full-width">
+            <label>
+              <input type="checkbox" id="extendedWarrantyCheckbox">
+              <span data-i18n="labelExtendedWarranty">Extended Warranty Purchased?</span>
+            </label>
+          </div>
+
+          <!-- RM-77: Conditional extended warranty fields -->
+          <div id="extendedWarrantyFields" class="extended-warranty-fields hidden">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="extWarrantyProvider" data-i18n="labelExtWarrantyProvider">Provider Name</label>
+                <input type="text" id="extWarrantyProvider">
+              </div>
+              <div class="form-group">
+                <label for="extWarrantyMonths" data-i18n="labelExtWarrantyMonths">Extended Warranty (months)</label>
+                <input type="number" id="extWarrantyMonths" min="0" step="1" placeholder="12">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="extWarrantyCost" data-i18n="labelExtWarrantyCost">Cost</label>
+                <input type="text" id="extWarrantyCost" placeholder="€50.00">
+              </div>
             </div>
           </div>
 
