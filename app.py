@@ -7,6 +7,7 @@ import json
 import logging
 import mimetypes
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -230,7 +231,7 @@ def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     Removes path separators and leading dots, restricts characters, and truncates length.
     """
     # Remove any path separators outright
-    name = name.replace("/", "").replace("\\\\", "")
+    name = name.replace("/", "").replace("\\", "")
     # Allow only a conservative set of characters
     name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
     # Avoid hidden or relative-path-like names
@@ -504,13 +505,85 @@ def _today_ymmmdd():
     return datetime.now().strftime("%Y-%b-%d")
 
 
-def _open_file_dialog_subprocess():
+def _open_file_dialog_macos():
     """
-    RM-80: Open native file dialog using tkinter in a separate subprocess.
-    This prevents blocking the web server thread.
+    RM-80: Open native macOS file dialog using AppleScript.
+    Works on all macOS versions without tkinter dependency.
     Returns selected file path or None if cancelled.
     """
-    # Script to run in subprocess
+    applescript = '''
+    set theFile to choose file with prompt "Select Data File" of type {"json", "public.json"}
+    return POSIX path of theFile
+    '''
+    
+    try:
+        result = subprocess.run(
+            ['osascript', '-e', applescript],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        else:
+            # User cancelled or error
+            return None
+            
+    except subprocess.TimeoutExpired:
+        logger.error("File dialog timed out")
+        return None
+    except Exception as e:
+        logger.exception(f"Error running AppleScript file dialog: {e}")
+        return None
+
+
+def _open_file_dialog_linux():
+    """
+    RM-80: Open native Linux file dialog using zenity or kdialog.
+    Fallback chain: zenity -> kdialog -> tkinter subprocess
+    Returns selected file path or None if cancelled.
+    """
+    # Try zenity first (most common)
+    try:
+        result = subprocess.run(
+            ['zenity', '--file-selection', '--title=Select Data File', '--file-filter=JSON files (*.json) | *.json', '--file-filter=All files | *'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass  # zenity not installed
+    except Exception:
+        pass
+    
+    # Try kdialog (KDE)
+    try:
+        result = subprocess.run(
+            ['kdialog', '--getopenfilename', '.', '*.json|JSON files'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass  # kdialog not installed
+    except Exception:
+        pass
+    
+    # Fallback to tkinter subprocess
+    return _open_file_dialog_tkinter()
+
+
+def _open_file_dialog_tkinter():
+    """
+    RM-80: Fallback file dialog using tkinter in subprocess.
+    Used when platform-specific dialogs are unavailable.
+    Returns selected file path or None if cancelled/error.
+    """
     dialog_script = '''
 import sys
 try:
@@ -546,32 +619,50 @@ except Exception as e:
 '''
     
     try:
-        # Run in subprocess with timeout
         result = subprocess.run(
             [sys.executable, '-c', dialog_script],
             capture_output=True,
             text=True,
-            timeout=60  # 60 second timeout
+            timeout=60
         )
         
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         elif result.returncode == 1:
-            # User cancelled
-            return None
-        elif result.returncode == 2:
-            logger.error("tkinter not available")
-            return None
+            return None  # User cancelled
         else:
-            logger.error(f"File dialog error: {result.stderr}")
+            logger.error(f"tkinter dialog error: {result.stderr}")
             return None
             
     except subprocess.TimeoutExpired:
         logger.error("File dialog timed out")
         return None
     except Exception as e:
-        logger.exception(f"Error running file dialog subprocess: {e}")
+        logger.exception(f"Error running tkinter dialog subprocess: {e}")
         return None
+
+
+def _open_file_dialog():
+    """
+    RM-80: Cross-platform file dialog opener.
+    Automatically selects the best method for the current platform.
+    Returns selected file path or None if cancelled.
+    """
+    system = platform.system()
+    
+    if system == "Darwin":
+        # macOS - use AppleScript (no tkinter dependency issues)
+        return _open_file_dialog_macos()
+    elif system == "Linux":
+        # Linux - try zenity/kdialog, fallback to tkinter
+        return _open_file_dialog_linux()
+    elif system == "Windows":
+        # Windows - tkinter works reliably
+        return _open_file_dialog_tkinter()
+    else:
+        # Unknown platform - try tkinter
+        logger.warning(f"Unknown platform: {system}, trying tkinter")
+        return _open_file_dialog_tkinter()
 
 
 # ---------- HTTP handler ----------
@@ -694,11 +785,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
             return
 
-        # RM-80: Path browsing endpoint (subprocess version)
+        # RM-80: Path browsing endpoint (cross-platform version)
         if path == "/api/browse/path":
             try:
-                logger.info("[Browse] Opening file dialog subprocess...")
-                selected_path = _open_file_dialog_subprocess()
+                logger.info("[Browse] Opening file dialog...")
+                selected_path = _open_file_dialog()
                 logger.info(f"[Browse] Result: {selected_path}")
                 
                 if selected_path:
