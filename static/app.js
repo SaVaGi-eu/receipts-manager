@@ -19,6 +19,7 @@ function updateUI() {
   if (typeof window.t === 'function') {
     document.querySelectorAll('.btn-edit').forEach(btn => btn.textContent = window.t('edit'));
     document.querySelectorAll('.btn-delete').forEach(btn => btn.textContent = window.t('delete'));
+    document.querySelectorAll('.btn-open').forEach(btn => btn.textContent = window.t('open'));
   }
 }
 
@@ -28,7 +29,7 @@ let suggestions = { shops: [], brands: [], models: [], locations: [], documentat
 let currentSort = { column: 'id', direction: 'asc' };
 let visibleColumns = new Set([
   'id', 'receipt_group_id', 'brand', 'model', 'location', 'category', 'users', // RM-79: Added category
-  'project', 'shop', 'purchase_date', 'documentation', 'guarantee_end_date', 'extended_warranty', 'file', 'actions' // RM-77: Added extended_warranty
+  'project', 'shop', 'purchase_date', 'documentation', 'guarantee_end_date', 'extended_warranty', 'actions' // RM-77: Added extended_warranty, removed 'file'
 ]);
 
 // ===== User tags management =====
@@ -187,7 +188,7 @@ function applyFilters(rows) {
       const hay = [
         r.id, r.receipt_group_id, r.brand, r.model, r.location, r.category, r.project, // RM-79: Added category to search
         r.shop, r.purchase_date, r.documentation, r.guarantee_end_date,
-        normalizeUsers(r.users).join('; '), r.file
+        normalizeUsers(r.users).join('; ')
       ].map(x => String(x || '').toLowerCase()).join(' | ');
       if (!hay.includes(q)) return false;
     }
@@ -235,7 +236,6 @@ function buildRows() {
       documentation: r.documentation || '', 
       guarantee_end_date: it.guarantee_end_date || '',
       extended_warranty: it.extended_warranty ? '✓' : '', // RM-77: Extended warranty indicator
-      file: r.receipt_filename || it.receipt_relative_path || '',
       receipt_relative_path: r.receipt_relative_path || it.receipt_relative_path || ''
     };
   });
@@ -246,17 +246,18 @@ function renderTable(rows) {
   if (!tbody) return;
   const t = window.t || (key => key);
   if (!rows || rows.length === 0) {
-    tbody.innerHTML = `<tr class="empty-state"><td colspan="15"><div class="empty-message"><span class="empty-icon">📦</span><p>${t('noItems')}</p></div></td></tr>`;
+    tbody.innerHTML = `<tr class="empty-state"><td colspan="14"><div class="empty-message"><span class="empty-icon">📦</span><p>${t('noItems')}</p></div></td></tr>`;
     if ($('itemCount')) $('itemCount').textContent = t('itemCount', { count: 0 });
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const fileCell = r.receipt_relative_path
-      ? `<a href="${API.fileUrl(r.receipt_relative_path)}" target="_blank" class="file-link" title="${r.receipt_relative_path}">${r.file || r.receipt_relative_path}</a>`
-      : (r.file ? r.file : '');
+    const hasFile = !!r.receipt_relative_path;
+    const openButton = hasFile 
+      ? `<button type="button" class="btn-small btn-open" data-action="open" data-file-path="${r.receipt_relative_path}">${t('open')}</button>`
+      : '';
 
     return `
-    <tr>
+    <tr data-item-id="${r.id}">
       <td data-column="id">${r.id ?? ''}</td>
       <td data-column="receipt_group_id">${r.receipt_group_id ?? ''}</td>
       <td data-column="brand">${r.brand ?? ''}</td>
@@ -270,10 +271,10 @@ function renderTable(rows) {
       <td data-column="documentation">${r.documentation ?? ''}</td>
       <td data-column="guarantee_end_date">${r.guarantee_end_date ?? ''}</td>
       <td data-column="extended_warranty">${r.extended_warranty ?? ''}</td>
-      <td data-column="file">${fileCell}</td>
       <td data-column="actions">
-        <button type="button" class="btn-small btn-edit" onclick="editItem(${r.id})">${t('edit')}</button>
-        <button type="button" class="btn-small btn-delete" onclick="deleteItem(${r.id})">${t('delete')}</button>
+        ${openButton}
+        <button type="button" class="btn-small btn-edit" data-action="edit">${t('edit')}</button>
+        <button type="button" class="btn-small btn-delete" data-action="delete">${t('delete')}</button>
       </td>
     </tr>`;
   }).join('');
@@ -529,14 +530,21 @@ function renderUserTags() {
   const container = $('userTags');
   if (!container) return;
   container.innerHTML = userTags.map(user => 
-    `<span class="user-tag">
+    `<span class="user-tag" data-user="${user.replace(/"/g, '&quot;')}">
       ${user}
-      <span class="tag-remove" onclick="removeUserTag('${user.replace(/'/g, "\\'")}')">×</span>
+      <span class="tag-remove">×</span>
     </span>`
   ).join('');
+  
+  // Add event listeners to remove buttons
+  container.querySelectorAll('.tag-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tag = e.target.closest('.user-tag');
+      const username = tag?.dataset.user;
+      if (username) removeUserTag(username);
+    });
+  });
 }
-
-window.removeUserTag = removeUserTag;
 
 async function saveOcrData(e) {
   e.preventDefault();
@@ -722,8 +730,35 @@ async function deleteItem(itemId) {
   }
 }
 
-window.editItem = editItem;
-window.deleteItem = deleteItem;
+function openFile(filePath) {
+  if (!filePath) return;
+  window.open(API.fileUrl(filePath), '_blank');
+}
+
+// Event delegation for table actions
+function handleTableClick(e) {
+  const button = e.target.closest('button[data-action]');
+  if (!button) return;
+  
+  const action = button.dataset.action;
+  const row = button.closest('tr');
+  const itemId = parseInt(row?.dataset.itemId);
+  
+  if (!itemId) return;
+  
+  switch (action) {
+    case 'edit':
+      editItem(itemId);
+      break;
+    case 'delete':
+      deleteItem(itemId);
+      break;
+    case 'open':
+      const filePath = button.dataset.filePath;
+      openFile(filePath);
+      break;
+  }
+}
 
 function setupEventListeners() {
   ['dragenter','dragover','dragleave','drop'].forEach(ev =>
@@ -781,6 +816,12 @@ function setupEventListeners() {
         }
       }
     });
+  }
+
+  // Event delegation for table row actions
+  const itemsTable = $('itemsTable');
+  if (itemsTable) {
+    itemsTable.addEventListener('click', handleTableClick);
   }
 
   // RM-80: Menu modal event handlers
