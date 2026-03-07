@@ -502,6 +502,40 @@ def _today_ymmmdd():
     return datetime.now().strftime("%Y-%b-%d")
 
 
+def _open_file_dialog():
+    """
+    RM-80: Open native file dialog using tkinter.
+    Returns selected file path or None if cancelled.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        # Create hidden root window
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        
+        # Open file dialog
+        file_path = filedialog.askopenfilename(
+            title="Select Data File",
+            filetypes=[
+                ("JSON files", "*.json"),
+                ("All files", "*.*")
+            ]
+        )
+        
+        root.destroy()
+        return file_path if file_path else None
+        
+    except ImportError:
+        logger.error("tkinter not available - file dialog requires tkinter")
+        return None
+    except Exception as e:
+        logger.exception(f"Error opening file dialog: {e}")
+        return None
+
+
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
     """
@@ -620,6 +654,22 @@ class Handler(BaseHTTPRequestHandler):
                     if not chunk:
                         break
                     self.wfile.write(chunk)
+            return
+
+        # RM-80: Path browsing endpoint
+        if path == "/api/browse/path":
+            try:
+                selected_path = _open_file_dialog()
+                if selected_path:
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
+                else:
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": False, "error": "No file selected"}).encode("utf-8"))
+            except Exception as e:
+                logger.exception("Error in browse endpoint")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
             return
 
         if path == "/api/data":
