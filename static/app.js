@@ -141,7 +141,7 @@ function populateExistingReceipts() {
   const select = $('existingReceiptSelect');
   if (!select) return;
   const t = window.t || (key => key);
-  
+
   const rmap = receiptMap();
   const options = Array.from(rmap.values())
     .sort((a, b) => String(b.purchase_date || '').localeCompare(String(a.purchase_date || '')))
@@ -149,7 +149,7 @@ function populateExistingReceipts() {
       const label = `${r.shop || 'Unknown'} - ${r.purchase_date || 'No date'} - ${r.receipt_group_id}`;
       return `<option value="${r.receipt_group_id}">${label}</option>`;
     }).join('');
-  
+
   select.innerHTML = `<option value="">${t('selectReceiptOption')}</option>` + options;
 }
 
@@ -203,7 +203,7 @@ function sortRows(rows) {
   return [...rows].sort((a, b) => {
     const aVal = a?.[col] ?? '';
     const bVal = b?.[col] ?? '';
-    
+
     // RM-75: Numeric sorting for ID column
     if (col === 'id') {
       const aNum = parseInt(aVal);
@@ -212,7 +212,7 @@ function sortRows(rows) {
         return (aNum - bNum) * dir;
       }
     }
-    
+
     // String sorting for other columns
     return String(aVal).localeCompare(String(bVal)) * dir;
   });
@@ -223,17 +223,17 @@ function buildRows() {
   return (allData.items || []).map(it => {
     const r = rmap.get(it.receipt_group_id) || {};
     return {
-      id: it.id, 
+      id: it.id,
       receipt_group_id: it.receipt_group_id,
-      brand: it.brand || '', 
-      model: it.model || '', 
+      brand: it.brand || '',
+      model: it.model || '',
       location: it.location || '',
       category: it.category || '', // RM-79: Category field
-      users: it.users || [], 
+      users: it.users || [],
       project: it.project || '',
-      shop: r.shop || '', 
+      shop: r.shop || '',
       purchase_date: r.purchase_date || '',
-      documentation: r.documentation || '', 
+      documentation: r.documentation || '',
       guarantee_end_date: it.guarantee_end_date || '',
       extended_warranty: it.extended_warranty ? '✓' : '', // RM-77: Extended warranty indicator
       receipt_relative_path: r.receipt_relative_path || it.receipt_relative_path || ''
@@ -252,7 +252,7 @@ function renderTable(rows) {
   }
   tbody.innerHTML = rows.map(r => {
     const hasFile = !!r.receipt_relative_path;
-    const openButton = hasFile 
+    const openButton = hasFile
       ? `<button type="button" class="btn-small btn-open" data-action="open" data-file-path="${r.receipt_relative_path}">${t('open')}</button>`
       : '';
 
@@ -332,7 +332,7 @@ async function handleFile(file) {
 function showOcrModal(uploadResult, mode = 'new') {
   const modal = $('ocrModal'); if (!modal) return;
   const ocr = uploadResult?.ocr_data || {};
-  
+
   $('modalMode').value = mode;
   $('modalItemId').value = mode === 'new' ? (uploadResult?.item_id || '') : '';
   $('modalReceiptGroupId').value = uploadResult?.receipt_group_id || '';
@@ -352,19 +352,19 @@ function showOcrModal(uploadResult, mode = 'new') {
   } else { $('modalPurchaseDate').value = ''; }
   $('modalDocumentation').value = ocr.documentation || '';
   $('modalWarranty').value = '';
-  $('modalBrand').value = ''; 
-  $('modalModel').value = ''; 
+  $('modalBrand').value = '';
+  $('modalModel').value = '';
   $('modalLocation').value = '';
   $('modalCategory').value = ''; // RM-79: Clear category field
   $('modalProject').value = '';
-  
+
   // RM-77: Clear extended warranty fields
   $('extendedWarrantyCheckbox').checked = false;
   $('extWarrantyProvider').value = '';
   $('extWarrantyMonths').value = '';
   $('extWarrantyCost').value = '';
   $('extendedWarrantyFields').classList.add('hidden');
-  
+
   userTags = [];
   renderUserTags();
 
@@ -391,7 +391,7 @@ function showOcrModal(uploadResult, mode = 'new') {
     itemsList.innerHTML = ocr.items.map(i => `<li>${i.name} - ${i.price}</li>`).join('');
     itemsPreview.style.display = 'block';
   } else { itemsPreview.style.display = 'none'; }
-  
+
   modal.style.display = 'flex';
 }
 
@@ -401,27 +401,27 @@ function openNewReceiptModal() {
   $('modalItemId').value = '';
   $('modalReceiptGroupId').value = '';
   $('existingReceiptSelect').value = '';
-  
+
   // RM-77: Reset extended warranty fields
   $('extendedWarrantyCheckbox').checked = false;
   $('extendedWarrantyFields').classList.add('hidden');
-  
+
   userTags = [];
   renderUserTags();
-  
+
   const modalTitle = $('modalTitle');
   if (modalTitle) modalTitle.textContent = '📄 Add New Receipt';
-  
+
   const uploadSection = qs('.upload-select-section');
   if (uploadSection) uploadSection.style.display = 'block';
-  
+
   $('modalShop').readOnly = false;
   $('modalPurchaseDate').readOnly = false;
   $('modalDocumentation').readOnly = false;
   $('modalShop').classList.remove('readonly');
   $('modalPurchaseDate').classList.remove('readonly');
   $('modalDocumentation').classList.remove('readonly');
-  
+
   $('modalItemsPreview').style.display = 'none';
   $('ocrModal').style.display = 'flex';
 }
@@ -429,13 +429,13 @@ function openNewReceiptModal() {
 function handleExistingReceiptSelect(e) {
   const receiptGroupId = e.target.value;
   if (!receiptGroupId) return;
-  
+
   const fileInput = $('modalFileInput');
   if (fileInput) fileInput.value = '';
-  
+
   const receipt = allData.receipts.find(r => r.receipt_group_id === receiptGroupId);
   if (!receipt) { alert('Receipt not found'); return; }
-  
+
   const result = {
     receipt_group_id: receipt.receipt_group_id,
     ocr_data: {
@@ -444,15 +444,15 @@ function handleExistingReceiptSelect(e) {
       documentation: receipt.documentation
     }
   };
-  
+
   showOcrModal(result, 'existing');
 }
 
 function closeOcrModal() {
   const modal = $('ocrModal');
-  if (modal) { 
-    modal.style.display = 'none'; 
-    $('ocrForm').reset(); 
+  if (modal) {
+    modal.style.display = 'none';
+    $('ocrForm').reset();
     $('existingReceiptSelect').value = '';
     const fileInput = $('modalFileInput');
     if (fileInput) fileInput.value = '';
@@ -468,13 +468,13 @@ function closeOcrModal() {
 function openMenuModal() {
   const modal = $('menuModal');
   if (!modal) return;
-  
+
   // Update current location display
   const storageType = $('currentStorageType');
   const storagePath = $('currentStoragePath');
   if (storageType) storageType.textContent = 'Local';
   if (storagePath) storagePath.textContent = '/data/receipts.json';
-  
+
   modal.style.display = 'flex';
 }
 
@@ -486,11 +486,11 @@ function closeMenuModal() {
 function openLocationModal() {
   const modal = $('locationModal');
   if (!modal) return;
-  
+
   // Set current selection to local
   const localRadio = $('storageLocal');
   if (localRadio) localRadio.checked = true;
-  
+
   modal.style.display = 'flex';
 }
 
@@ -501,12 +501,12 @@ function closeLocationModal() {
 
 function applyLocationChange() {
   const selectedStorage = document.querySelector('input[name="storage"]:checked')?.value;
-  
+
   if (selectedStorage === 'cloud') {
     alert('Cloud storage is coming soon!');
     return;
   }
-  
+
   // For local storage, just close the modal
   closeLocationModal();
   closeMenuModal();
@@ -529,13 +529,13 @@ function removeUserTag(username) {
 function renderUserTags() {
   const container = $('userTags');
   if (!container) return;
-  container.innerHTML = userTags.map(user => 
+  container.innerHTML = userTags.map(user =>
     `<span class="user-tag" data-user="${user.replace(/"/g, '&quot;')}">
       ${user}
       <span class="tag-remove">×</span>
     </span>`
   ).join('');
-  
+
   // Add event listeners to remove buttons
   container.querySelectorAll('.tag-remove').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -564,9 +564,9 @@ async function saveOcrData(e) {
   const users = userTags.length > 0 ? userTags : [];
 
   // RM-78: Validate required fields
-  if (!shop || !purchaseDate || !brand || !model) { 
+  if (!shop || !purchaseDate || !brand || !model) {
     alert('Shop, Purchase Date, Brand, and Model are required');
-    return; 
+    return;
   }
 
   // RM-77: Extended warranty data
@@ -606,12 +606,12 @@ async function saveOcrData(e) {
       guarantee_duration: warranty,
       guarantee_unit: 'months'
     };
-    
+
     // RM-77: Add extended warranty if present
     if (extendedWarranty) {
       payload.extended_warranty = extendedWarranty;
     }
-    
+
     const resp = await fetchJson(API.updateItem(itemId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -619,7 +619,7 @@ async function saveOcrData(e) {
     });
     if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
     closeOcrModal();
-    await loadData(); 
+    await loadData();
     await loadSuggestions();
   } catch (err) { console.error('Save error:', err); alert(`Save failed: ${err.message}`); }
 }
@@ -640,7 +640,7 @@ async function editItem(itemId) {
   $('modalCategory').value = item.category !== 'N/A' ? item.category : ''; // RM-79: Load category
   $('modalProject').value = item.project !== 'N/A' ? item.project : '';
   $('modalDocumentation').value = receipt.documentation !== 'N/A' ? receipt.documentation : '';
-  
+
   // RM-77: Load extended warranty data
   if (item.extended_warranty) {
     $('extendedWarrantyCheckbox').checked = true;
@@ -652,7 +652,7 @@ async function editItem(itemId) {
     $('extendedWarrantyCheckbox').checked = false;
     $('extendedWarrantyFields').classList.add('hidden');
   }
-  
+
   userTags = Array.isArray(item.users) ? item.users : [];
   renderUserTags();
 
@@ -739,13 +739,13 @@ function openFile(filePath) {
 function handleTableClick(e) {
   const button = e.target.closest('button[data-action]');
   if (!button) return;
-  
+
   const action = button.dataset.action;
   const row = button.closest('tr');
   const itemId = parseInt(row?.dataset.itemId);
-  
+
   if (!itemId) return;
-  
+
   switch (action) {
     case 'edit':
       editItem(itemId);
@@ -773,19 +773,19 @@ function setupEventListeners() {
     modalDropZone.addEventListener('click', e => { if (!e.target.classList.contains('browse-link')) modalFileInput.click(); });
     modalDropZone.addEventListener('dragover', () => modalDropZone.classList.add('drag-over'));
     modalDropZone.addEventListener('dragleave', () => modalDropZone.classList.remove('drag-over'));
-    modalDropZone.addEventListener('drop', e => { 
-      modalDropZone.classList.remove('drag-over'); 
-      const f = e.dataTransfer?.files?.[0]; 
+    modalDropZone.addEventListener('drop', e => {
+      modalDropZone.classList.remove('drag-over');
+      const f = e.dataTransfer?.files?.[0];
       if (f) {
         $('existingReceiptSelect').value = '';
-        handleFile(f); 
+        handleFile(f);
       }
     });
-    modalFileInput.addEventListener('change', e => { 
-      const f = e.target.files?.[0]; 
+    modalFileInput.addEventListener('change', e => {
+      const f = e.target.files?.[0];
       if (f) {
         $('existingReceiptSelect').value = '';
-        handleFile(f); 
+        handleFile(f);
       }
     });
   }
@@ -828,7 +828,7 @@ function setupEventListeners() {
   bind('menuBtn', 'click', openMenuModal);
   bind('closeMenuModal', 'click', closeMenuModal);
   bind('closeMenuModalBtn', 'click', closeMenuModal);
-  
+
   // Menu modal backdrop close
   const menuModal = $('menuModal');
   if (menuModal) {
@@ -836,7 +836,7 @@ function setupEventListeners() {
       if (e.target === menuModal) closeMenuModal();
     });
   }
-  
+
   // Location change handlers
   bind('changeLocationBtn', 'click', () => {
     openLocationModal();
@@ -844,7 +844,7 @@ function setupEventListeners() {
   bind('closeLocationModal', 'click', closeLocationModal);
   bind('cancelLocationChange', 'click', closeLocationModal);
   bind('applyLocationChange', 'click', applyLocationChange);
-  
+
   // Location modal backdrop close
   const locationModal = $('locationModal');
   if (locationModal) {
@@ -852,7 +852,7 @@ function setupEventListeners() {
       if (e.target === locationModal) closeLocationModal();
     });
   }
-  
+
   // Menu action buttons
   bind('menuBackupBtn', 'click', () => { exportJson(); });
   bind('menuRestoreBtn', 'click', () => { $('importInput')?.click(); });
@@ -898,13 +898,13 @@ function setupEventListeners() {
 function initApp() {
   console.log('[app] Initializing application');
   updateUI();
-  loadData(); 
-  loadSuggestions(); 
+  loadData();
+  loadSuggestions();
   setupEventListeners();
-  
+
   // RM-80: Set app version
   const versionEl = $('appVersion');
-  if (versionEl) versionEl.textContent = '1.0.0';
+  if (versionEl) versionEl.textContent = '2.1.0';
 }
 
 let domReady = false;
