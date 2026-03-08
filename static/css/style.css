@@ -26,6 +26,25 @@
   box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
 }
 
+/* Green Open button styling */
+.btn-open {
+  background: #4CAF50;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-open:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
 /* Requirement 3: Yellow warning banner at bottom of modal */
 .warning-banner {
   background: #fff3cd;
