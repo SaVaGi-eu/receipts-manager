@@ -18,6 +18,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 APP_NAME = "Receipt Manager"
@@ -31,7 +32,7 @@ SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 # ── Path resolution ─────────────────────────────────────────────────────────────
 
 
-def get_data_root() -> Path | None:
+def get_data_root() -> Optional[Path]:
     """
     Returns the root data directory as a Path object, or None if not configured.
 

@@ -7,13 +7,18 @@ import json
 import logging
 import mimetypes
 import os
+import platform
 import re
+import shlex
 import shutil
+import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
@@ -52,7 +57,7 @@ def sanitize_header_value(value: str) -> str:
     return sanitized
 
 
-def safe_resolve_within(root: Path, rel_path: str) -> Path | None:
+def safe_resolve_within(root: Path, rel_path: str) -> Optional[Path]:
     """
     SECURITY: Resolve a user-supplied relative path against root safely.
     Returns the resolved Path if it is contained within root, otherwise None.
@@ -227,7 +232,7 @@ def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     Removes path separators and leading dots, restricts characters, and truncates length.
     """
     # Remove any path separators outright
-    name = name.replace("/", "").replace("\\\\", "")
+    name = name.replace("/", "").replace("\\", "")
     # Allow only a conservative set of characters
     name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
     # Avoid hidden or relative-path-like names
@@ -501,6 +506,231 @@ def _today_ymmmdd():
     return datetime.now().strftime("%Y-%b-%d")
 
 
+def _open_file_dialog_macos():
+    """
+    RM-80: Open native macOS directory picker using AppleScript.
+    Works on all macOS versions without tkinter dependency.
+    Returns selected directory path or None if cancelled.
+    """
+    applescript = '''
+    try
+        set theFolder to choose folder with prompt "Select Data Directory"
+        set posixPath to POSIX path of theFolder
+        return posixPath
+    on error errMsg number errNum
+        if errNum is -128 then
+            return "USER_CANCELLED"
+        else
+            return "ERROR: " & errMsg
+        end if
+    end try
+    '''
+    
+    try:
+        result = subprocess.run(
+            ['osascript', '-e', applescript],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        if result.returncode == 0:
+            path = result.stdout.strip()
+            
+            # Handle user cancellation
+            if path == "USER_CANCELLED":
+                return None
+            
+            # Handle errors
+            if path.startswith("ERROR:"):
+                logger.error(f"AppleScript error: {path}")
+                return None
+            
+            # Remove trailing slash if present
+            path = path.rstrip('/')
+            
+            # Validate the returned path exists and is a directory
+            if path and Path(path).is_dir():
+                return path
+            else:
+                logger.error(f"Selected path is not a valid directory: {path}")
+                return None
+        else:
+            logger.error(f"AppleScript failed with code {result.returncode}: {result.stderr}")
+            return None
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Directory dialog timed out")
+        return None
+    except Exception as e:
+        logger.exception(f"Error running AppleScript directory dialog: {e}")
+        return None
+
+
+def _open_file_dialog_linux():
+    """
+    RM-80: Open native Linux directory picker using zenity or kdialog.
+    Fallback chain: zenity -> kdialog -> tkinter subprocess
+    Returns selected directory path or None if cancelled.
+    """
+    # Try zenity first (most common)
+    try:
+        result = subprocess.run(
+            ['zenity', '--file-selection', '--directory', '--title=Select Data Directory'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass  # zenity not installed
+    except Exception:
+        pass
+    
+    # Try kdialog (KDE)
+    try:
+        result = subprocess.run(
+            ['kdialog', '--getexistingdirectory', '.', 'Select Data Directory'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass  # kdialog not installed
+    except Exception:
+        pass
+    
+    # Fallback to tkinter subprocess
+    return _open_file_dialog_tkinter()
+
+
+def _open_file_dialog_tkinter():
+    """
+    RM-80: Fallback directory picker using tkinter in subprocess.
+    Used when platform-specific dialogs are unavailable.
+    Returns selected directory path or None if cancelled/error.
+    """
+    dialog_script = '''
+import sys
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    
+    dir_path = filedialog.askdirectory(
+        title="Select Data Directory"
+    )
+    
+    root.destroy()
+    
+    if dir_path:
+        print(dir_path)
+        sys.exit(0)
+    else:
+        sys.exit(1)
+        
+except ImportError:
+    print("ERROR: tkinter not available", file=sys.stderr)
+    sys.exit(2)
+except Exception as e:
+    print(f"ERROR: {e}", file=sys.stderr)
+    sys.exit(3)
+'''
+    
+    try:
+        result = subprocess.run(
+            [sys.executable, '-c', dialog_script],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        elif result.returncode == 1:
+            return None  # User cancelled
+        else:
+            logger.error(f"tkinter dialog error: {result.stderr}")
+            return None
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Directory dialog timed out")
+        return None
+    except Exception as e:
+        logger.exception(f"Error running tkinter dialog subprocess: {e}")
+        return None
+
+
+def _open_file_dialog():
+    """
+    RM-80: Cross-platform directory picker.
+    Automatically selects the best method for the current platform.
+    Returns selected directory path or None if cancelled.
+    """
+    system = platform.system()
+    
+    if system == "Darwin":
+        # macOS - use AppleScript (no tkinter dependency issues)
+        return _open_file_dialog_macos()
+    elif system == "Linux":
+        # Linux - try zenity/kdialog, fallback to tkinter
+        return _open_file_dialog_linux()
+    elif system == "Windows":
+        # Windows - tkinter works reliably
+        return _open_file_dialog_tkinter()
+    else:
+        # Unknown platform - try tkinter
+        logger.warning(f"Unknown platform: {system}, trying tkinter")
+        return _open_file_dialog_tkinter()
+
+
+def _get_current_config():
+    """
+    RM-80: Get current configuration for frontend display.
+    Returns dict with storage_type, data_path, and configured status.
+    """
+    from config import SETTINGS_FILE
+    
+    # Check for DATA_DIR environment variable first
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir:
+        return {
+            "storage_type": "local",
+            "data_path": env_dir,
+            "configured": True,
+            "source": "environment"
+        }
+    
+    # Check settings.json
+    if SETTINGS_FILE.exists():
+        try:
+            settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            data_dir = settings.get("data_directory")
+            if data_dir:
+                return {
+                    "storage_type": "local",
+                    "data_path": data_dir,
+                    "configured": True,
+                    "source": "settings_file"
+                }
+        except Exception as e:
+            logger.error(f"Error reading settings: {e}")
+    
+    # Not configured
+    return {
+        "storage_type": "none",
+        "data_path": None,
+        "configured": False,
+        "source": "none"
+    }
+
+
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
     """
@@ -619,6 +849,43 @@ class Handler(BaseHTTPRequestHandler):
                     if not chunk:
                         break
                     self.wfile.write(chunk)
+            return
+
+        # RM-80: Get current configuration
+        if path == "/api/config":
+            try:
+                config = _get_current_config()
+                self._set_headers(200)
+                self.wfile.write(json.dumps(config).encode("utf-8"))
+            except Exception as e:
+                logger.exception("Error getting config")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            return
+
+        # RM-80: Directory browsing endpoint (cross-platform version)
+        if path == "/api/browse/path":
+            try:
+                logger.info("[Browse] Opening directory dialog...")
+                selected_path = _open_file_dialog()
+                logger.info(f"[Browse] Result: {selected_path}")
+                
+                if selected_path:
+                    # Validate path exists and is a directory
+                    path_obj = Path(selected_path)
+                    if path_obj.exists() and path_obj.is_dir():
+                        self._set_headers(200)
+                        self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
+                    else:
+                        self._set_headers(200)
+                        self.wfile.write(json.dumps({"success": False, "error": "Selected path is not a valid directory"}).encode("utf-8"))
+                else:
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": False, "error": "No directory selected"}).encode("utf-8"))
+            except Exception as e:
+                logger.exception("Error in browse endpoint")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
             return
 
         if path == "/api/data":
@@ -775,6 +1042,41 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # RM-80: Config update endpoint
+        if path == "/api/config/update":
+            try:
+                updates = self._read_json()
+                data_directory = updates.get("data_directory")
+                
+                if not data_directory:
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({"success": False, "error": "Missing data_directory parameter"}).encode("utf-8"))
+                    return
+                
+                # Convert to Path and validate it's a directory
+                dir_path = Path(data_directory)
+                
+                if not dir_path.is_dir():
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({"success": False, "error": "Path is not a valid directory"}).encode("utf-8"))
+                    return
+                
+                # Import save_data_path from config
+                from config import save_data_path
+                
+                # Validate and save the directory path
+                if save_data_path(str(dir_path)):
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": True, "message": "Configuration updated. Please restart the application."}).encode("utf-8"))
+                else:
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({"success": False, "error": "Failed to save configuration. Check if the path is a valid directory and writable."}).encode("utf-8"))
+            except Exception as e:
+                logger.exception("Error updating config")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            return
 
         if path == "/api/upload":
             length = int(self.headers.get("Content-Length", 0) or 0)
