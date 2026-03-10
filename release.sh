@@ -2,7 +2,8 @@
 
 # Receipt Manager - Release Script
 # Fetches existing GitHub releases, lets you pick or create a new version,
-# builds the macOS DMG, and uploads it to GitHub Releases automatically.
+# bumps the version in ALL source files (single source of truth),
+# commits & pushes, builds the macOS DMG, and uploads to GitHub Releases.
 
 set -e
 
@@ -126,15 +127,32 @@ if [[ $REPLY =~ ^[Nn]$ ]]; then
     exit 0
 fi
 
+# Strip leading 'v' — used for files that need a plain semver string
+NPM_VERSION="${APP_VERSION#v}"
+
 # ── Bump version in package.json ─────────────────────────────────────────────
 
-echo -e "\n${BLUE}═══ Updating package.json version ═══${NC}\n"
-# Strip leading 'v' — npm version doesn't want it
-NPM_VERSION="${APP_VERSION#v}"
+echo -e "\n${BLUE}═══ Updating package.json ═══${NC}\n"
 cd platforms/macos
 npm version "$NPM_VERSION" --no-git-tag-version --allow-same-version
 cd ../..
 echo -e "${GREEN}✓ package.json updated to $NPM_VERSION${NC}"
+
+# ── Bump version in templates/index.html (the in-app Settings screen) ────────
+
+echo -e "\n${BLUE}═══ Updating in-app version display ═══${NC}\n"
+# Replaces: <span id="appVersion">ANY.VERSION.HERE</span>
+# With:     <span id="appVersion">X.Y.Z</span>
+sed -i '' "s|<span id=\"appVersion\">[^<]*</span>|<span id=\"appVersion\">${NPM_VERSION}</span>|" templates/index.html
+echo -e "${GREEN}✓ templates/index.html updated to $NPM_VERSION${NC}"
+
+# ── Commit & push version bumps ───────────────────────────────────────────────
+
+echo -e "\n${BLUE}═══ Committing version bumps ═══${NC}\n"
+git add platforms/macos/package.json platforms/macos/package-lock.json templates/index.html
+git commit -m "chore: bump version to ${APP_VERSION}"
+git push origin main
+echo -e "${GREEN}✓ Version bump committed and pushed${NC}"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
