@@ -1361,8 +1361,9 @@ class Handler(BaseHTTPRequestHandler):
                                 try:
                                     if not any(file_path.parent.iterdir()):
                                         file_path.parent.rmdir()
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    # Best-effort cleanup: failure to remove an empty directory is non-fatal
+                                    logger.debug("Failed to remove parent directory %s: %s", file_path.parent, e)
                             except Exception as e:
                                 logger.exception("Failed to delete file")
                                 self._set_headers(500)
