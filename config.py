@@ -32,6 +32,7 @@ def _sanitize_for_log(value) -> str:
     text = str(value)
     return text.replace("\r", "").replace("\n", "")
 
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 APP_NAME = "Receipt Manager"
 
