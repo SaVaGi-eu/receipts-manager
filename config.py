@@ -23,6 +23,15 @@ from typing import Optional
 # ── Logging ───────────────────────────────────────────────────────────────────
 logger = logging.getLogger("receipt-manager.config")
 
+
+def _sanitize_for_log(value) -> str:
+    """
+    Return a log-safe string representation of value by stripping CR/LF
+    to mitigate log injection via user-controlled paths or messages.
+    """
+    text = str(value)
+    return text.replace("\r", "").replace("\n", "")
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 APP_NAME = "Receipt Manager"
 
@@ -122,7 +131,8 @@ def _try_create(p: Path) -> bool:
         test_file.unlink()
         return True
     except Exception as e:
-        logger.error("[Config] Cannot create or write to directory %s: %s", p, e)
+        safe_p = _sanitize_for_log(p)
+        logger.error("[Config] Cannot create or write to directory %s: %s", safe_p, e)
         return False
 
 
@@ -147,11 +157,13 @@ def save_data_path(chosen_path: str) -> bool:
         if not p.exists():
             # Try to create it
             if not _try_create(p):
-                logger.error("[Config] Cannot create directory: %s", chosen_path)
+                safe_chosen = _sanitize_for_log(chosen_path)
+                logger.error("[Config] Cannot create directory: %s", safe_chosen)
                 return False
 
         if not p.is_dir():
-            logger.error("[Config] Path is not a directory: %s", chosen_path)
+            safe_chosen = _sanitize_for_log(chosen_path)
+            logger.error("[Config] Path is not a directory: %s", safe_chosen)
             return False
 
         # Create settings directory if needed
@@ -167,7 +179,8 @@ def save_data_path(chosen_path: str) -> bool:
             "updated_at": datetime.utcnow().isoformat() + "Z",
         }
         SETTINGS_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
-        logger.info("[Config] Saved data directory: %s", chosen_path)
+        safe_chosen = _sanitize_for_log(chosen_path)
+        logger.info("[Config] Saved data directory: %s", safe_chosen)
         return True
     except Exception as e:
         logger.error("[Config] could not save settings: %s", e)
