@@ -22,7 +22,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Setup Node.js
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee109 # v4.1.0
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: '20'
       - name: Setup Python
@@ -59,14 +59,14 @@ jobs:
           echo "Build artifacts:"
           ls -lh platforms/macos/dist/
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@ea4f168a17456b26663e29d9c52a825ff7a85a90 # v4.6.0
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: Receipt-Manager-macOS
           path: platforms/macos/dist/*.dmg
           if-no-files-found: error
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.2.0
+        uses: softprops/action-gh-release@7b4da11513bf3f43f9999e90eabced41ab8bb048 # v2.2.0
         with:
           files: platforms/macos/dist/*.dmg
           draft: false
@@ -103,13 +103,13 @@ jobs:
           docker save receipts-manager:latest | gzip > receipt-manager-docker.tar.gz
       - name: Upload Docker image artifact
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@ea4f168a17456b26663e29d9c52a825ff7a85a90 # v4.6.0
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: Receipt-Manager-Docker
           path: receipt-manager-docker.tar.gz
       - name: Add Docker image to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.2.0
+        uses: softprops/action-gh-release@7b4da11513bf3f43f9999e90eabced41ab8bb048 # v2.2.0
         with:
           files: receipt-manager-docker.tar.gz
         env:
