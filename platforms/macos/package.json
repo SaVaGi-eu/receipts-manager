@@ -65,15 +65,12 @@
       }
     ],
     "mac": {
-      "icon": "build/icon.icns",
       "category": "public.app-category.productivity",
       "identity": null,
       "target": ["dmg"]
     },
     "dmg": {
       "title": "Receipt Manager ${version}",
-      "icon": "build/icon.icns",
-      "background": "build/background.png",
       "window": {
         "width": 540,
         "height": 380
