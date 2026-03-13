@@ -15,10 +15,13 @@ If no valid data directory is found, the application should prompt the user to c
 """
 
 import json
+import logging
 import os
-import sys
 from pathlib import Path
 from typing import Optional
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logger = logging.getLogger("receipt-manager.config")
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 APP_NAME = "Receipt Manager"
@@ -52,14 +55,14 @@ def get_data_root() -> Optional[Path]:
         # Validate that the path is accessible
         try:
             if p.exists() and p.is_dir():
-                print(f"[Config] Using DATA_DIR environment variable: {p}", file=sys.stderr)
+                logger.info("[Config] Using DATA_DIR environment variable: %s", p)
                 return p
             # Try to create if it doesn't exist
             if _try_create(p):
-                print(f"[Config] Created DATA_DIR directory: {p}", file=sys.stderr)
+                logger.info("[Config] Created DATA_DIR directory: %s", p)
                 return p
         except Exception as e:
-            print(f"[Config] WARNING: DATA_DIR set but path not accessible: {env_dir} - {e}", file=sys.stderr)
+            logger.warning("[Config] DATA_DIR set but path not accessible: %s - %s", env_dir, e)
 
     # 2. Electron wrote the user-chosen path into settings.json
     if SETTINGS_FILE.exists():
@@ -71,39 +74,41 @@ def get_data_root() -> Optional[Path]:
                 # First check if it exists
                 try:
                     if p.exists() and p.is_dir():
-                        print(f"[Config] Using configured data directory: {p}", file=sys.stderr)
+                        logger.info("[Config] Using configured data directory: %s", p)
                         return p
                     # If it doesn't exist, try to create it
                     if _try_create(p):
-                        print(f"[Config] Created configured directory: {p}", file=sys.stderr)
+                        logger.info("[Config] Created configured directory: %s", p)
                         return p
                     # Path no longer accessible
-                    print(f"[Config] ERROR: Configured data path not accessible: {chosen}", file=sys.stderr)
-                    print(f"[Config] The directory may have been moved, deleted, or permissions changed.", file=sys.stderr)
+                    logger.error("[Config] Configured data path not accessible: %s", chosen)
+                    logger.error("[Config] The directory may have been moved, deleted, or permissions changed.")
                 except Exception as e:
-                    print(f"[Config] ERROR: Cannot access configured path {chosen}: {e}", file=sys.stderr)
+                    logger.error("[Config] Cannot access configured path %s: %s", chosen, e)
         except json.JSONDecodeError as e:
-            print(f"[Config] ERROR: settings.json is corrupted: {e}", file=sys.stderr)
-            print(f"[Config] You may need to delete {SETTINGS_FILE} and reconfigure.", file=sys.stderr)
+            logger.error("[Config] settings.json is corrupted: %s", e)
+            logger.error("[Config] You may need to delete %s and reconfigure.", SETTINGS_FILE)
         except Exception as e:
-            print(f"[Config] ERROR: could not read settings.json: {e}", file=sys.stderr)
+            logger.error("[Config] could not read settings.json: %s", e)
 
     # 3. DEVELOPMENT MODE ONLY: Allow ./data fallback if explicitly enabled
     if os.environ.get("DEV_MODE") == "1":
         fallback = Path(__file__).parent / "data"
-        print(f"[Config] DEV_MODE enabled, using fallback: {fallback}", file=sys.stderr)
+        logger.info("[Config] DEV_MODE enabled, using fallback: %s", fallback)
         try:
             fallback.mkdir(parents=True, exist_ok=True)
             return fallback
         except Exception as e:
-            print(f"[Config] ERROR: Cannot create DEV_MODE fallback: {e}", file=sys.stderr)
+            logger.error("[Config] Cannot create DEV_MODE fallback: %s", e)
 
     # No valid data directory found
-    print(f"[Config] WARNING: No data directory configured.", file=sys.stderr)
-    print(f"[Config] Checked:", file=sys.stderr)
-    print(f"[Config]   - DATA_DIR environment variable: Not set", file=sys.stderr)
-    print(f"[Config]   - Settings file: {SETTINGS_FILE} - {'exists' if SETTINGS_FILE.exists() else 'not found'}", file=sys.stderr)
-    print(f"[Config] Application should prompt user to choose a data location.", file=sys.stderr)
+    logger.warning("[Config] No data directory configured.")
+    logger.warning("[Config] Checked:")
+    logger.warning("[Config]   - DATA_DIR environment variable: Not set")
+    logger.warning(
+        "[Config]   - Settings file: %s - %s", SETTINGS_FILE, "exists" if SETTINGS_FILE.exists() else "not found"
+    )
+    logger.warning("[Config] Application should prompt user to choose a data location.")
     return None
 
 
@@ -117,7 +122,7 @@ def _try_create(p: Path) -> bool:
         test_file.unlink()
         return True
     except Exception as e:
-        print(f"[Config] Cannot create or write to directory {p}: {e}", file=sys.stderr)
+        logger.error("[Config] Cannot create or write to directory %s: %s", p, e)
         return False
 
 
@@ -142,11 +147,11 @@ def save_data_path(chosen_path: str) -> bool:
         if not p.exists():
             # Try to create it
             if not _try_create(p):
-                print(f"[Config] ERROR: Cannot create directory: {chosen_path}", file=sys.stderr)
+                logger.error("[Config] Cannot create directory: %s", chosen_path)
                 return False
 
         if not p.is_dir():
-            print(f"[Config] ERROR: Path is not a directory: {chosen_path}", file=sys.stderr)
+            logger.error("[Config] Path is not a directory: %s", chosen_path)
             return False
 
         # Create settings directory if needed
@@ -154,17 +159,18 @@ def save_data_path(chosen_path: str) -> bool:
 
         # Save settings
         from datetime import datetime
+
         settings = {
             "data_directory": str(chosen_path),
             "app_name": APP_NAME,
             "version": 1,
-            "updated_at": datetime.utcnow().isoformat() + "Z"
+            "updated_at": datetime.utcnow().isoformat() + "Z",
         }
         SETTINGS_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"[Config] Saved data directory: {chosen_path}", file=sys.stderr)
+        logger.info("[Config] Saved data directory: %s", chosen_path)
         return True
     except Exception as e:
-        print(f"[Config] ERROR: could not save settings: {e}", file=sys.stderr)
+        logger.error("[Config] could not save settings: %s", e)
         return False
 
 
@@ -184,9 +190,9 @@ if DATA_ROOT:
     try:
         for _d in (DATA_ROOT, DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR):
             _d.mkdir(parents=True, exist_ok=True)
-        print(f"[Config] ✓ Data directory initialized: {DATA_ROOT}", file=sys.stderr)
+        logger.info("[Config] Data directory initialized: %s", DATA_ROOT)
     except Exception as e:
-        print(f"[Config] ERROR: Could not create directory structure: {e}", file=sys.stderr)
+        logger.error("[Config] Could not create directory structure: %s", e)
         # Set to None so app knows there's a problem
         DATA_ROOT = None
         DATABASE_DIR = None
@@ -197,7 +203,7 @@ if DATA_ROOT:
 else:
     # Data directory not configured - set to None
     # The application (Electron) should handle this by showing a folder picker
-    print(f"[Config] ⚠  Data directory not configured - application should prompt user", file=sys.stderr)
+    logger.warning("[Config] Data directory not configured - application should prompt user")
     DATABASE_DIR = None
     STORAGE_DIR = None
     RECEIPTS_DIR = None
