@@ -34,7 +34,7 @@ def sanitize_for_logging(text: str, max_length: int = 200) -> str:
     if not text:
         return ""
     # Remove control characters including CR, LF, and other escape sequences
-    sanitized = re.sub(r'[\r\n\x00-\x1f\x7f]', '', str(text))
+    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text))
     # Truncate to prevent log flooding
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length] + "..."
@@ -61,13 +61,13 @@ def get_tesseract_config():
         tessdata_dir = os.path.join(bundle_dir, "Resources", "tesseract", "tessdata")
 
         if os.path.exists(tesseract_cmd):
-            print(f"ℹ️  Using bundled Tesseract: {tesseract_cmd}")
+            logger.info("Using bundled Tesseract: %s", tesseract_cmd)
             return tesseract_cmd, tessdata_dir
         else:
-            print(f"⚠️  Bundled Tesseract not found at {tesseract_cmd}, falling back to system")
+            logger.warning("Bundled Tesseract not found at %s, falling back to system", tesseract_cmd)
 
     # Running from source or bundled Tesseract not found - use system
-    print("ℹ️  Using system Tesseract")
+    logger.info("Using system Tesseract")
     return "tesseract", None  # Use system default
 
 

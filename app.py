@@ -9,7 +9,6 @@ import mimetypes
 import os
 import platform
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -43,6 +42,19 @@ data_lock = threading.Lock()
 
 
 # ---------- Security helpers ----------
+def sanitize_for_logging(text: str, max_length: int = 200) -> str:
+    """
+    SECURITY: Sanitize user-controlled input before logging to prevent log injection (CWE-117).
+    Removes newlines, carriage returns, and other control characters.
+    """
+    if not text:
+        return ""
+    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text))
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+    return sanitized
+
+
 def sanitize_header_value(value: str) -> str:
     """
     SECURITY: Sanitize values used in HTTP headers to prevent response splitting.
@@ -428,16 +440,9 @@ def verify_file_integrity(data):
         if not rel:
             continue
 
-        # SECURITY: Construct path safely
-        try:
-            full = Path(rel)
-            if not full.is_absolute():
-                full = DATA_ROOT / rel
-        except Exception:
-            continue
-
-        # Validate path before checking existence
-        if not validate_path_within_root(full, DATA_ROOT):
+        # SECURITY: Use safe_resolve_within for path validation
+        full = safe_resolve_within(DATA_ROOT, rel)
+        if not full:
             continue
 
         # Now safe to check existence
@@ -512,7 +517,7 @@ def _open_file_dialog_macos():
     Works on all macOS versions without tkinter dependency.
     Returns selected directory path or None if cancelled.
     """
-    applescript = '''
+    applescript = """
     try
         set theFolder to choose folder with prompt "Select Data Directory"
         set posixPath to POSIX path of theFolder
@@ -524,46 +529,41 @@ def _open_file_dialog_macos():
             return "ERROR: " & errMsg
         end if
     end try
-    '''
-    
+    """
+
     try:
-        result = subprocess.run(
-            ['osascript', '-e', applescript],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        
+        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True, timeout=60)
+
         if result.returncode == 0:
             path = result.stdout.strip()
-            
+
             # Handle user cancellation
             if path == "USER_CANCELLED":
                 return None
-            
+
             # Handle errors
             if path.startswith("ERROR:"):
-                logger.error(f"AppleScript error: {path}")
+                logger.error("AppleScript error: %s", sanitize_for_logging(path))
                 return None
-            
+
             # Remove trailing slash if present
-            path = path.rstrip('/')
-            
+            path = path.rstrip("/")
+
             # Validate the returned path exists and is a directory
             if path and Path(path).is_dir():
                 return path
             else:
-                logger.error(f"Selected path is not a valid directory: {path}")
+                logger.error("Selected path is not a valid directory: %s", sanitize_for_logging(path))
                 return None
         else:
-            logger.error(f"AppleScript failed with code {result.returncode}: {result.stderr}")
+            logger.error("AppleScript failed with code %d: %s", result.returncode, sanitize_for_logging(result.stderr))
             return None
-            
+
     except subprocess.TimeoutExpired:
         logger.error("Directory dialog timed out")
         return None
     except Exception as e:
-        logger.exception(f"Error running AppleScript directory dialog: {e}")
+        logger.exception("Error running AppleScript directory dialog: %s", sanitize_for_logging(str(e)))
         return None
 
 
@@ -576,10 +576,10 @@ def _open_file_dialog_linux():
     # Try zenity first (most common)
     try:
         result = subprocess.run(
-            ['zenity', '--file-selection', '--directory', '--title=Select Data Directory'],
+            ["zenity", "--file-selection", "--directory", "--title=Select Data Directory"],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -587,14 +587,14 @@ def _open_file_dialog_linux():
         pass  # zenity not installed
     except Exception:
         pass
-    
+
     # Try kdialog (KDE)
     try:
         result = subprocess.run(
-            ['kdialog', '--getexistingdirectory', '.', 'Select Data Directory'],
+            ["kdialog", "--getexistingdirectory", ".", "Select Data Directory"],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -602,7 +602,7 @@ def _open_file_dialog_linux():
         pass  # kdialog not installed
     except Exception:
         pass
-    
+
     # Fallback to tkinter subprocess
     return _open_file_dialog_tkinter()
 
@@ -613,57 +613,52 @@ def _open_file_dialog_tkinter():
     Used when platform-specific dialogs are unavailable.
     Returns selected directory path or None if cancelled/error.
     """
-    dialog_script = '''
+    dialog_script = """
 import sys
 try:
     import tkinter as tk
     from tkinter import filedialog
-    
+
     root = tk.Tk()
     root.withdraw()
     root.attributes('-topmost', True)
-    
+
     dir_path = filedialog.askdirectory(
         title="Select Data Directory"
     )
-    
+
     root.destroy()
-    
+
     if dir_path:
         print(dir_path)
         sys.exit(0)
     else:
         sys.exit(1)
-        
+
 except ImportError:
     print("ERROR: tkinter not available", file=sys.stderr)
     sys.exit(2)
 except Exception as e:
     print(f"ERROR: {e}", file=sys.stderr)
     sys.exit(3)
-'''
-    
+"""
+
     try:
-        result = subprocess.run(
-            [sys.executable, '-c', dialog_script],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        
+        result = subprocess.run([sys.executable, "-c", dialog_script], capture_output=True, text=True, timeout=60)
+
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         elif result.returncode == 1:
             return None  # User cancelled
         else:
-            logger.error(f"tkinter dialog error: {result.stderr}")
+            logger.error("tkinter dialog error: %s", sanitize_for_logging(result.stderr))
             return None
-            
+
     except subprocess.TimeoutExpired:
         logger.error("Directory dialog timed out")
         return None
     except Exception as e:
-        logger.exception(f"Error running tkinter dialog subprocess: {e}")
+        logger.exception("Error running tkinter dialog subprocess: %s", sanitize_for_logging(str(e)))
         return None
 
 
@@ -674,7 +669,7 @@ def _open_file_dialog():
     Returns selected directory path or None if cancelled.
     """
     system = platform.system()
-    
+
     if system == "Darwin":
         # macOS - use AppleScript (no tkinter dependency issues)
         return _open_file_dialog_macos()
@@ -686,7 +681,7 @@ def _open_file_dialog():
         return _open_file_dialog_tkinter()
     else:
         # Unknown platform - try tkinter
-        logger.warning(f"Unknown platform: {system}, trying tkinter")
+        logger.warning("Unknown platform: %s, trying tkinter", sanitize_for_logging(system))
         return _open_file_dialog_tkinter()
 
 
@@ -696,39 +691,24 @@ def _get_current_config():
     Returns dict with storage_type, data_path, and configured status.
     """
     from config import SETTINGS_FILE
-    
+
     # Check for DATA_DIR environment variable first
     env_dir = os.environ.get("DATA_DIR")
     if env_dir:
-        return {
-            "storage_type": "local",
-            "data_path": env_dir,
-            "configured": True,
-            "source": "environment"
-        }
-    
+        return {"storage_type": "local", "data_path": env_dir, "configured": True, "source": "environment"}
+
     # Check settings.json
     if SETTINGS_FILE.exists():
         try:
             settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
             data_dir = settings.get("data_directory")
             if data_dir:
-                return {
-                    "storage_type": "local",
-                    "data_path": data_dir,
-                    "configured": True,
-                    "source": "settings_file"
-                }
+                return {"storage_type": "local", "data_path": data_dir, "configured": True, "source": "settings_file"}
         except Exception as e:
-            logger.error(f"Error reading settings: {e}")
-    
+            logger.error("Error reading settings: %s", sanitize_for_logging(str(e)))
+
     # Not configured
-    return {
-        "storage_type": "none",
-        "data_path": None,
-        "configured": False,
-        "source": "none"
-    }
+    return {"storage_type": "none", "data_path": None, "configured": False, "source": "none"}
 
 
 # ---------- HTTP handler ----------
@@ -860,7 +840,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.exception("Error getting config")
                 self._set_headers(500)
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                self.wfile.write(json.dumps({"error": "Internal configuration error"}).encode("utf-8"))
             return
 
         # RM-80: Directory browsing endpoint (cross-platform version)
@@ -868,8 +848,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 logger.info("[Browse] Opening directory dialog...")
                 selected_path = _open_file_dialog()
-                logger.info(f"[Browse] Result: {selected_path}")
-                
+                logger.info("[Browse] Result: %s", sanitize_for_logging(str(selected_path)))
+
                 if selected_path:
                     # Validate path exists and is a directory
                     path_obj = Path(selected_path)
@@ -878,14 +858,18 @@ class Handler(BaseHTTPRequestHandler):
                         self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
                     else:
                         self._set_headers(200)
-                        self.wfile.write(json.dumps({"success": False, "error": "Selected path is not a valid directory"}).encode("utf-8"))
+                        self.wfile.write(
+                            json.dumps({"success": False, "error": "Selected path is not a valid directory"}).encode(
+                                "utf-8"
+                            )
+                        )
                 else:
                     self._set_headers(200)
                     self.wfile.write(json.dumps({"success": False, "error": "No directory selected"}).encode("utf-8"))
             except Exception as e:
                 logger.exception("Error in browse endpoint")
                 self._set_headers(500)
-                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
         if path == "/api/data":
@@ -1033,7 +1017,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.exception("Error serving file")
                 self._set_headers(500, "text/plain")
-                self.wfile.write(f"Error: {e}".encode())
+                self.wfile.write(b"Internal server error")
             return
 
         self._set_headers(404, "text/plain")
@@ -1048,34 +1032,49 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 updates = self._read_json()
                 data_directory = updates.get("data_directory")
-                
+
                 if not data_directory:
                     self._set_headers(400)
-                    self.wfile.write(json.dumps({"success": False, "error": "Missing data_directory parameter"}).encode("utf-8"))
+                    self.wfile.write(
+                        json.dumps({"success": False, "error": "Missing data_directory parameter"}).encode("utf-8")
+                    )
                     return
-                
+
                 # Convert to Path and validate it's a directory
                 dir_path = Path(data_directory)
-                
+
                 if not dir_path.is_dir():
                     self._set_headers(400)
-                    self.wfile.write(json.dumps({"success": False, "error": "Path is not a valid directory"}).encode("utf-8"))
+                    self.wfile.write(
+                        json.dumps({"success": False, "error": "Path is not a valid directory"}).encode("utf-8")
+                    )
                     return
-                
+
                 # Import save_data_path from config
                 from config import save_data_path
-                
+
                 # Validate and save the directory path
                 if save_data_path(str(dir_path)):
                     self._set_headers(200)
-                    self.wfile.write(json.dumps({"success": True, "message": "Configuration updated. Please restart the application."}).encode("utf-8"))
+                    self.wfile.write(
+                        json.dumps(
+                            {"success": True, "message": "Configuration updated. Please restart the application."}
+                        ).encode("utf-8")
+                    )
                 else:
                     self._set_headers(400)
-                    self.wfile.write(json.dumps({"success": False, "error": "Failed to save configuration. Check if the path is a valid directory and writable."}).encode("utf-8"))
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "success": False,
+                                "error": "Failed to save configuration. Check if the path is a valid directory and writable.",
+                            }
+                        ).encode("utf-8")
+                    )
             except Exception as e:
                 logger.exception("Error updating config")
                 self._set_headers(500)
-                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
         if path == "/api/upload":
@@ -1129,8 +1128,9 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 saved_path.write_bytes(file_bytes)
             except Exception as e:
+                logger.exception("Failed to save uploaded file")
                 self._set_headers(500)
-                self.wfile.write(json.dumps({"success": False, "error": f"Failed to save: {e}"}).encode())
+                self.wfile.write(json.dumps({"success": False, "error": "Failed to save uploaded file"}).encode())
                 return
 
             # path relative to DATA_ROOT
@@ -1248,15 +1248,10 @@ class Handler(BaseHTTPRequestHandler):
                 is_multi = len(items_in_group) > 1
                 old_rel_path = item.get("receipt_relative_path")
 
-                # SECURITY: Build old_path and validate
+                # SECURITY: Build old_path and validate using safe_resolve_within
                 old_path = None
                 if old_rel_path:
-                    try:
-                        old_path = DATA_ROOT / old_rel_path
-                        if not validate_path_within_root(old_path, DATA_ROOT):
-                            old_path = None
-                    except Exception:
-                        old_path = None
+                    old_path = safe_resolve_within(DATA_ROOT, old_rel_path)
 
                 needs_move = False
 
@@ -1316,14 +1311,16 @@ class Handler(BaseHTTPRequestHandler):
                                 old_path.parent.rmdir()
                         except Exception:
                             pass
-                    except FileExistsError as e:
+                    except FileExistsError:
                         self._set_headers(400)
-                        self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                        self.wfile.write(
+                            json.dumps({"success": False, "error": "Target file already exists"}).encode("utf-8")
+                        )
                         return
-                    except (ValueError, FileNotFoundError, IOError) as e:
+                    except (ValueError, FileNotFoundError, IOError):
                         logger.exception("Failed to move file")
                         self._set_headers(500)
-                        self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                        self.wfile.write(json.dumps({"success": False, "error": "Failed to move file"}).encode("utf-8"))
                         return
 
                 save_data(data)
@@ -1356,25 +1353,22 @@ class Handler(BaseHTTPRequestHandler):
                 if len(items_in_group) == 1:
                     rel = item.get("receipt_relative_path")
                     if rel:
-                        # SECURITY: Validate path before deletion
-                        try:
-                            file_path = DATA_ROOT / rel
-                            if validate_path_within_root(file_path, DATA_ROOT) and file_path.exists():
+                        # SECURITY: Validate path using safe_resolve_within before deletion
+                        file_path = safe_resolve_within(DATA_ROOT, rel)
+                        if file_path and file_path.exists():
+                            try:
+                                file_path.unlink()
                                 try:
-                                    file_path.unlink()
-                                    try:
-                                        if not any(file_path.parent.iterdir()):
-                                            file_path.parent.rmdir()
-                                    except Exception:
-                                        pass
-                                except Exception as e:
-                                    logger.exception("Failed to delete file")
-                                    self._set_headers(500)
-                                    msg = {"success": False, "error": f"Failed to delete file: {e}"}
-                                    self.wfile.write(json.dumps(msg).encode("utf-8"))
-                                    return
-                        except Exception:
-                            pass  # Path construction failed, continue with data cleanup
+                                    if not any(file_path.parent.iterdir()):
+                                        file_path.parent.rmdir()
+                                except Exception:
+                                    pass
+                            except Exception as e:
+                                logger.exception("Failed to delete file")
+                                self._set_headers(500)
+                                msg = {"success": False, "error": "Failed to delete file"}
+                                self.wfile.write(json.dumps(msg).encode("utf-8"))
+                                return
 
                 # Remove item and possibly receipt
                 data["items"] = [i for i in data["items"] if i["id"] != item_id]
@@ -1393,7 +1387,7 @@ class Handler(BaseHTTPRequestHandler):
 # ---------- Server bootstrap ----------
 def run_server():
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    logger.info(f"Starting server on port {PORT}")
+    logger.info("Starting server on port %d", PORT)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
