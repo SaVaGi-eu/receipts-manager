@@ -153,76 +153,87 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     SECURITY: Move src -> dst_dir/dst_name safely with comprehensive validation.
     Returns the final destination Path on success, raises exceptions on failure.
 
+    Validation uses os.path.realpath + startswith (the pattern CodeQL recognises as a
+    path-traversal sanitizer) so that taint flow is provably broken before any file
+    operation.
+
     Validation steps:
     1. Verify source exists and is a file
-    2. Sanitize destination filename (no path separators or ..)
-    3. Validate destination directory is within allowed_root
-    4. Validate final destination is within allowed_root
+    2. Reject dst_name containing path separators or ..
+    3. Compute canonical real paths for src, dst_dir, and the final destination
+    4. Verify all three are contained within allowed_root via realpath + startswith
     5. Check for existing files to prevent overwrites
     """
     if not src or not src.exists() or not src.is_file():
         raise FileNotFoundError("Source file missing")
 
-    # SECURITY: Validate dst_name doesn't contain path traversal sequences
+    # SECURITY: Reject dst_name that contains path traversal sequences
     if not dst_name or ".." in dst_name or "/" in dst_name or "\\" in dst_name:
         raise ValueError("Invalid filename: contains path separators or traversal sequences")
 
-    # SECURITY: Validate dst_dir is within allowed_root
-    if not validate_path_within_root(dst_dir, allowed_root):
+    # SECURITY: Compute the canonical allowed root once.
+    # Adding os.sep prevents a prefix like "/data" matching "/data_evil/...".
+    try:
+        allowed_root_real = os.path.realpath(str(allowed_root))
+    except Exception:
+        raise ValueError("Cannot resolve allowed root")
+    allowed_root_prefix = allowed_root_real + os.sep
+
+    # SECURITY: Validate source path is within allowed_root using realpath + startswith
+    try:
+        src_real = os.path.realpath(str(src))
+    except Exception:
+        raise ValueError("Cannot resolve source path")
+    if not src_real.startswith(allowed_root_prefix):
+        raise ValueError("Source path outside allowed root")
+
+    # SECURITY: Validate destination directory is within allowed_root
+    try:
+        dst_dir_real = os.path.realpath(str(dst_dir))
+    except Exception:
+        raise ValueError("Cannot resolve destination directory")
+    if not dst_dir_real.startswith(allowed_root_prefix):
         raise ValueError("Destination directory outside allowed root")
 
-    # Ensure destination directory exists with validation
+    # Ensure destination directory exists
     try:
         dst_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         raise IOError(f"Cannot create destination directory: {e}")
 
-    # SECURITY: Construct destination path
+    # SECURITY: Compute the canonical final destination and validate it.
+    # os.path.join is used so that CodeQL can track the data flow through
+    # realpath into the startswith guard below.
     try:
-        dst = dst_dir / dst_name
+        dst_real = os.path.realpath(os.path.join(dst_dir_real, dst_name))
     except Exception:
         raise ValueError("Invalid destination path construction")
-
-    # SECURITY: Validate final destination is within allowed_root
-    if not validate_path_within_root(dst, allowed_root):
+    if not dst_real.startswith(allowed_root_prefix):
         raise ValueError("Path traversal detected: destination outside allowed directory")
 
-    # Resolve final destination path
-    try:
-        final_dst = dst.resolve(strict=False)
-    except Exception:
-        raise ValueError("Cannot resolve destination path")
+    # If destination already exists, only allow it when src and dst are the same file
+    if os.path.exists(dst_real):
+        if dst_real != src_real:
+            raise FileExistsError("Target file already exists")
+        return Path(dst_real)
 
-    # If final_dst exists and is not the same as src, fail to avoid overwrite
-    if final_dst.exists():
-        try:
-            src_resolved = src.resolve()
-            if final_dst.resolve() != src_resolved:
-                raise FileExistsError("Target file already exists")
-            else:
-                # Same file already in place
-                return final_dst
-        except FileExistsError:
-            raise
-        except Exception:
-            raise IOError("Unable to verify existing target")
-
-    # Attempt atomic move; fallback to shutil.move if necessary
+    # Attempt atomic move using the validated canonical path strings.
+    # Both src_real and dst_real have passed the startswith guard above.
     try:
         try:
-            os.replace(str(src), str(final_dst))
+            os.replace(src_real, dst_real)
         except OSError:
-            shutil.move(str(src), str(final_dst))
+            shutil.move(src_real, dst_real)
     except Exception as e:
         raise IOError(f"Failed to move file: {e}")
 
     # Optionally set safe permissions
     try:
-        final_dst.chmod(0o640)
+        Path(dst_real).chmod(0o640)
     except Exception:
         pass
 
-    return final_dst
+    return Path(dst_real)
 
 
 # ---------- Utility functions ----------
