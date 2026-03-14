@@ -1,12 +1,2 @@
 # Core web framework (required)
 Flask>=3.0.0
-
-# OCR Libraries
-easyocr>=1.7.0         # Recommended: More accurate, supports 80+ languages
-pytesseract>=0.3.10    # Alternative: Lightweight, requires Tesseract installation
-Pillow>=10.0.0         # Image processing for both OCR engines
-
-# Optional: For better OCR preprocessing
-opencv-python>=4.8.0   # Image preprocessing (optional but recommended)
-numpy>=1.24.0          # Required by EasyOCR and OpenCV
-pdf2image>=1.16.0      # Required for PDF to Image conversion

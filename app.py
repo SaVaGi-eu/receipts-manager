@@ -21,9 +21,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
 
-# Internal imports (config and OCR)
-from ocr_service import extract_receipt_data
-
 # Basic configuration
 PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
 BASE_DIR = Path(__file__).parent
@@ -1191,27 +1188,13 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 rel_path = str(saved_path)
 
-            # Run OCR extraction (best-effort)
-            ocr_data = {"shop": "N/A", "purchase_date": "N/A", "total_amount": None, "items": []}
-            try:
-                ocr_result = extract_receipt_data(str(saved_path), engine="easyocr", languages=["en", "nl", "el", "lv"])
-                ocr_data = {
-                    "shop": ocr_result.get("shop", "N/A"),
-                    "purchase_date": ocr_result.get("purchase_date", _today_ymmmdd()),
-                    "total_amount": ocr_result.get("total_amount"),
-                    "items": ocr_result.get("items", [])[:3],
-                    "raw_text": ocr_result.get("raw_text", "")[:500],
-                }
-            except Exception:
-                logger.exception("OCR extraction failed")
-
             with data_lock:
                 data = load_data()
                 rg_id = generate_receipt_group_id(data)
                 receipt = {
                     "receipt_group_id": rg_id,
-                    "shop": ocr_data["shop"],
-                    "purchase_date": ocr_data["purchase_date"],
+                    "shop": "N/A",
+                    "purchase_date": _today_ymmmdd(),
                     "documentation": "N/A",
                     "receipt_filename": saved_name,
                     "receipt_relative_path": rel_path,
@@ -1241,7 +1224,7 @@ class Handler(BaseHTTPRequestHandler):
                     "item_id": item_id,
                     "receipt_filename": saved_name,
                     "receipt_relative_path": rel_path,
-                    "ocr_data": ocr_data,
+                    "ocr_data": {"shop": "", "purchase_date": "", "total_amount": None, "items": []},
                 }
                 self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
