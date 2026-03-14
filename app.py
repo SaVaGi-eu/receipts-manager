@@ -1096,8 +1096,10 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return
 
-                # Convert to Path and validate it's a directory
-                dir_path = Path(data_directory)
+                # Convert to Path and validate it's a directory.
+                # SECURITY: Canonicalize with realpath to prevent path injection
+                # via symlinks or '..' components before any filesystem operations.
+                dir_path = Path(os.path.realpath(str(data_directory)))
 
                 if not dir_path.is_dir():
                     self._set_headers(400)
