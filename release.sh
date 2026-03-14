@@ -53,7 +53,10 @@ echo -e "${GREEN}✓ All prerequisites met.${NC}\n"
 
 echo "Fetching existing releases from GitHub..."
 TAGS_JSON=$(gh release list --repo "$REPO" --limit 20 --json tagName,isLatest 2>/dev/null || echo "[]")
-mapfile -t TAGS < <(echo "$TAGS_JSON" | python3 -c "
+TAGS=()
+while IFS= read -r line; do
+    TAGS+=("$line")
+done < <(echo "$TAGS_JSON" | python3 -c "
 import json, sys
 releases = json.load(sys.stdin)
 for r in releases:
