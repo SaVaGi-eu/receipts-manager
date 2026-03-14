@@ -8,18 +8,14 @@ import logging
 import os
 import platform
 import re
-import shutil
 import subprocess
 import sys
-import threading
-import time
-from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
+from receipt_service import ReceiptService
 
 # Basic configuration
 PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
@@ -34,7 +30,7 @@ ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000", "http://loc
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("receipt-manager")
 
-data_lock = threading.Lock()
+service = ReceiptService(DATA_FILE, DATA_ROOT, RECEIPTS_DIR, STORAGE_DIR, BACKUP_DIR)
 
 
 # ---------- Security helpers ----------
@@ -63,461 +59,6 @@ def sanitize_header_value(value: str) -> str:
     # Also handle Unicode characters that could fold into newlines
     sanitized = sanitized.replace("\u0085", "").replace("\u2028", "").replace("\u2029", "")
     return sanitized
-
-
-def safe_resolve_within(root: Path, rel_path: str) -> Optional[Path]:
-    """
-    SECURITY: Resolve a user-supplied relative path against root safely.
-    Returns the resolved Path if it is contained within root, otherwise None.
-
-    This function validates paths through multiple layers:
-    1. Rejects empty paths
-    2. Decodes percent-encoding
-    3. Rejects absolute paths
-    4. Rejects paths with .. components
-    5. Validates final resolved path is within root using is_relative_to()
-    """
-    if not rel_path:
-        return None
-
-    # Decode percent-encoding
-    rel = unquote(rel_path)
-
-    # SECURITY: Reject absolute paths and path separators
-    if rel.startswith("/") or rel.startswith("\\\\") or ".." in rel:
-        return None
-
-    # SECURITY: Reject paths with .. components by checking parts
-    try:
-        path_parts = Path(rel).parts
-        if any(part == ".." or part == "." for part in path_parts):
-            return None
-    except Exception:
-        return None
-
-    # SECURITY: Resolve paths with explicit error handling
-    try:
-        root_resolved = root.resolve(strict=False)
-    except Exception:
-        return None
-
-    try:
-        # Construct candidate path
-        candidate_path = root / rel
-        candidate = candidate_path.resolve(strict=False)
-    except Exception:
-        return None
-
-    # SECURITY: Explicit containment check that CodeQL can track
-    try:
-        if not candidate.is_relative_to(root_resolved):
-            return None
-    except Exception:
-        return None
-
-    return candidate
-
-
-def validate_path_within_root(path: Path, root: Path) -> bool:
-    """
-    SECURITY: Explicitly validate that a path is within root.
-    Returns True if path is safely contained within root, False otherwise.
-
-    This is a helper for CodeQL to track path validation through data flow.
-    """
-    if path is None or root is None:
-        return False
-
-    try:
-        resolved_path = path.resolve(strict=False)
-    except Exception:
-        return False
-
-    try:
-        resolved_root = root.resolve(strict=False)
-    except Exception:
-        return False
-
-    try:
-        return resolved_path.is_relative_to(resolved_root)
-    except Exception:
-        return False
-
-
-def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) -> Path:
-    """
-    SECURITY: Move src -> dst_dir/dst_name safely with comprehensive validation.
-    Returns the final destination Path on success, raises exceptions on failure.
-
-    Validation uses os.path.realpath + startswith (the pattern CodeQL recognises as a
-    path-traversal sanitizer) so that taint flow is provably broken before any file
-    operation.
-
-    Validation steps:
-    1. Verify source exists and is a file
-    2. Reject dst_name containing path separators or ..
-    3. Compute canonical real paths for src, dst_dir, and the final destination
-    4. Verify all three are contained within allowed_root via realpath + startswith
-    5. Check for existing files to prevent overwrites
-    """
-    if not src or not src.exists() or not src.is_file():
-        raise FileNotFoundError("Source file missing")
-
-    # SECURITY: Reject dst_name that contains path traversal sequences
-    if not dst_name or ".." in dst_name or "/" in dst_name or "\\" in dst_name:
-        raise ValueError("Invalid filename: contains path separators or traversal sequences")
-
-    # SECURITY: Compute the canonical allowed root once.
-    # Adding os.sep prevents a prefix like "/data" matching "/data_evil/...".
-    try:
-        allowed_root_real = os.path.realpath(str(allowed_root))
-    except Exception:
-        raise ValueError("Cannot resolve allowed root")
-    allowed_root_prefix = allowed_root_real + os.sep
-
-    # SECURITY: Validate source path is within allowed_root using realpath + startswith
-    try:
-        src_real = os.path.realpath(str(src))
-    except Exception:
-        raise ValueError("Cannot resolve source path")
-    if not src_real.startswith(allowed_root_prefix):
-        raise ValueError("Source path outside allowed root")
-
-    # SECURITY: Validate destination directory is within allowed_root
-    try:
-        dst_dir_real = os.path.realpath(str(dst_dir))
-    except Exception:
-        raise ValueError("Cannot resolve destination directory")
-    if not dst_dir_real.startswith(allowed_root_prefix):
-        raise ValueError("Destination directory outside allowed root")
-
-    # Ensure destination directory exists
-    try:
-        dst_dir.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        raise IOError(f"Cannot create destination directory: {e}")
-
-    # SECURITY: Compute the canonical final destination and validate it.
-    # os.path.join is used so that CodeQL can track the data flow through
-    # realpath into the startswith guard below.
-    try:
-        dst_real = os.path.realpath(os.path.join(dst_dir_real, dst_name))
-    except Exception:
-        raise ValueError("Invalid destination path construction")
-    if not dst_real.startswith(allowed_root_prefix):
-        raise ValueError("Path traversal detected: destination outside allowed directory")
-
-    # If destination already exists, only allow it when src and dst are the same file
-    if os.path.exists(dst_real):
-        if dst_real != src_real:
-            raise FileExistsError("Target file already exists")
-        return Path(dst_real)
-
-    # Attempt atomic move using the validated canonical path strings.
-    # Both src_real and dst_real have passed the startswith guard above.
-    try:
-        try:
-            os.replace(src_real, dst_real)
-        except OSError:
-            shutil.move(src_real, dst_real)
-    except Exception as e:
-        raise IOError(f"Failed to move file: {e}")
-
-    # Optionally set safe permissions
-    try:
-        Path(dst_real).chmod(0o640)
-    except Exception as e:
-        logger.debug("Could not set permissions on %s: %s", re.sub(r"[\r\n]", "", str(dst_real)), e)
-
-    return Path(dst_real)
-
-
-# ---------- Utility functions ----------
-def sanitize_filename(text, max_length=50):
-    if not text or text == "N/A":
-        return "NA"
-    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
-    text = re.sub(r"[\s]+", "-", text)
-    text = re.sub(r"-+", "-", text)
-    text = text.strip("-")
-    if len(text) > max_length:
-        text = text[:max_length].rstrip("-")
-    return text or "unnamed"
-
-
-def sanitize_full_filename(name: str, max_length: int = 200) -> str:
-    """
-    Final safeguard for filenames that may include user-provided data.
-    Removes path separators and leading dots, restricts characters, and truncates length.
-    """
-    # Remove any path separators outright
-    name = name.replace("/", "").replace("\\", "")
-    # Allow only a conservative set of characters
-    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-    # Avoid hidden or relative-path-like names
-    name = name.lstrip(".")
-    # Enforce maximum length
-    if max_length > 0 and len(name) > max_length:
-        name = name[:max_length]
-    return name or "file"
-
-
-def format_date_for_filename(date_str):
-    try:
-        dt = datetime.strptime(date_str, "%Y-%b-%d")
-        return dt.strftime("%Y%b%d")
-    except Exception:
-        safe = re.sub(r"[^A-Za-z0-9]", "", str(date_str))
-        return safe or "unknown"
-
-
-def calculate_guarantee_end_date(purchase_date, duration, unit):
-    if duration == 0:
-        return "N/A"
-    try:
-        dt = datetime.strptime(purchase_date, "%Y-%b-%d")
-        if unit == "days":
-            end_dt = dt + timedelta(days=duration)
-        elif unit == "months":
-            month = dt.month + duration
-            year = dt.year + (month - 1) // 12
-            month = ((month - 1) % 12) + 1
-            if month == 12:
-                last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-            else:
-                last_day = datetime(year, month + 1, 1) - timedelta(days=1)
-            if dt.day <= last_day.day:
-                end_dt = last_day.replace(day=dt.day)
-            else:
-                end_dt = last_day
-        elif unit == "years":
-            year = dt.year + duration
-            month = dt.month
-            day = dt.day
-            try:
-                end_dt = datetime(year, month, day)
-            except ValueError:
-                # fallback to last valid day of month
-                if month == 12:
-                    last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-                else:
-                    last_day = datetime(year, month + 1, 1) - timedelta(days=1)
-                end_dt = last_day
-        else:
-            return "N/A"
-        return end_dt.strftime("%Y-%b-%d")
-    except Exception:
-        return "N/A"
-
-
-def load_data():
-    if not DATA_FILE.exists():
-        return {"receipts": [], "items": [], "next_id": 1}
-    try:
-        with DATA_FILE.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-            if "next_id" not in data:
-                data["next_id"] = max((i["id"] for i in data.get("items", [])), default=0) + 1
-            return data
-    except Exception:
-        return {"receipts": [], "items": [], "next_id": 1}
-
-
-def save_data(data):
-    try:
-        new_content = json.dumps(data, indent=2, ensure_ascii=False)
-        if DATA_FILE.exists():
-            try:
-                existing = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-                existing.pop("integrity_issues", None)
-                new_cmp = json.loads(new_content)
-                new_cmp.pop("integrity_issues", None)
-                changed = json.dumps(new_cmp, sort_keys=True) != json.dumps(existing, sort_keys=True)
-            except Exception:
-                changed = True
-        else:
-            changed = True
-
-        if changed:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup = BACKUP_DIR / f"data_backup_{ts}.json"
-            if DATA_FILE.exists():
-                shutil.copy2(DATA_FILE, backup)
-
-            backups = sorted(BACKUP_DIR.glob("data_backup_*.json"))
-            if len(backups) > 20:
-                for b in backups[:-20]:
-                    b.unlink(missing_ok=True)
-
-        with DATA_FILE.open("w", encoding="utf-8") as f:
-            f.write(new_content)
-        return True
-    except Exception as e:
-        logger.exception("Save error")
-        return False
-
-
-def generate_receipt_group_id(data):
-    ids = [r["receipt_group_id"] for r in data.get("receipts", [])]
-    numbers = []
-    for rid in ids:
-        m = re.search(r"RG-(\d+)", rid)
-        if m:
-            numbers.append(int(m.group(1)))
-    return f"RG-{(max(numbers, default=0)+1):04d}"
-
-
-def build_single_item_filename(item, receipt, ext):
-    parts = [
-        sanitize_filename(item.get("brand", "N/A"), 30),
-        sanitize_filename(item.get("model", "N/A"), 30),
-        format_date_for_filename(receipt.get("purchase_date", "unknown")),
-        sanitize_filename(receipt.get("shop", "N/A"), 20),
-        sanitize_filename(item.get("location", "N/A"), 20),
-        "-".join(sanitize_filename(u, 15) for u in item.get("users", [])[:3]) if item.get("users") else "NoUser",
-        sanitize_filename(receipt.get("documentation", "N/A"), 20),
-    ]
-    base = "-".join(parts)
-    full = f"{base}{ext}"
-    if len(full) > 200:
-        allowed = 200 - len(ext)
-        base = base[:allowed]
-        full = f"{base}{ext}"
-    # Final safety normalization on the full filename
-    full = sanitize_full_filename(full, 200)
-    return full
-
-
-def build_multi_item_filename(receipt, ext):
-    parts = [
-        sanitize_filename(receipt.get("shop", "N/A"), 40),
-        format_date_for_filename(receipt.get("purchase_date", "unknown")),
-        sanitize_filename(receipt.get("documentation", "N/A"), 40),
-        receipt.get("receipt_group_id", "RG-0000"),
-    ]
-    base = "-".join(parts)
-    full = f"{base}{ext}"
-
-    if len(full) > 200:
-        allowed = 200 - len(ext) - len(receipt.get("receipt_group_id", "")) - 1
-        p_str = "-".join(parts[:-1])[:allowed]
-        base = f"{p_str}-{receipt.get('receipt_group_id', '')}"
-        full = f"{base}{ext}"
-
-    return sanitize_full_filename(full, 200)
-
-
-def get_storage_directory(item):
-    """
-    SECURITY: Build storage directory path using sanitized components.
-    Returns a Path within STORAGE_DIR based on project or brand.
-    """
-    # Sanitize to prevent path traversal
-    if item.get("project") and item.get("project") != "N/A":
-        safe_project = sanitize_filename(item.get("project"), 50)
-        # SECURITY: Explicit construction to prevent path injection
-        try:
-            result = STORAGE_DIR / safe_project
-        except Exception:
-            return STORAGE_DIR / "default"
-    else:
-        safe_brand = sanitize_filename(item.get("brand", "N/A"), 50)
-        # SECURITY: Explicit construction to prevent path injection
-        try:
-            result = STORAGE_DIR / safe_brand
-        except Exception:
-            return STORAGE_DIR / "default"
-
-    # SECURITY: Validate result is within STORAGE_DIR using inline pattern CodeQL recognises
-    storage_root_real = os.path.realpath(str(STORAGE_DIR))
-    storage_root_prefix = storage_root_real + os.sep
-    result_real = os.path.realpath(str(result))
-    if not result_real.startswith(storage_root_prefix):
-        return STORAGE_DIR / "default"
-
-    return Path(result_real)
-
-
-def verify_file_integrity(data):
-    """
-    SECURITY: Read-only integrity check of file existence.
-    Paths were validated when originally saved via safe_move_file().
-    """
-    issues = []
-    for item in data.get("items", []):
-        rel = item.get("receipt_relative_path")
-        if not rel:
-            continue
-
-        # SECURITY: Use safe_resolve_within for path validation
-        full = safe_resolve_within(DATA_ROOT, rel)
-        if not full:
-            continue
-
-        # Now safe to check existence
-        try:
-            if not full.exists():
-                issues.append(
-                    {
-                        "id": item["id"],
-                        "type": "item",
-                        "receipt_group_id": item["receipt_group_id"],
-                        "path": rel,
-                    }
-                )
-        except Exception as e:
-            logger.debug("Error checking file existence for item %s: %s", item.get("id"), e)
-
-    return issues
-
-
-def integrity_worker():
-    while True:
-        time.sleep(30)
-        try:
-            with data_lock:
-                data = load_data()
-                data["integrity_issues"] = verify_file_integrity(data)
-                save_data(data)
-        except Exception:
-            logger.exception("Integrity worker error")
-
-
-def _parse_multipart_file(body: bytes, content_type: str, field_name: str = "file"):
-    if not content_type or "multipart/form-data" not in content_type:
-        return None, None, None
-    m = re.search(r"boundary=([^;]+)", content_type)
-    if not m:
-        return None, None, None
-    boundary = m.group(1).strip().strip('"')
-    b_boundary = ("--" + boundary).encode("utf-8")
-    parts = body.split(b_boundary)
-    for part in parts:
-        part = part.strip()
-        if not part or part == b"--":
-            continue
-        if b"\r\n\r\n" not in part:
-            continue
-        raw_headers, raw_content = part.split(b"\r\n\r\n", 1)
-        raw_content = raw_content.rstrip(b"\r\n")
-        header_lines = raw_headers.decode("utf-8", errors="replace").split("\r\n")
-        headers = {}
-        for line in header_lines:
-            if ":" in line:
-                k, v = line.split(":", 1)
-                headers[k.strip().lower()] = v.strip()
-        disp = headers.get("content-disposition", "")
-        if "form-data" not in disp or f'name="{field_name}"' not in disp:
-            continue
-        fn_m = re.search(r'filename="([^"]+)"', disp)
-        filename = fn_m.group(1) if fn_m else "upload.bin"
-        part_ctype = headers.get("content-type", "application/octet-stream")
-        return filename, raw_content, part_ctype
-    return None, None, None
-
-
-def _today_ymmmdd():
-    return datetime.now().strftime("%Y-%b-%d")
 
 
 def _open_file_dialog_macos():
@@ -908,96 +449,23 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/data":
-            with data_lock:
-                data = load_data()
-                data["integrity_issues"] = verify_file_integrity(data)
-                self._set_headers(200)
-                self.wfile.write(json.dumps(data).encode("utf-8"))
+            self._set_headers(200)
+            self.wfile.write(json.dumps(service.get_all()).encode("utf-8"))
             return
 
         if path == "/api/suggestions":
-            with data_lock:
-                data = load_data()
-                shops = [r["shop"] for r in data.get("receipts", []) if r.get("shop")]
-                brands = [i["brand"] for i in data.get("items", []) if i.get("brand")]
-                models = [i["model"] for i in data.get("items", []) if i.get("model")]
-                locations = [i["location"] for i in data.get("items", []) if i.get("location")]
-                docs = [r["documentation"] for r in data.get("receipts", []) if r.get("documentation")]
-                projects = [i["project"] for i in data.get("items", []) if i.get("project") and i["project"] != "N/A"]
-                users = [u for i in data.get("items", []) for u in i.get("users", [])]
-                payload = {
-                    "shops": sorted(set(shops)),
-                    "brands": sorted(set(brands)),
-                    "models": sorted(set(models)),
-                    "locations": sorted(set(locations)),
-                    "documentation": sorted(set(docs)),
-                    "projects": sorted(set(projects)),
-                    "users": sorted(set(users)),
-                }
-                self._set_headers(200)
-                self.wfile.write(json.dumps(payload).encode("utf-8"))
+            self._set_headers(200)
+            self.wfile.write(json.dumps(service.get_suggestions()).encode("utf-8"))
             return
 
         if path == "/api/export/json":
-            with data_lock:
-                data = load_data()
-                data.pop("integrity_issues", None)
-                self._set_headers(200, "application/json; charset=utf-8")
-                self.wfile.write(json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8"))
+            self._set_headers(200, "application/json; charset=utf-8")
+            self.wfile.write(json.dumps(service.export_json(), indent=2, ensure_ascii=False).encode("utf-8"))
             return
 
         if path == "/api/export/csv":
-            import csv
-            from io import StringIO
-
-            with data_lock:
-                data = load_data()
-                output = StringIO()
-                writer = csv.writer(output)
-                writer.writerow(
-                    [
-                        "Item ID",
-                        "Receipt Group ID",
-                        "Brand",
-                        "Model",
-                        "Location",
-                        "Users",
-                        "Project",
-                        "Shop",
-                        "Purchase Date",
-                        "Documentation",
-                        "Guarantee Duration",
-                        "Guarantee Unit",
-                        "Guarantee End Date",
-                        "Receipt Filename",
-                        "Receipt Path",
-                    ]
-                )
-                receipts_map = {r["receipt_group_id"]: r for r in data.get("receipts", [])}
-                for item in data.get("items", []):
-                    r = receipts_map.get(item["receipt_group_id"], {})
-                    writer.writerow(
-                        [
-                            item["id"],
-                            item["receipt_group_id"],
-                            item.get("brand", ""),
-                            item.get("model", ""),
-                            item.get("location", ""),
-                            ";".join(item.get("users", [])),
-                            item.get("project", ""),
-                            r.get("shop", ""),
-                            r.get("purchase_date", ""),
-                            r.get("documentation", ""),
-                            item.get("guarantee_duration", 0),
-                            item.get("guarantee_unit", "days"),
-                            item.get("guarantee_end_date", ""),
-                            r.get("receipt_filename", ""),
-                            item.get("receipt_relative_path", ""),
-                        ]
-                    )
-                csv_data = output.getvalue()
-                self._set_headers(200, "text/csv; charset=utf-8")
-                self.wfile.write(csv_data.encode("utf-8"))
+            self._set_headers(200, "text/csv; charset=utf-8")
+            self.wfile.write(service.export_csv().encode("utf-8"))
             return
 
         if path == "/api/file":
@@ -1124,126 +592,34 @@ class Handler(BaseHTTPRequestHandler):
                 return
             body = self.rfile.read(length)
             ctype = self.headers.get("Content-Type", "")
-            filename, file_bytes, part_type = _parse_multipart_file(body, ctype, field_name="file")
-            if not file_bytes:
-                self._set_headers(400)
-                self.wfile.write(b'{"success":false,"error":"No file field found"}')
-                return
-
-            # SECURITY: Sanitize uploaded filename and build safe path
             try:
-                ext = Path(filename).suffix.lower() or ".bin"
-                safe_base = sanitize_filename(Path(filename).stem, max_length=80)
-            except Exception:
-                ext = ".bin"
-                safe_base = "upload"
-
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            upload_dir = RECEIPTS_DIR / "uploads"
-
-            try:
-                upload_dir.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                self._set_headers(500)
-                self.wfile.write(b'{"success":false,"error":"Cannot create upload directory"}')
-                return
-
-            saved_name = f"{ts}_{safe_base}{ext}"
-
-            try:
-                saved_path = upload_dir / saved_name
-            except Exception:
-                self._set_headers(400)
-                self.wfile.write(b'{"success":false,"error":"Invalid filename"}')
-                return
-
-            # SECURITY: Validate path before writing using inline pattern CodeQL recognises
-            receipts_root_real = os.path.realpath(str(RECEIPTS_DIR))
-            receipts_root_prefix = receipts_root_real + os.sep
-            saved_path_real = os.path.realpath(str(saved_path))
-            if not saved_path_real.startswith(receipts_root_prefix):
-                self._set_headers(400)
-                self.wfile.write(b'{"success":false,"error":"Invalid upload path"}')
-                return
-            saved_path = Path(saved_path_real)
-
-            try:
-                saved_path.write_bytes(file_bytes)
-            except Exception as e:
-                logger.exception("Failed to save uploaded file")
-                self._set_headers(500)
-                self.wfile.write(json.dumps({"success": False, "error": "Failed to save uploaded file"}).encode())
-                return
-
-            # path relative to DATA_ROOT
-            try:
-                rel_path = str(saved_path.relative_to(DATA_ROOT))
-            except Exception:
-                rel_path = str(saved_path)
-
-            with data_lock:
-                data = load_data()
-                rg_id = generate_receipt_group_id(data)
-                receipt = {
-                    "receipt_group_id": rg_id,
-                    "shop": "N/A",
-                    "purchase_date": _today_ymmmdd(),
-                    "documentation": "N/A",
-                    "receipt_filename": saved_name,
-                    "receipt_relative_path": rel_path,
-                }
-                data.setdefault("receipts", []).append(receipt)
-                item_id = int(data.get("next_id", 1))
-                item = {
-                    "id": item_id,
-                    "receipt_group_id": rg_id,
-                    "brand": "N/A",
-                    "model": "N/A",
-                    "location": "N/A",
-                    "users": [],
-                    "project": "N/A",
-                    "guarantee_duration": 0,
-                    "guarantee_unit": "days",
-                    "guarantee_end_date": "N/A",
-                    "receipt_relative_path": rel_path,
-                }
-                data.setdefault("items", []).append(item)
-                data["next_id"] = item_id + 1
-                save_data(data)
+                payload = service.upload(body, ctype)
                 self._set_headers(200)
-                payload = {
-                    "success": True,
-                    "receipt_group_id": rg_id,
-                    "item_id": item_id,
-                    "receipt_filename": saved_name,
-                    "receipt_relative_path": rel_path,
-                    "ocr_data": {"shop": "", "purchase_date": "", "total_amount": None, "items": []},
-                }
                 self.wfile.write(json.dumps(payload).encode("utf-8"))
+            except ValueError as e:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            except Exception:
+                logger.exception("Upload error")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
         if path == "/api/integrity/check":
-            with data_lock:
-                data = load_data()
-                issues = verify_file_integrity(data)
-                data["integrity_issues"] = issues
-                save_data(data)
-                self._set_headers(200)
-                self.wfile.write(json.dumps({"success": True, "issues": issues}).encode("utf-8"))
+            issues = service.check_integrity()
+            self._set_headers(200)
+            self.wfile.write(json.dumps({"success": True, "issues": issues}).encode("utf-8"))
             return
 
         if path == "/api/import/json":
             imported = self._read_json()
-            if "receipts" not in imported or "items" not in imported:
-                self._set_headers(400)
-                self.wfile.write(b'{"success":false,"error":"Invalid JSON structure"}')
-                return
-            with data_lock:
-                if "next_id" not in imported:
-                    imported["next_id"] = max((i["id"] for i in imported.get("items", [])), default=0) + 1
-                save_data(imported)
+            try:
+                service.import_json(imported)
                 self._set_headers(200)
                 self.wfile.write(b'{"success":true,"message":"Data imported successfully"}')
+            except ValueError as e:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
             return
 
         self._set_headers(404)
@@ -1260,100 +636,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"success":false,"error":"Invalid ID"}')
                 return
             updates = self._read_json()
-            with data_lock:
-                data = load_data()
-                item = next((i for i in data["items"] if i["id"] == item_id), None)
-                if not item:
-                    self._set_headers(404)
-                    self.wfile.write(b'{"success":false,"error":"Item not found"}')
-                    return
-                receipt = next((r for r in data["receipts"] if r["receipt_group_id"] == item["receipt_group_id"]), None)
-                if not receipt:
-                    self._set_headers(404)
-                    self.wfile.write(b'{"success":false,"error":"Receipt not found"}')
-                    return
-                items_in_group = [i for i in data["items"] if i["receipt_group_id"] == item["receipt_group_id"]]
-                is_multi = len(items_in_group) > 1
-                old_rel_path = item.get("receipt_relative_path")
-
-                # SECURITY: Build old_path and validate using safe_resolve_within
-                old_path = None
-                if old_rel_path:
-                    old_path = safe_resolve_within(DATA_ROOT, old_rel_path)
-
-                needs_move = False
-
-                def u(field, dest):
-                    nonlocal needs_move
-                    if field in updates:
-                        dest[field] = updates[field]
-                        if not is_multi and field in ["brand", "model", "location", "project"]:
-                            needs_move = True
-
-                u("brand", item)
-                u("model", item)
-                u("location", item)
-                u("project", item)
-                if "users" in updates:
-                    item["users"] = updates["users"] or []
-                    if not is_multi:
-                        needs_move = True
-                if "shop" in updates:
-                    receipt["shop"] = updates["shop"]
-                    if not is_multi:
-                        needs_move = True
-                if "purchase_date" in updates:
-                    receipt["purchase_date"] = updates["purchase_date"]
-                    if not is_multi:
-                        needs_move = True
-                if "documentation" in updates:
-                    receipt["documentation"] = updates["documentation"]
-                    if not is_multi:
-                        needs_move = True
-                if "guarantee_duration" in updates:
-                    item["guarantee_duration"] = updates["guarantee_duration"]
-                if "guarantee_unit" in updates:
-                    item["guarantee_unit"] = updates["guarantee_unit"]
-
-                item["guarantee_end_date"] = calculate_guarantee_end_date(
-                    receipt["purchase_date"], item.get("guarantee_duration", 0), item.get("guarantee_unit", "days")
-                )
-
-                if needs_move and old_path and old_path.exists():
-                    try:
-                        ext = old_path.suffix
-                        new_name = build_single_item_filename(item, receipt, ext)
-                        new_dir = get_storage_directory(item)
-                        new_dir.mkdir(parents=True, exist_ok=True)
-
-                        # SECURITY: Use safe_move_file helper which validates paths
-                        final_dst = safe_move_file(old_path, new_dir, new_name, DATA_ROOT)
-                        rel = str(final_dst.relative_to(DATA_ROOT))
-                        receipt["receipt_filename"] = new_name
-                        receipt["receipt_relative_path"] = rel
-                        item["receipt_relative_path"] = rel
-
-                        # Clean up empty directory
-                        try:
-                            if old_path.parent.exists() and not any(old_path.parent.iterdir()):
-                                old_path.parent.rmdir()
-                        except Exception as e:
-                            logger.debug("Could not remove empty directory %s: %s", old_path.parent, e)
-                    except FileExistsError:
-                        self._set_headers(400)
-                        self.wfile.write(
-                            json.dumps({"success": False, "error": "Target file already exists"}).encode("utf-8")
-                        )
-                        return
-                    except (ValueError, FileNotFoundError, IOError):
-                        logger.exception("Failed to move file")
-                        self._set_headers(500)
-                        self.wfile.write(json.dumps({"success": False, "error": "Failed to move file"}).encode("utf-8"))
-                        return
-
-                save_data(data)
+            try:
+                item = service.update_item(item_id, updates)
                 self._set_headers(200)
                 self.wfile.write(json.dumps({"success": True, "item": item}).encode("utf-8"))
+            except KeyError as e:
+                self._set_headers(404)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            except FileExistsError:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"success": False, "error": "Target file already exists"}).encode("utf-8"))
+            except (ValueError, FileNotFoundError, IOError):
+                logger.exception("Failed to move file")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Failed to move file"}).encode("utf-8"))
             return
 
         self._set_headers(404)
@@ -1369,44 +665,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._set_headers(400)
                 self.wfile.write(b'{"success":false,"error":"Invalid ID"}')
                 return
-            with data_lock:
-                data = load_data()
-                item = next((i for i in data["items"] if i["id"] == item_id), None)
-                if not item:
-                    self._set_headers(404)
-                    self.wfile.write(b'{"success":false,"error":"Item not found"}')
-                    return
-                rg_id = item["receipt_group_id"]
-                items_in_group = [i for i in data["items"] if i["receipt_group_id"] == rg_id]
-                if len(items_in_group) == 1:
-                    rel = item.get("receipt_relative_path")
-                    if rel:
-                        # SECURITY: Validate path using safe_resolve_within before deletion
-                        file_path = safe_resolve_within(DATA_ROOT, rel)
-                        if file_path and file_path.exists():
-                            try:
-                                file_path.unlink()
-                                try:
-                                    if not any(file_path.parent.iterdir()):
-                                        file_path.parent.rmdir()
-                                except Exception as e:
-                                    # Best-effort cleanup: failure to remove an empty directory is non-fatal
-                                    logger.debug("Failed to remove parent directory %s: %s", file_path.parent, e)
-                            except Exception as e:
-                                logger.exception("Failed to delete file")
-                                self._set_headers(500)
-                                msg = {"success": False, "error": "Failed to delete file"}
-                                self.wfile.write(json.dumps(msg).encode("utf-8"))
-                                return
-
-                # Remove item and possibly receipt
-                data["items"] = [i for i in data["items"] if i["id"] != item_id]
-                # If no items remain for the receipt, remove receipt
-                if not any(i for i in data["items"] if i["receipt_group_id"] == rg_id):
-                    data["receipts"] = [r for r in data["receipts"] if r["receipt_group_id"] != rg_id]
-                save_data(data)
+            try:
+                service.delete_item(item_id)
                 self._set_headers(200)
                 self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            except KeyError as e:
+                self._set_headers(404)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            except Exception:
+                logger.exception("Failed to delete item")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Failed to delete"}).encode("utf-8"))
             return
 
         self._set_headers(404)
@@ -1433,7 +702,6 @@ if __name__ == "__main__":
             logger.debug("Could not create directory %s: %s", d, e)
 
     # Start integrity worker
-    t = threading.Thread(target=integrity_worker, daemon=True)
-    t.start()
+    service.start_integrity_worker()
 
     run_server()
