@@ -211,10 +211,9 @@ class OCRService:
         """
         # Handle PDF files
         if self._is_pdf(image_path):
-            # SECURITY: Inline CR/LF removal — CodeQL recognises re.sub(r'[\r\n]', ...)
-            # as a py/log-injection sanitizer (custom helper functions are not recognised).
-            safe_path = re.sub(r"[\r\n]", "", str(image_path))
-            logger.info("Processing PDF file: %s", safe_path)
+            # SECURITY: Sanitize path inline before logging to prevent log injection.
+            # CodeQL recognises re.sub(r'[\r\n]', ...) as a py/log-injection sanitizer.
+            logger.info("Processing PDF file: %s", re.sub(r"[\r\n]", "", str(image_path)))
             images = self._pdf_to_images(image_path)
 
             # Extract text from all pages
