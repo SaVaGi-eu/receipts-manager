@@ -1,6 +1,6 @@
 {
   "name": "receipt-warranty-manager",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Receipt & Warranty Manager - macOS Desktop App",
   "repository": {
     "type": "git",
@@ -32,7 +32,11 @@
       {
         "from": "../../venv",
         "to": "venv",
-        "filter": ["**/*", "!**/__pycache__", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../app.py",
@@ -70,7 +74,9 @@
     "mac": {
       "category": "public.app-category.productivity",
       "identity": null,
-      "target": ["dmg"]
+      "target": [
+        "dmg"
+      ]
     },
     "dmg": {
       "title": "Receipt Manager ${version}",
