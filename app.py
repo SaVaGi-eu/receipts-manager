@@ -431,12 +431,14 @@ def get_storage_directory(item):
         except Exception:
             return STORAGE_DIR / "default"
 
-    # SECURITY: Validate result is within STORAGE_DIR
-    if not validate_path_within_root(result, STORAGE_DIR):
-        # Fallback to safe default
+    # SECURITY: Validate result is within STORAGE_DIR using inline pattern CodeQL recognises
+    storage_root_real = os.path.realpath(str(STORAGE_DIR))
+    storage_root_prefix = storage_root_real + os.sep
+    result_real = os.path.realpath(str(result))
+    if not result_real.startswith(storage_root_prefix):
         return STORAGE_DIR / "default"
 
-    return result
+    return Path(result_real)
 
 
 def verify_file_integrity(data):
@@ -1173,11 +1175,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"success":false,"error":"Invalid filename"}')
                 return
 
-            # SECURITY: Validate path before writing
-            if not validate_path_within_root(saved_path, RECEIPTS_DIR):
+            # SECURITY: Validate path before writing using inline pattern CodeQL recognises
+            receipts_root_real = os.path.realpath(str(RECEIPTS_DIR))
+            receipts_root_prefix = receipts_root_real + os.sep
+            saved_path_real = os.path.realpath(str(saved_path))
+            if not saved_path_real.startswith(receipts_root_prefix):
                 self._set_headers(400)
                 self.wfile.write(b'{"success":false,"error":"Invalid upload path"}')
                 return
+            saved_path = Path(saved_path_real)
 
             try:
                 saved_path.write_bytes(file_bytes)
