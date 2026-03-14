@@ -984,14 +984,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b"Missing 'path' parameter")
                 return
             try:
-                # SECURITY: Validate path using safe_resolve_within
-                target = safe_resolve_within(DATA_ROOT, rel)
-                if not target or not target.exists() or not target.is_file():
+                # SECURITY: Validate path using realpath + startswith — the pattern
+                # CodeQL (py/path-injection) recognises as a path-traversal sanitizer.
+                data_root_real = os.path.realpath(str(DATA_ROOT))
+                data_root_prefix = data_root_real + os.sep
+
+                # Decode percent-encoding and reject obvious traversal early
+                rel_decoded = unquote(rel)
+                if rel_decoded.startswith("/") or rel_decoded.startswith("\\") or ".." in rel_decoded:
                     self._set_headers(404, "text/plain")
                     self.wfile.write(b"File not found")
                     return
 
-                suffix = target.suffix.lower()
+                # Compute canonical path; startswith guard breaks taint flow for CodeQL
+                target_real = os.path.realpath(os.path.join(data_root_real, rel_decoded))
+                if not target_real.startswith(data_root_prefix):
+                    self._set_headers(404, "text/plain")
+                    self.wfile.write(b"File not found")
+                    return
+                if not os.path.isfile(target_real):
+                    self._set_headers(404, "text/plain")
+                    self.wfile.write(b"File not found")
+                    return
+
+                suffix = os.path.splitext(target_real)[1].lower()
                 file_content_types = {
                     ".pdf": "application/pdf",
                     ".jpg": "image/jpeg",
@@ -1004,7 +1020,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 # SECURITY: Triple sanitization for Content-Disposition
                 # 1. Sanitize filename (remove path separators, limit length)
-                safe_filename_step1 = sanitize_full_filename(target.name, 100)
+                safe_filename_step1 = sanitize_full_filename(os.path.basename(target_real), 100)
                 # 2. Sanitize for header injection (remove CR/LF)
                 safe_filename_step2 = sanitize_header_value(safe_filename_step1)
                 # 3. Sanitize content type
@@ -1018,8 +1034,8 @@ class Handler(BaseHTTPRequestHandler):
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
-                # SECURITY: target validated by safe_resolve_within()
-                with target.open("rb") as f:
+                # SECURITY: target_real validated by realpath + startswith above
+                with open(target_real, "rb") as f:
                     while True:
                         chunk = f.read(64 * 1024)
                         if not chunk:
