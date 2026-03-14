@@ -399,51 +399,6 @@ function showErrorPage(errorMessage) {
   }
 }
 
-// ── Helper: poll backend until /api/data responds ─────────────────────────
-function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
-  const checkUrl = new URL('/api/data', url).toString();
-  console.log('[Backend] Polling for backend readiness:', checkUrl);
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-
-    const attempt = () => {
-      const req = http.get(checkUrl, (res) => {
-        // consume body so socket closes cleanly
-        res.on('data', () => {});
-        res.on('end', () => {});
-        if (res.statusCode === 200) {
-          console.log('[Backend] ✓ Backend is ready!');
-          resolve();
-        } else {
-          console.log('[Backend] Backend responded with status:', res.statusCode);
-          retryOrTimeout();
-        }
-      });
-
-      req.on('error', (err) => {
-        console.log('[Backend] Connection error:', err.message.replace(/\n|\r/g, ''));
-        retryOrTimeout();
-      });
-
-      // safety: abort request if it takes too long
-      req.setTimeout(2000, () => {
-        req.abort();
-      });
-
-      function retryOrTimeout() {
-        if (Date.now() - start >= timeoutMs) {
-          console.error('[Backend] ✗ Timeout waiting for backend');
-          reject(new Error(`Backend did not respond within ${timeoutMs}ms`));
-        } else {
-          setTimeout(attempt, intervalMs);
-        }
-      }
-    };
-
-    attempt();
-  });
-}
-
 // ── createWindow ───────────────────────────────────────────────────────────
 function createWindow() {
   console.log('[Window] Creating application window...');
