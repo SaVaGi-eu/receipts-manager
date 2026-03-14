@@ -17,6 +17,9 @@
     "electron": "^40.6.0",
     "electron-builder": "^26.8.1"
   },
+  "overrides": {
+    "yauzl": "^3.2.1"
+  },
   "build": {
     "appId": "eu.savagi.receipts-manager",
     "productName": "Receipt Manager",

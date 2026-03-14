@@ -597,8 +597,8 @@ def _open_file_dialog_linux():
             return result.stdout.strip()
     except FileNotFoundError:
         pass  # zenity not installed
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("zenity file dialog failed: %s", e)
 
     # Try kdialog (KDE)
     try:
@@ -612,8 +612,8 @@ def _open_file_dialog_linux():
             return result.stdout.strip()
     except FileNotFoundError:
         pass  # kdialog not installed
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("kdialog file dialog failed: %s", e)
 
     # Fallback to tkinter subprocess
     return _open_file_dialog_tkinter()
@@ -1369,8 +1369,8 @@ class Handler(BaseHTTPRequestHandler):
                         try:
                             if old_path.parent.exists() and not any(old_path.parent.iterdir()):
                                 old_path.parent.rmdir()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Could not remove empty directory %s: %s", old_path.parent, e)
                     except FileExistsError:
                         self._set_headers(400)
                         self.wfile.write(

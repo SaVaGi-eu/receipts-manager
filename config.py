@@ -125,9 +125,12 @@ def get_data_root() -> Optional[Path]:
 def _try_create(p: Path) -> bool:
     """Try to create directory and verify write permissions, return True on success."""
     try:
-        p.mkdir(parents=True, exist_ok=True)
+        # SECURITY: Canonicalize path with realpath to prevent path injection via
+        # symlinks or '..' components before any filesystem operations.
+        p_real = Path(os.path.realpath(str(p)))
+        p_real.mkdir(parents=True, exist_ok=True)
         # Verify we can actually write to it
-        test_file = p / ".write_test"
+        test_file = p_real / ".write_test"
         test_file.touch()
         test_file.unlink()
         return True
