@@ -806,35 +806,46 @@ class Handler(BaseHTTPRequestHandler):
         # SECURITY: Serve static files with path validation
         if path.startswith("/static/"):
             rel = path[len("/static/") :]
-            candidate = safe_resolve_within(STATIC_DIR, rel)
-            if not candidate or not candidate.exists() or not candidate.is_file():
+
+            # SECURITY: Validate using realpath + startswith — the pattern CodeQL
+            # (py/path-injection) recognises as a path-traversal sanitizer.
+            static_dir_real = os.path.realpath(str(STATIC_DIR))
+            static_dir_prefix = static_dir_real + os.sep
+
+            rel_decoded = unquote(rel)
+            if rel_decoded.startswith("/") or rel_decoded.startswith("\\") or ".." in rel_decoded:
+                self._set_headers(404, "text/plain")
+                self.wfile.write(b"File not found")
+                return
+
+            # Compute canonical path; startswith guard breaks taint flow for CodeQL
+            candidate_real = os.path.realpath(os.path.join(static_dir_real, rel_decoded))
+            if not candidate_real.startswith(static_dir_prefix):
+                self._set_headers(404, "text/plain")
+                self.wfile.write(b"File not found")
+                return
+            if not os.path.isfile(candidate_real):
                 self._set_headers(404, "text/plain")
                 self.wfile.write(b"File not found")
                 return
 
             # Whitelist extensions
-            ALLOWED_STATIC_EXT = {".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp"}
-            suffix = candidate.suffix.lower()
-            if suffix not in ALLOWED_STATIC_EXT:
-                ctype, _ = mimetypes.guess_type(str(candidate))
-                ctype = ctype or "application/octet-stream"
-            else:
-                ctype, _ = mimetypes.guess_type(str(candidate))
-                ctype = ctype or "application/octet-stream"
+            suffix = os.path.splitext(candidate_real)[1].lower()
+            ctype, _ = mimetypes.guess_type(candidate_real)
+            ctype = ctype or "application/octet-stream"
 
             # SECURITY: Sanitize content type BEFORE using in header
             ctype_safe = sanitize_header_value(ctype)
 
             # Stream file to avoid large memory usage
             self.send_response(200)
-            # Use sanitized content type
             content_type_header = ctype_safe + "; charset=utf-8"
             self.send_header("Content-Type", content_type_header)
             set_cors_headers(self)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            # SECURITY: candidate validated by safe_resolve_within()
-            with candidate.open("rb") as f:
+            # SECURITY: candidate_real validated by realpath + startswith above
+            with open(candidate_real, "rb") as f:
                 while True:
                     chunk = f.read(64 * 1024)
                     if not chunk:
