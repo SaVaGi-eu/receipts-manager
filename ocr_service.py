@@ -233,6 +233,7 @@ class OCRService:
             return self._extract_text_easyocr(image_path)
         elif self.engine == "tesseract":
             return self._extract_text_tesseract(image_path)
+        return ""
 
     def _extract_text_easyocr(self, image_path: str) -> str:
         """Extract text using EasyOCR."""
