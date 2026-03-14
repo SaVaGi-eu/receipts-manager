@@ -1424,12 +1424,12 @@ def run_server():
 
 
 if __name__ == "__main__":
-    # Ensure directories exist
+    # Ensure directories exist (may be None if data directory is not yet configured)
     for d in (DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR):
         try:
             Path(d).mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not create directory %s: %s", d, e)
 
     # Start integrity worker
     t = threading.Thread(target=integrity_worker, daemon=True)
