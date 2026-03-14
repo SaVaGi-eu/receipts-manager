@@ -153,35 +153,40 @@ def save_data_path(chosen_path: str) -> bool:
     for CLI/testing use.
     """
     try:
-        # Validate the path first
-        p = Path(chosen_path)
+        # SECURITY: Reject paths containing null bytes, then resolve to a
+        # canonical absolute path (resolves symlinks, removes '..' components).
+        # All subsequent operations use the canonical path to prevent
+        # traversal attacks via symlinks or relative path components.
+        if "\x00" in str(chosen_path):
+            logger.error("[Config] Rejected path containing null byte")
+            return False
+        p_real = os.path.realpath(str(chosen_path))
+        p = Path(p_real)
+
         if not p.exists():
             # Try to create it
             if not _try_create(p):
-                safe_chosen = _sanitize_for_log(chosen_path)
-                logger.error("[Config] Cannot create directory: %s", safe_chosen)
+                logger.error("[Config] Cannot create directory: %s", _sanitize_for_log(p_real))
                 return False
 
         if not p.is_dir():
-            safe_chosen = _sanitize_for_log(chosen_path)
-            logger.error("[Config] Path is not a directory: %s", safe_chosen)
+            logger.error("[Config] Path is not a directory: %s", _sanitize_for_log(p_real))
             return False
 
         # Create settings directory if needed
         SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Save settings
+        # Save settings — store the canonical path, not the raw user input
         from datetime import datetime
 
         settings = {
-            "data_directory": str(chosen_path),
+            "data_directory": p_real,
             "app_name": APP_NAME,
             "version": 1,
             "updated_at": datetime.utcnow().isoformat() + "Z",
         }
         SETTINGS_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
-        safe_chosen = _sanitize_for_log(chosen_path)
-        logger.info("[Config] Saved data directory: %s", safe_chosen)
+        logger.info("[Config] Saved data directory: %s", _sanitize_for_log(p_real))
         return True
     except Exception as e:
         logger.error("[Config] could not save settings: %s", e)
