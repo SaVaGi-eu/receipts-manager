@@ -421,7 +421,7 @@ function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
       });
 
       req.on('error', (err) => {
-        console.log('[Backend] Connection error:', err.message);
+        console.log('[Backend] Connection error:', err.message.replace(/\n|\r/g, ''));
         retryOrTimeout();
       });
 
