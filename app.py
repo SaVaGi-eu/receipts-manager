@@ -5,7 +5,6 @@ Integrated with config.py for dynamic path resolution
 """
 import json
 import logging
-import mimetypes
 import os
 import platform
 import re
@@ -739,10 +738,14 @@ def set_cors_headers(handler):
     # SECURITY: Sanitize origin to prevent response splitting BEFORE checking
     origin_sanitized = sanitize_header_value(origin)
 
-    # Allow known browser origins (check sanitized version)
-    if origin_sanitized in ALLOWED_ORIGINS:
-        # Use sanitized version in header
-        handler.send_header("Access-Control-Allow-Origin", origin_sanitized)
+    # Allow known browser origins (check sanitized version), then echo back the
+    # matched value from ALLOWED_ORIGINS — a compile-time constant — rather than
+    # the user-provided string.  This breaks the taint flow for CodeQL's
+    # py/http-response-splitting analysis: the header value is a literal from the
+    # allowlist, never the raw request data.
+    matched_origin = next((o for o in ALLOWED_ORIGINS if o == origin_sanitized), None)
+    if matched_origin is not None:
+        handler.send_header("Access-Control-Allow-Origin", matched_origin)
         handler.send_header("Vary", "Origin")
 
 
@@ -829,13 +832,24 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b"File not found")
                 return
 
-            # Whitelist extensions
+            # SECURITY: Derive content type from a predefined dict keyed on the
+            # file extension.  All values are string literals, so CodeQL's
+            # py/http-response-splitting analysis sees no tainted data reaching
+            # the send_header sink.
             suffix = os.path.splitext(candidate_real)[1].lower()
-            ctype, _ = mimetypes.guess_type(candidate_real)
-            ctype = ctype or "application/octet-stream"
-
-            # SECURITY: Sanitize content type BEFORE using in header
-            ctype_safe = sanitize_header_value(ctype)
+            _STATIC_CONTENT_TYPES = {
+                ".css": "text/css",
+                ".js": "application/javascript",
+                ".json": "application/json",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+                ".svg": "image/svg+xml",
+                ".ico": "image/x-icon",
+                ".webp": "image/webp",
+            }
+            ctype_safe = _STATIC_CONTENT_TYPES.get(suffix, "application/octet-stream")
 
             # Stream file to avoid large memory usage
             self.send_response(200)
@@ -1029,18 +1043,20 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 ctype = file_content_types.get(suffix, "application/octet-stream")
 
-                # SECURITY: Triple sanitization for Content-Disposition
-                # 1. Sanitize filename (remove path separators, limit length)
-                safe_filename_step1 = sanitize_full_filename(os.path.basename(target_real), 100)
-                # 2. Sanitize for header injection (remove CR/LF)
-                safe_filename_step2 = sanitize_header_value(safe_filename_step1)
-                # 3. Sanitize content type
-                ctype_safe = sanitize_header_value(ctype)
+                # SECURITY: Build a safe Content-Disposition filename.
+                # 1. Take only the basename of the validated canonical path.
+                # 2. Restrict to word chars / dots / hyphens (whitelist substitution).
+                # 3. Inline CR/LF removal — CodeQL recognises re.sub(r'[\r\n]', ...)
+                #    as a py/http-response-splitting sanitizer.
+                raw_name = os.path.basename(target_real)
+                safe_filename = re.sub(r"[\r\n]", "", re.sub(r"[^\w.\-]", "_", raw_name))[:100]
+
+                # SECURITY: Sanitize content type with inline CR/LF removal
+                ctype_safe = re.sub(r"[\r\n]", "", ctype)
 
                 self.send_response(200)
                 self.send_header("Content-Type", ctype_safe)
-                # SECURITY: Build header value with pre-sanitized components
-                disposition_value = 'inline; filename="' + safe_filename_step2 + '"'
+                disposition_value = 'inline; filename="' + safe_filename + '"'
                 self.send_header("Content-Disposition", disposition_value)
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
