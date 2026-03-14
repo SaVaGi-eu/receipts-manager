@@ -81,7 +81,6 @@ if tessdata_dir:
 
 # Check for PDF support
 try:
-    import numpy as np
     from pdf2image import convert_from_path
 
     PDF_SUPPORT = True

@@ -468,8 +468,8 @@ def verify_file_integrity(data):
                         "path": rel,
                     }
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Error checking file existence for item %s: %s", item.get("id"), e)
 
     return issues
 
