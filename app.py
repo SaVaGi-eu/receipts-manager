@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
 
@@ -227,7 +227,7 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     try:
         Path(dst_real).chmod(0o640)
     except Exception as e:
-        logger.debug("Could not set permissions on %s: %s", dst_real, e)
+        logger.debug("Could not set permissions on %s: %s", re.sub(r"[\r\n]", "", str(dst_real)), e)
 
     return Path(dst_real)
 
@@ -1042,21 +1042,14 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 ctype = file_content_types.get(suffix, "application/octet-stream")
 
-                # SECURITY: Build a safe Content-Disposition filename.
-                # 1. Take only the basename of the validated canonical path.
-                # 2. Restrict to word chars / dots / hyphens (whitelist substitution).
-                # 3. Inline CR/LF removal — applied directly at the send_header sink so
-                #    CodeQL can track the sanitizer without an intermediate variable.
                 self.send_response(200)
-                self.send_header(
-                    "Content-Type",
-                    re.sub(r"[\r\n]", "", ctype),
-                )
+                self.send_header("Content-Type", ctype)
+                # SECURITY: Use RFC 5987 percent-encoding for the filename so that
+                # no raw user-controlled bytes appear in the header value.
+                safe_name = quote(os.path.basename(target_real), safe="")
                 self.send_header(
                     "Content-Disposition",
-                    'inline; filename="'
-                    + re.sub(r"[\r\n]", "", re.sub(r"[^\w.\-]", "_", os.path.basename(target_real)))[:100]
-                    + '"',
+                    "inline; filename*=UTF-8''" + safe_name,
                 )
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")

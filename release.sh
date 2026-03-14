@@ -195,6 +195,13 @@ if [ -z "$DMG_FILE" ]; then
     exit 1
 fi
 
+# Rename DMG to ensure the filename matches the selected release version
+VERSIONED_DMG="platforms/macos/dist/ReceiptsManager-${NPM_VERSION}.dmg"
+if [ "$DMG_FILE" != "$VERSIONED_DMG" ]; then
+    mv "$DMG_FILE" "$VERSIONED_DMG"
+fi
+DMG_FILE="$VERSIONED_DMG"
+
 echo -e "${GREEN}✓ Build successful: $DMG_FILE${NC}"
 
 # ── Upload to GitHub Releases ─────────────────────────────────────────────────
