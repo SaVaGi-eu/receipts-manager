@@ -259,7 +259,7 @@ function findPython() {
     '/usr/bin/python3',
     'python3'
   ];
-  
+
   for (const pyPath of possiblePaths) {
     console.log('[Python] Checking:', pyPath);
     if (pyPath === 'python3' || fs.existsSync(pyPath)) {
@@ -267,7 +267,7 @@ function findPython() {
       return pyPath;
     }
   }
-  
+
   console.error('[Python] ✗ Python 3 not found in any expected location');
   startupError = 'Python 3 not found. Please install Python 3 from python.org';
   return null;
@@ -277,7 +277,7 @@ function findPython() {
 function startFlask(dataPath) {
   console.log('[Server] Starting Python backend...');
   console.log('[Server] Data path:', dataPath);
-  
+
   const pythonPath = findPython();
   if (!pythonPath) return false;
 
@@ -312,7 +312,7 @@ function startFlask(dataPath) {
       const msg = d.toString().trim();
       console.log('[Server STDOUT]', msg);
     });
-    
+
     flaskProcess.stderr.on('data', d => {
       const msg = d.toString().trim();
       console.log('[Server STDERR]', msg);
@@ -348,9 +348,9 @@ function waitForFlask(url, retries, callback, errorCallback) {
       callback();
     } else {
       console.log('[Server] Server responded with error status:', res.statusCode);
-      if (retries <= 0) { 
-        errorCallback(`Server error: ${res.statusCode}`); 
-        return; 
+      if (retries <= 0) {
+        errorCallback(`Server error: ${res.statusCode}`);
+        return;
       }
       setTimeout(() => waitForFlask(url, retries - 1, callback, errorCallback), 500);
     }
@@ -360,10 +360,10 @@ function waitForFlask(url, retries, callback, errorCallback) {
     req.destroy();
   });
   req.on('error', (err) => {
-    console.log('[Server] Connection error:', err.message);
-    if (retries <= 0) { 
-      errorCallback(startupError || 'Server timeout'); 
-      return; 
+    console.log('[Server] Connection error:', err.message.replace(/\n|\r/g, ''));
+    if (retries <= 0) {
+      errorCallback(startupError || 'Server timeout');
+      return;
     }
     setTimeout(() => waitForFlask(url, retries - 1, callback, errorCallback), 500);
   });
@@ -447,7 +447,7 @@ function waitForBackendAndLoad(url, intervalMs = 500, timeoutMs = 15000) {
 // ── createWindow ───────────────────────────────────────────────────────────
 function createWindow() {
   console.log('[Window] Creating application window...');
-  
+
   // If a window already exists, focus it and return
   if (mainWindow) {
     console.log('[Window] Window already exists, focusing...');
@@ -519,9 +519,9 @@ function createWindow() {
     }
   });
 
-  mainWindow.on('closed', () => { 
+  mainWindow.on('closed', () => {
     console.log('[Window] Window closed');
-    mainWindow = null; 
+    mainWindow = null;
   });
 }
 
