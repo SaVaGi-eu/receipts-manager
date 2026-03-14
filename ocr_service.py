@@ -168,10 +168,9 @@ class OCRService:
             )
 
         try:
-            # SECURITY: Inline CR/LF removal — CodeQL recognises re.sub(r'[\r\n]', ...)
-            # as a py/log-injection sanitizer (custom helper functions are not recognised).
-            safe_path = re.sub(r"[\r\n]", "", str(pdf_path))
-            logger.info("Converting PDF to images: %s", safe_path)
+            # SECURITY: Strip CR/LF inline at the logger call to prevent log injection.
+            # Use str.replace so CodeQL can track the sanitizer without an intermediate variable.
+            logger.info("Converting PDF to images: %s", str(pdf_path).replace("\r", "").replace("\n", ""))
 
             # Convert PDF to images (one per page)
             images = convert_from_path(pdf_path, dpi=300)
@@ -210,9 +209,9 @@ class OCRService:
         """
         # Handle PDF files
         if self._is_pdf(image_path):
-            # SECURITY: Sanitize path inline before logging to prevent log injection.
-            # CodeQL recognises re.sub(r'[\r\n]', ...) as a py/log-injection sanitizer.
-            logger.info("Processing PDF file: %s", re.sub(r"[\r\n]", "", str(image_path)))
+            # SECURITY: Strip CR/LF inline at the logger call to prevent log injection.
+            # Use str.replace so CodeQL can track the sanitizer without an intermediate variable.
+            logger.info("Processing PDF file: %s", str(image_path).replace("\r", "").replace("\n", ""))
             images = self._pdf_to_images(image_path)
 
             # Extract text from all pages

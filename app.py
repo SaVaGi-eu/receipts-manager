@@ -229,8 +229,8 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     # Optionally set safe permissions
     try:
         Path(dst_real).chmod(0o640)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not set permissions on %s: %s", dst_real, e)
 
     return Path(dst_real)
 
@@ -1048,18 +1048,19 @@ class Handler(BaseHTTPRequestHandler):
                 # SECURITY: Build a safe Content-Disposition filename.
                 # 1. Take only the basename of the validated canonical path.
                 # 2. Restrict to word chars / dots / hyphens (whitelist substitution).
-                # 3. Inline CR/LF removal — CodeQL recognises re.sub(r'[\r\n]', ...)
-                #    as a py/http-response-splitting sanitizer.
-                raw_name = os.path.basename(target_real)
-                safe_filename = re.sub(r"[\r\n]", "", re.sub(r"[^\w.\-]", "_", raw_name))[:100]
-
-                # SECURITY: Sanitize content type with inline CR/LF removal
-                ctype_safe = re.sub(r"[\r\n]", "", ctype)
-
+                # 3. Inline CR/LF removal — applied directly at the send_header sink so
+                #    CodeQL can track the sanitizer without an intermediate variable.
                 self.send_response(200)
-                self.send_header("Content-Type", ctype_safe)
-                disposition_value = 'inline; filename="' + safe_filename + '"'
-                self.send_header("Content-Disposition", disposition_value)
+                self.send_header(
+                    "Content-Type",
+                    re.sub(r"[\r\n]", "", ctype),
+                )
+                self.send_header(
+                    "Content-Disposition",
+                    'inline; filename="'
+                    + re.sub(r"[\r\n]", "", re.sub(r"[^\w.\-]", "_", os.path.basename(target_real)))[:100]
+                    + '"',
+                )
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
@@ -1096,23 +1097,12 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return
 
-                # Convert to Path and validate it's a directory.
-                # SECURITY: Canonicalize with realpath to prevent path injection
-                # via symlinks or '..' components before any filesystem operations.
-                dir_path = Path(os.path.realpath(str(data_directory)))
-
-                if not dir_path.is_dir():
-                    self._set_headers(400)
-                    self.wfile.write(
-                        json.dumps({"success": False, "error": "Path is not a valid directory"}).encode("utf-8")
-                    )
-                    return
-
                 # Import save_data_path from config
                 from config import save_data_path
 
-                # Validate and save the directory path
-                if save_data_path(str(dir_path)):
+                # Validate and save the directory path.
+                # save_data_path() canonicalizes via realpath and validates internally.
+                if save_data_path(str(data_directory)):
                     self._set_headers(200)
                     self.wfile.write(
                         json.dumps(
