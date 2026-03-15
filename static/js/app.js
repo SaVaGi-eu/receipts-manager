@@ -280,7 +280,7 @@ function renderTable(rows) {
   if (!tbody) return;
   if (!rows || rows.length === 0) {
     tbody.innerHTML = `<tr class="empty-state"><td colspan="16"><div class="empty-message"><span class="empty-icon">📦</span><p>No items yet. Click "Add Receipt" to get started!</p></div></td></tr>`;
-    if ($('itemCount')) $('itemCount').textContent = '0 items';
+    if ($('itemCount')) $('itemCount').textContent = typeof t === 'function' ? t('itemCount', { count: 0 }) : '0 items';
     return;
   }
   tbody.innerHTML = rows.map(r => {
@@ -312,7 +312,7 @@ function renderTable(rows) {
       </td>
     </tr>`;
   }).join('');
-  if ($('itemCount')) $('itemCount').textContent = `${rows.length} items`;
+  if ($('itemCount')) $('itemCount').textContent = typeof t === 'function' ? t('itemCount', { count: rows.length }) : `${rows.length} items`;
   updateColumnVisibility();
   qsa('#tableBody .btn-edit').forEach(btn =>
     btn.addEventListener('click', () => editItem(parseInt(btn.dataset.id)))
@@ -401,6 +401,19 @@ async function handleFile(file) {
 }
 
 // ===================== MODAL — OPEN / CLOSE =====================
+function openModalForChoose() {
+  const modal = $('ocrModal'); if (!modal) return;
+  sessionGroupId = null;
+  sessionItemIds = [];
+  clearFormItemFields();
+  populateExistingReceiptSelect();
+  $('modalItemId').value = '';
+  $('modalReceiptGroupId').value = '';
+  const sel = $('existingReceiptSelect'); if (sel) sel.value = '';
+  setModalMode('choose');
+  modal.style.display = 'flex';
+}
+
 function openModalForNew(uploadResult) {
   const modal = $('ocrModal'); if (!modal) return;
   sessionGroupId = uploadResult.receipt_group_id;
@@ -435,14 +448,23 @@ function setModalMode(mode) {
   const btnAdd    = $('btnAddAnother');
   const btnFinish = $('btnFinish');
   const uploadSec = qs('.upload-select-section');
-  if (mode === 'new') {
+  const form      = $('ocrForm');
+  if (mode === 'choose') {
+    // Show upload/existing-receipt chooser; hide form and action buttons until a receipt is chosen
+    if (uploadSec) uploadSec.style.display = '';
+    if (form)      form.style.display = 'none';
+    if (btnAdd)    btnAdd.style.display = 'none';
+    if (btnFinish) btnFinish.style.display = 'none';
+  } else if (mode === 'new') {
+    if (uploadSec) uploadSec.style.display = 'none';
+    if (form)      form.style.display = '';
     if (btnAdd)    { btnAdd.style.display = ''; }
-    if (btnFinish) { btnFinish.textContent = 'Finish'; btnFinish.classList.remove('btn-primary'); btnFinish.classList.add('btn-success'); }
-    if (uploadSec) uploadSec.style.display = 'none';
+    if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = 'Finish'; btnFinish.classList.remove('btn-primary'); btnFinish.classList.add('btn-success'); }
   } else {
-    if (btnAdd)    { btnAdd.style.display = 'none'; }
-    if (btnFinish) { btnFinish.textContent = 'Save'; btnFinish.classList.remove('btn-success'); btnFinish.classList.add('btn-primary'); }
     if (uploadSec) uploadSec.style.display = 'none';
+    if (form)      form.style.display = '';
+    if (btnAdd)    { btnAdd.style.display = 'none'; }
+    if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = 'Save'; btnFinish.classList.remove('btn-success'); btnFinish.classList.add('btn-primary'); }
   }
 }
 
@@ -464,9 +486,11 @@ function closeOcrModal() {
   clearUserTags();
   sessionGroupId = null;
   sessionItemIds = [];
-  // Restore upload section visibility for next open
+  // Restore visibility for next open
   const uploadSec = qs('.upload-select-section');
   if (uploadSec) uploadSec.style.display = '';
+  const form = $('ocrForm');
+  if (form) form.style.display = '';
 }
 
 // ===================== FORM DATA =====================
@@ -714,8 +738,8 @@ async function saveSettings() {
 
 // ===================== EVENT LISTENERS =====================
 function setupEventListeners() {
-  // "Add Receipt" button → open file picker
-  bind('addReceiptBtn', 'click', () => $('modalFileInput')?.click());
+  // "Add Receipt" button → open modal in choose mode (upload OR existing receipt)
+  bind('addReceiptBtn', 'click', openModalForChoose);
 
   // Modal file input
   const modalFileInput = $('modalFileInput');
