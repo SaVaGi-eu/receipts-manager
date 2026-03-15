@@ -15,7 +15,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
-from receipt_service import ReceiptService
+from services.receipt_service import ReceiptService
 
 # Basic configuration
 PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
@@ -448,6 +448,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
+        if path == "/api/settings":
+            self._set_headers(200)
+            self.wfile.write(json.dumps(service.get_settings()).encode("utf-8"))
+            return
+
         if path == "/api/data":
             self._set_headers(200)
             self.wfile.write(json.dumps(service.get_all()).encode("utf-8"))
@@ -605,6 +610,27 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
+        # RM-123 / RM-110: Create new item in existing receipt group
+        if path == "/api/item":
+            body = self._read_json()
+            receipt_group_id = body.get("receipt_group_id")
+            if not receipt_group_id:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"success": False, "error": "Missing receipt_group_id"}).encode("utf-8"))
+                return
+            try:
+                item = service.create_item(receipt_group_id, body)
+                self._set_headers(200)
+                self.wfile.write(json.dumps({"success": True, "item": item}).encode("utf-8"))
+            except KeyError as e:
+                self._set_headers(404)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            except Exception:
+                logger.exception("Error creating item")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
+            return
+
         if path == "/api/integrity/check":
             issues = service.check_integrity()
             self._set_headers(200)
@@ -628,6 +654,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_PUT(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/settings":
+            updates = self._read_json()
+            try:
+                settings = service.update_settings(updates)
+                self._set_headers(200)
+                self.wfile.write(json.dumps(settings).encode("utf-8"))
+            except Exception:
+                logger.exception("Error updating settings")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
+            return
+
         if path.startswith("/api/item/"):
             try:
                 item_id = int(path.rsplit("/", 1)[-1])

@@ -1,4 +1,6 @@
-const { BrowserWindow, shell } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const { BrowserWindow, shell, app } = require('electron');
 const { SESSION_PARTITION, FLASK_URL, PORT } = require('./constants');
 const state = require('./state');
 const { killPortProcess } = require('../utils/port');
@@ -6,9 +8,38 @@ const { startFlask, waitForFlask } = require('../services/server');
 const { promptForDataFolder } = require('../services/folder-picker');
 const { showErrorPage, showLocationRequiredPage, loadAppWithRetry } = require('../renderer/pages');
 
+// RM-114: persist window size and position across restarts
+const _WIN_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json');
+const _DEFAULT_WIN_STATE = { width: 1400, height: 900 };
+
+function loadWindowState() {
+  try {
+    const raw = fs.readFileSync(_WIN_STATE_FILE, 'utf8');
+    const s = JSON.parse(raw);
+    if (typeof s.width === 'number' && typeof s.height === 'number') {
+      return s;
+    }
+  } catch (_) { /* no saved state yet */ }
+  return { ..._DEFAULT_WIN_STATE };
+}
+
+function saveWindowState(win) {
+  try {
+    if (win.isMaximized() || win.isMinimized() || win.isFullScreen()) return;
+    const b = win.getBounds();
+    fs.writeFileSync(_WIN_STATE_FILE, JSON.stringify(b), 'utf8');
+  } catch (err) {
+    console.warn('[Window] Could not save window state:', err.message);
+  }
+}
+
+const _savedState = loadWindowState();
+
 const WINDOW_OPTIONS = {
-  width: 1400,
-  height: 900,
+  width: _savedState.width,
+  height: _savedState.height,
+  x: _savedState.x,
+  y: _savedState.y,
   title: 'Receipt & Warranty Manager',
   webPreferences: {
     nodeIntegration: false,
@@ -49,6 +80,10 @@ function setupWindowListeners(win) {
       }
     }
   });
+
+  // RM-114: save bounds on move and resize
+  win.on('resize', () => saveWindowState(win));
+  win.on('move', () => saveWindowState(win));
 
   win.on('closed', () => {
     console.log('[Window] Window closed');

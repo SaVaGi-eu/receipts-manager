@@ -965,3 +965,45 @@ input[readonly] {
     .hidden {
       display: none !important;
     }
+
+/* ===== RM-77: Warranty row highlighting ===== */
+.items-table tbody tr.warranty-expired  { background-color: #ffebee !important; }
+.items-table tbody tr.warranty-expiring { background-color: #fffde7 !important; }
+.items-table tbody tr.warranty-expired:hover  { background-color: #ffcdd2 !important; }
+.items-table tbody tr.warranty-expiring:hover { background-color: #fff9c4 !important; }
+
+/* ===== RM-110: Modal action buttons ===== */
+.btn-danger {
+  padding: 0.6rem 1.2rem;
+  border: none; border-radius: 8px;
+  font-size: 0.9rem; font-weight: 500;
+  cursor: pointer; transition: all 0.3s ease;
+  background: #f44336; color: white;
+}
+.btn-danger:hover { background: #d32f2f; }
+
+.btn-success {
+  padding: 0.6rem 1.2rem;
+  border: none; border-radius: 8px;
+  font-size: 0.9rem; font-weight: 500;
+  cursor: pointer; transition: all 0.3s ease;
+  background: #4CAF50; color: white;
+}
+.btn-success:hover { background: #388e3c; }
+
+.btn-add-another {
+  padding: 0.6rem 1.2rem;
+  border: none; border-radius: 8px;
+  font-size: 0.9rem; font-weight: 500;
+  cursor: pointer; transition: all 0.3s ease;
+  background: #2196F3; color: white;
+}
+.btn-add-another:hover  { background: #1565c0; }
+.btn-add-another:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== RM-71: Settings rows ===== */
+.settings-row {
+  display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;
+}
+.settings-select { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid #ccc; }
+.settings-input-small { width: 70px; padding: 0.4rem; border-radius: 6px; border: 1px solid #ccc; }
