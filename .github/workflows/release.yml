@@ -59,7 +59,7 @@ jobs:
           echo "Build artifacts:"
           ls -lh platforms/macos/dist/
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: Receipt-Manager-macOS
           path: platforms/macos/dist/*.dmg
@@ -103,7 +103,7 @@ jobs:
           docker save receipts-manager:latest | gzip > receipt-manager-docker.tar.gz
       - name: Upload Docker image artifact
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: Receipt-Manager-Docker
           path: receipt-manager-docker.tar.gz
