@@ -33,6 +33,7 @@ const API = {
   importJson:     '/api/import/json',
   integrityCheck: '/api/integrity/check',
   upload:         '/api/upload',
+  uploadDoc:      '/api/upload/document',
   createItem:     '/api/item',
   updateItem: id  => `/api/item/${id}`,
   deleteItem: id  => `/api/item/${id}`,
@@ -477,6 +478,10 @@ function clearFormItemFields() {
   if (ewCb) ewCb.checked = false;
   const ewFields = $('extendedWarrantyFields');
   if (ewFields) ewFields.classList.add('hidden');
+  // Reset ext warranty doc fields
+  const docPath = $('extWarrantyDocPath'); if (docPath) docPath.value = '';
+  const docName = $('extWarrantyDocName'); if (docName) docName.textContent = '';
+  const docLink = $('extWarrantyDocLink'); if (docLink) { docLink.href = '#'; docLink.classList.add('hidden'); }
   clearUserTags();
 }
 
@@ -509,9 +514,10 @@ function collectFormData() {
 
   const ewChecked = $('extendedWarrantyCheckbox')?.checked || false;
   const extWarranty = ewChecked ? {
-    provider: ($('extWarrantyProvider')?.value || '').trim(),
-    months:   parseInt($('extWarrantyMonths')?.value) || 0,
-    cost:     parseFloat($('extWarrantyCost')?.value) || null
+    provider:      ($('extWarrantyProvider')?.value || '').trim(),
+    months:        parseInt($('extWarrantyMonths')?.value) || 0,
+    cost:          parseFloat($('extWarrantyCost')?.value) || null,
+    document_path: ($('extWarrantyDocPath')?.value || '') || null
   } : null;
 
   let formattedDate = purchaseDate;
@@ -539,9 +545,12 @@ function validateForm() {
   if (!pd)    { alert('Purchase Date is required.'); return false; }
   if (!brand) { alert('Brand is required.');         return false; }
   if (!model) { alert('Model is required.');         return false; }
-  // RM-122: Year range validation
-  const year = new Date(pd).getFullYear();
-  if (year < 1900 || year > 2099) { alert('Year must be between 1900 and 2099.'); return false; }
+  // RM-122: purchase date must not be in the future and not more than 100 years ago
+  const pdDate  = new Date(pd);
+  const today   = new Date(); today.setHours(0, 0, 0, 0);
+  const minDate = new Date(today); minDate.setFullYear(minDate.getFullYear() - 100);
+  if (pdDate > today)   { alert('Purchase date cannot be in the future.');               return false; }
+  if (pdDate < minDate) { alert('Purchase date cannot be more than 100 years in the past.'); return false; }
   // RM-122: Price format
   const priceRaw = ($('modalPrice')?.value || '').trim();
   if (priceRaw && isNaN(parseFloat(priceRaw))) { alert('Price must be a valid number.'); return false; }
@@ -605,15 +614,22 @@ async function handleFinish(e) {
 
 async function handleCancelModal() {
   if (sessionItemIds.length > 0) {
-    const confirmed = confirm(
-      `Cancel? This will discard ${sessionItemIds.length} item(s) and delete the uploaded file.`
-    );
+    const confirmed = confirm('Are you sure you want to cancel? Unsaved changes will be lost.');
     if (!confirmed) return;
-    for (const id of sessionItemIds) {
-      try { await fetchJson(API.deleteItem(id), { method: 'DELETE' }); }
-      catch (err) { console.error('Error deleting session item:', err); }
+    // Only delete items that were created as placeholders for a NEW receipt upload
+    // (not for existing-receipt mode, where the file belongs to an existing group)
+    const mode = $('modalMode')?.value;
+    if (mode === 'new' && sessionGroupId) {
+      // Check if this group existed before this session (existing-receipt) or was just uploaded
+      const existedBefore = (allData.receipts || []).some(r => r.receipt_group_id === sessionGroupId);
+      if (!existedBefore) {
+        for (const id of sessionItemIds) {
+          try { await fetchJson(API.deleteItem(id), { method: 'DELETE' }); }
+          catch (err) { console.error('Error deleting session item:', err); }
+        }
+        await loadData();
+      }
     }
-    await loadData();
   }
   closeOcrModal();
 }
@@ -688,6 +704,17 @@ async function editItem(itemId) {
   if ($('extWarrantyProvider')) $('extWarrantyProvider').value = ew?.provider || '';
   if ($('extWarrantyMonths'))   $('extWarrantyMonths').value   = ew?.months   || '';
   if ($('extWarrantyCost'))     $('extWarrantyCost').value     = ew?.cost     || '';
+  const ewDocPath = ew?.document_path || '';
+  const dpEl = $('extWarrantyDocPath'); if (dpEl) dpEl.value = ewDocPath;
+  const dnEl = $('extWarrantyDocName');
+  const dlEl = $('extWarrantyDocLink');
+  if (ewDocPath) {
+    if (dnEl) dnEl.textContent = ewDocPath.split('/').pop();
+    if (dlEl) { dlEl.href = API.fileUrl(ewDocPath); dlEl.classList.remove('hidden'); }
+  } else {
+    if (dnEl) dnEl.textContent = '';
+    if (dlEl) { dlEl.href = '#'; dlEl.classList.add('hidden'); }
+  }
 
   $('modalItemsPreview').style.display = 'none';
   sessionGroupId = null;
@@ -795,6 +822,37 @@ function setupEventListeners() {
     if (fields) fields.classList.toggle('hidden', !e.target.checked);
   });
 
+  // RM-77: ext warranty document upload
+  bind('extWarrantyDocBtn', 'click', () => $('extWarrantyDocInput')?.click());
+  const ewDocInput = $('extWarrantyDocInput');
+  if (ewDocInput) {
+    ewDocInput.addEventListener('change', async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const nameEl = $('extWarrantyDocName');
+      const linkEl = $('extWarrantyDocLink');
+      const pathEl = $('extWarrantyDocPath');
+      if (nameEl) nameEl.textContent = 'Uploading…';
+      try {
+        const fd = new FormData(); fd.append('file', file);
+        const resp = await fetch(API.uploadDoc, { method: 'POST', body: fd });
+        const result = await resp.json();
+        if (result.success) {
+          if (pathEl) pathEl.value = result.path;
+          if (nameEl) nameEl.textContent = file.name;
+          if (linkEl) { linkEl.href = API.fileUrl(result.path); linkEl.classList.remove('hidden'); }
+        } else {
+          if (nameEl) nameEl.textContent = 'Upload failed.';
+          console.error('Doc upload error:', result.error);
+        }
+      } catch (err) {
+        if (nameEl) nameEl.textContent = 'Upload failed.';
+        console.error('Doc upload error:', err);
+      }
+      ewDocInput.value = '';
+    });
+  }
+
   // User tag input
   const tagInput = $('userTagInput');
   if (tagInput) {
@@ -835,6 +893,14 @@ function setupEventListeners() {
 
 // ===================== INIT =====================
 document.addEventListener('DOMContentLoaded', () => {
+  // RM-122: set purchase date constraints dynamically
+  const pdInput = $('modalPurchaseDate');
+  if (pdInput) {
+    const today   = new Date();
+    const minDate = new Date(today); minDate.setFullYear(minDate.getFullYear() - 100);
+    pdInput.max = today.toISOString().split('T')[0];
+    pdInput.min = minDate.toISOString().split('T')[0];
+  }
   loadSettings();
   loadData();
   loadSuggestions();

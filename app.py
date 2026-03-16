@@ -610,6 +610,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
+        # RM-77: Upload a standalone document (e.g. ext warranty proof)
+        if path == "/api/upload/document":
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            max_len = 50 * 1024 * 1024
+            if length == 0 or length > max_len:
+                self._set_headers(400)
+                self.wfile.write(b'{"success":false,"error":"Invalid or too large upload"}')
+                return
+            body = self.rfile.read(length)
+            ctype = self.headers.get("Content-Type", "")
+            try:
+                payload = service.upload_document(body, ctype)
+                self._set_headers(200)
+                self.wfile.write(json.dumps(payload).encode("utf-8"))
+            except ValueError as e:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            except Exception:
+                logger.exception("Document upload error")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
+            return
+
         # RM-123 / RM-110: Create new item in existing receipt group
         if path == "/api/item":
             body = self._read_json()

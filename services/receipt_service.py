@@ -595,6 +595,44 @@ class ReceiptService:
             "ocr_data": {"shop": "", "purchase_date": "", "total_amount": None, "items": []},
         }
 
+    def upload_document(self, body: bytes, content_type: str) -> dict:
+        """Upload a standalone document file (e.g. ext warranty proof) and return its relative path."""
+        filename, file_bytes, _ = _parse_multipart_file(body, content_type, field_name="file")
+        if not file_bytes:
+            raise ValueError("No file field found")
+
+        try:
+            ext = Path(filename).suffix.lower() or ".bin"
+            safe_base = sanitize_filename(Path(filename).stem, max_length=80)
+        except Exception:
+            ext = ".bin"
+            safe_base = "upload"
+
+        from datetime import datetime as _dt
+
+        ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+        doc_dir = self._receipts_dir / "documents"
+        doc_dir.mkdir(parents=True, exist_ok=True)
+
+        saved_name = f"{ts}_{safe_base}{ext}"
+        saved_path = doc_dir / saved_name
+
+        receipts_root_real = os.path.realpath(str(self._receipts_dir))
+        receipts_root_prefix = receipts_root_real + os.sep
+        saved_path_real = os.path.realpath(str(saved_path))
+        if not saved_path_real.startswith(receipts_root_prefix):
+            raise ValueError("Invalid upload path")
+        saved_path = Path(saved_path_real)
+
+        saved_path.write_bytes(file_bytes)
+
+        try:
+            rel_path = str(saved_path.relative_to(self._data_root))
+        except Exception:
+            rel_path = str(saved_path)
+
+        return {"success": True, "path": rel_path, "filename": saved_name}
+
     def import_json(self, imported: dict) -> None:
         if "receipts" not in imported or "items" not in imported:
             raise ValueError("Invalid JSON structure: missing 'receipts' or 'items'")

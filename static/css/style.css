@@ -1007,3 +1007,10 @@ input[readonly] {
 }
 .settings-select { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid #ccc; }
 .settings-input-small { width: 70px; padding: 0.4rem; border-radius: 6px; border: 1px solid #ccc; }
+
+/* ===== RM-77: Ext warranty document upload ===== */
+.ext-doc-upload { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.3rem; }
+.btn-small { padding: 0.3rem 0.8rem; font-size: 0.85rem; }
+.ext-doc-name { font-size: 0.85rem; color: #555; }
+.ext-doc-link { font-size: 0.85rem; }
+.ext-doc-link.hidden { display: none; }

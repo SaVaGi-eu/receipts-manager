@@ -322,7 +322,7 @@
 
           <div class="existing-receipt-section">
             <select id="existingReceiptSelect" class="existing-receipt-select">
-              <option value="" data-i18n="selectReceiptOption">-- Choose existing receipt --</option>
+              <option value="" data-i18n="selectReceiptOption">-- Add to existing document --</option>
             </select>
           </div>
         </div>
@@ -340,14 +340,14 @@
             </div>
             <div class="form-group">
               <label for="modalPurchaseDate"><span data-i18n="labelPurchaseDate">Purchase Date</span> <span class="required-asterisk">*</span></label>
-              <input type="date" id="modalPurchaseDate" required min="1900-01-01" max="2099-12-31">
+              <input type="date" id="modalPurchaseDate" required>
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label for="modalShop"><span data-i18n="labelShop">Shop/Store</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalShop" list="shopList" required maxlength="100">
+              <input type="text" id="modalShop" list="shopList" required maxlength="50">
             </div>
             <div class="form-group">
               <label for="modalWarranty"><span data-i18n="labelWarranty">Warranty (months)</span></label>
@@ -358,11 +358,11 @@
           <div class="form-row">
             <div class="form-group">
               <label for="modalBrand"><span data-i18n="labelBrand">Brand</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalBrand" list="brandList" required maxlength="150">
+              <input type="text" id="modalBrand" list="brandList" required maxlength="100">
             </div>
             <div class="form-group">
               <label for="modalModel"><span data-i18n="labelModel">Model</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalModel" list="modelList" required maxlength="150">
+              <input type="text" id="modalModel" list="modelList" required maxlength="100">
             </div>
           </div>
 
@@ -410,6 +410,18 @@
               <div class="form-group">
                 <label for="extWarrantyCost" data-i18n="labelExtWarrantyCost">Cost</label>
                 <input type="text" id="extWarrantyCost" maxlength="10" placeholder="50.00" inputmode="decimal">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label for="extWarrantyDocInput" data-i18n="labelExtWarrantyDoc">Proof of Extended Warranty (optional)</label>
+                <div class="ext-doc-upload">
+                  <input type="file" id="extWarrantyDocInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+                  <button type="button" id="extWarrantyDocBtn" class="btn-secondary btn-small" data-i18n="chooseFile">Choose file…</button>
+                  <span id="extWarrantyDocName" class="ext-doc-name"></span>
+                  <a id="extWarrantyDocLink" href="#" target="_blank" class="ext-doc-link hidden" data-i18n="viewDoc">View</a>
+                </div>
+                <input type="hidden" id="extWarrantyDocPath">
               </div>
             </div>
           </div>
