@@ -26,7 +26,7 @@
     <div class="header-right">
       <!-- RM-80: Menu Button -->
       <button id="menuBtn" class="btn-secondary" data-i18n="menu">⚙️ Settings</button>
-      <span id="itemCount" class="item-count" data-i18n="itemCount">0 items</span>
+      <span id="itemCount" class="item-count">0 items</span>
     </div>
   </header>
 
@@ -80,6 +80,7 @@
         <label><input type="checkbox" class="col-toggle" data-column="documentation" checked> <span data-i18n="colDocumentation">Documentation</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="guarantee_end_date" checked> <span data-i18n="colGuaranteeEnd">Guarantee End</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="extended_warranty" checked> <span data-i18n="colExtendedWarranty">Extended Warranty</span></label>
+        <label><input type="checkbox" class="col-toggle" data-column="price" checked> <span data-i18n="colPrice">Price</span></label>
         <label><input type="checkbox" class="col-toggle" data-column="file" checked> <span data-i18n="colFile">File</span></label>
       </div>
     </div>
@@ -103,6 +104,7 @@
               <th data-column="documentation" class="sortable"><span data-i18n="colDocumentation">Documentation</span></th>
               <th data-column="guarantee_end_date" class="sortable"><span data-i18n="colGuaranteeEnd">Guarantee End</span></th>
               <th data-column="extended_warranty" class="sortable"><span data-i18n="colExtendedWarranty">Ext. Warranty</span></th>
+              <th data-column="price" class="sortable"><span data-i18n="colPrice">Price</span></th>
               <th data-column="file" class="sortable"><span data-i18n="colFile">File</span></th>
               <th data-column="actions"><span data-i18n="colActions">Actions</span></th>
             </tr>
@@ -178,6 +180,41 @@
             <button id="menuBackupBtn" class="settings-button" data-i18n="backupData">📦 Backup Data (JSON)</button>
             <button id="menuRestoreBtn" class="settings-button" data-i18n="restoreData">📥 Restore from Backup</button>
             <button id="menuExportBtn" class="settings-button" data-i18n="exportCsv">📤 Export to CSV</button>
+          </div>
+        </div>
+
+        <!-- Currency Settings (RM-71) -->
+        <div class="settings-section">
+          <h3 data-i18n="currencyTitle">💱 Currency</h3>
+          <div class="settings-actions">
+            <div class="settings-row">
+              <label for="currencySelect" data-i18n="currencyLabel">Currency:</label>
+              <select id="currencySelect" class="settings-select"></select>
+            </div>
+            <div class="settings-row">
+              <label for="currencyFormatSelect" data-i18n="currencyFormatLabel">Display Format:</label>
+              <select id="currencyFormatSelect" class="settings-select">
+                <option value="symbol">Symbol (€19.99)</option>
+                <option value="iso_code">ISO Code (EUR 19.99)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warranty Settings (RM-77) -->
+        <div class="settings-section">
+          <h3 data-i18n="warrantySettingsTitle">🛡️ Warranty Alerts</h3>
+          <div class="settings-actions">
+            <div class="settings-row">
+              <label for="warrantyWarningInput" data-i18n="warrantyWarningLabel">Expiration warning (months before):</label>
+              <input type="number" id="warrantyWarningInput" class="settings-input-small" min="1" max="24" value="3">
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-actions">
+            <button id="saveSettingsBtn" class="btn-primary" data-i18n="saveSettings">💾 Save Settings</button>
           </div>
         </div>
 
@@ -285,7 +322,7 @@
 
           <div class="existing-receipt-section">
             <select id="existingReceiptSelect" class="existing-receipt-select">
-              <option value="" data-i18n="selectReceiptOption">-- Choose existing receipt --</option>
+              <option value="" data-i18n="selectReceiptOption">-- Add to existing document --</option>
             </select>
           </div>
         </div>
@@ -299,7 +336,7 @@
           <div class="form-row">
             <div class="form-group">
               <label for="modalDocumentation"><span data-i18n="labelDocumentation">Documentation</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalDocumentation" list="docList" required>
+              <input type="text" id="modalDocumentation" list="docList" required maxlength="50">
             </div>
             <div class="form-group">
               <label for="modalPurchaseDate"><span data-i18n="labelPurchaseDate">Purchase Date</span> <span class="required-asterisk">*</span></label>
@@ -310,40 +347,44 @@
           <div class="form-row">
             <div class="form-group">
               <label for="modalShop"><span data-i18n="labelShop">Shop/Store</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalShop" list="shopList" required>
+              <input type="text" id="modalShop" list="shopList" required maxlength="50">
             </div>
             <div class="form-group">
               <label for="modalWarranty"><span data-i18n="labelWarranty">Warranty (months)</span></label>
-              <input type="number" id="modalWarranty" min="0" step="1" data-i18n-placeholder="warrantyPlaceholder" placeholder="24">
+              <input type="number" id="modalWarranty" min="0" max="999" step="1" data-i18n-placeholder="warrantyPlaceholder" placeholder="24">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label for="modalBrand"><span data-i18n="labelBrand">Brand</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalBrand" list="brandList" required>
+              <input type="text" id="modalBrand" list="brandList" required maxlength="100">
             </div>
             <div class="form-group">
               <label for="modalModel"><span data-i18n="labelModel">Model</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalModel" list="modelList" required>
+              <input type="text" id="modalModel" list="modelList" required maxlength="100">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label for="modalLocation" data-i18n="labelLocation">Location</label>
-              <input type="text" id="modalLocation" list="locationList">
+              <input type="text" id="modalLocation" list="locationList" maxlength="100">
             </div>
             <div class="form-group">
               <label for="modalCategory" data-i18n="labelCategory">Category</label>
-              <input type="text" id="modalCategory" list="categoryList">
+              <input type="text" id="modalCategory" list="categoryList" maxlength="50">
             </div>
           </div>
 
           <div class="form-row">
-            <div class="form-group full-width">
+            <div class="form-group">
               <label for="modalProject" data-i18n="labelProject">Project</label>
-              <input type="text" id="modalProject" list="projectList">
+              <input type="text" id="modalProject" list="projectList" maxlength="100">
+            </div>
+            <div class="form-group">
+              <label for="modalPrice" data-i18n="labelPrice">Price</label>
+              <input type="text" id="modalPrice" maxlength="10" placeholder="0.00" inputmode="decimal">
             </div>
           </div>
 
@@ -358,17 +399,29 @@
             <div class="form-row">
               <div class="form-group">
                 <label for="extWarrantyProvider" data-i18n="labelExtWarrantyProvider">Provider Name</label>
-                <input type="text" id="extWarrantyProvider">
+                <input type="text" id="extWarrantyProvider" maxlength="100">
               </div>
               <div class="form-group">
                 <label for="extWarrantyMonths" data-i18n="labelExtWarrantyMonths">Extended Warranty (months)</label>
-                <input type="number" id="extWarrantyMonths" min="0" step="1" placeholder="12">
+                <input type="number" id="extWarrantyMonths" min="0" max="999" step="1" placeholder="12">
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label for="extWarrantyCost" data-i18n="labelExtWarrantyCost">Cost</label>
-                <input type="text" id="extWarrantyCost" placeholder="€50.00">
+                <input type="text" id="extWarrantyCost" maxlength="10" placeholder="50.00" inputmode="decimal">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label for="extWarrantyDocInput" data-i18n="labelExtWarrantyDoc">Proof of Extended Warranty (optional)</label>
+                <div class="ext-doc-upload">
+                  <input type="file" id="extWarrantyDocInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+                  <button type="button" id="extWarrantyDocBtn" class="btn-secondary btn-small" data-i18n="chooseFile">Choose file…</button>
+                  <span id="extWarrantyDocName" class="ext-doc-name"></span>
+                  <a id="extWarrantyDocLink" href="#" target="_blank" class="ext-doc-link hidden" data-i18n="viewDoc">View</a>
+                </div>
+                <input type="hidden" id="extWarrantyDocPath">
               </div>
             </div>
           </div>
@@ -394,8 +447,9 @@
           </div>
 
           <div class="modal-footer">
-            <button type="button" id="cancelModal" class="btn-secondary" data-i18n="cancel">Cancel</button>
-            <button type="submit" class="btn-primary" data-i18n="saveReceipt">Save Receipt</button>
+            <button type="button" id="cancelModal"   class="btn-danger"       data-i18n="cancel">Cancel</button>
+            <button type="button" id="btnAddAnother" class="btn-add-another"  data-i18n="addAnother">Add Another</button>
+            <button type="submit" id="btnFinish"     class="btn-success"      data-i18n="saveReceipt">Finish</button>
           </div>
         </form>
       </div>
@@ -405,7 +459,7 @@
 <script src="https://cdn.jsdelivr.net/npm/i18next@23.7.16/i18next.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/i18next-http-backend@2.4.3/i18nextHttpBackend.min.js"></script>
 <script src="/static/i18n.js"></script>
-<script src="/static/app.js"></script>
+<script src="/static/js/app.js"></script>
 <script src="/static/js/settings.js"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/SaVaGi-eu/receipts-manager.git"
   },
-  "main": "electron-main.js",
+  "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --mac --arm64",
@@ -25,7 +25,7 @@
     "productName": "Receipt Manager",
     "asar": true,
     "files": [
-      "electron-main.js",
+      "src/**/*",
       "package.json"
     ],
     "extraResources": [
