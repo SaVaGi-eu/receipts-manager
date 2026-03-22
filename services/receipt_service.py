@@ -328,6 +328,7 @@ class ReceiptService:
                     data["next_id"] = max((i["id"] for i in data.get("items", [])), default=0) + 1
                 return data
         except Exception:
+            logger.exception("Failed to load data file, returning empty state")
             return {"receipts": [], "items": [], "next_id": 1}
 
     def save(self, data: dict) -> bool:
@@ -343,6 +344,7 @@ class ReceiptService:
                     new_cmp.pop("integrity_issues", None)
                     changed = json.dumps(new_cmp, sort_keys=True) != json.dumps(existing, sort_keys=True)
                 except Exception:
+                    logger.debug("Could not read existing data for change-detection; treating as changed")
                     changed = True
             else:
                 changed = True

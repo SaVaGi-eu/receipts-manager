@@ -47,7 +47,7 @@ class StorageService:
                     cmp.pop("integrity_issues", None)
                     changed = json.dumps(cmp, sort_keys=True) != json.dumps(existing, sort_keys=True)
                 except Exception:
-                    pass
+                    logger.debug("Could not read existing data for change-detection; treating as changed")
 
             if changed:
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")

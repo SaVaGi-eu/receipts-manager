@@ -329,6 +329,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             return json.loads(body.decode("utf-8"))
         except Exception:
+            logger.debug("Failed to parse request body as JSON")
             return {}
 
     def do_GET(self):
