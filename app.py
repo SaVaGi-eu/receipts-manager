@@ -521,10 +521,12 @@ class Handler(BaseHTTPRequestHandler):
                 # SECURITY: Use RFC 5987 percent-encoding for the filename so that
                 # no raw user-controlled bytes appear in the header value.
                 safe_name = quote(os.path.basename(target_real), safe="")
-                self.send_header(
-                    "Content-Disposition",
-                    "inline; filename*=UTF-8''" + safe_name,
-                )
+                # SECURITY: pipe through sanitize_header_value so CodeQL's
+                # py/http-response-splitting taint flow is broken at this sink.
+                # quote() already encodes CR/LF as %0D/%0A, so this is a no-op
+                # in practice but is required for the static analysis to verify safety.
+                content_disp = sanitize_header_value("inline; filename*=UTF-8''" + safe_name)
+                self.send_header("Content-Disposition", content_disp)
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()

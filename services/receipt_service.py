@@ -185,9 +185,21 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     try:
         Path(dst_real).chmod(0o640)
     except Exception as e:
-        logger.debug("Could not set permissions on %s: %s", re.sub(r"[\r\n]", "", str(dst_real)), e)
+        logger.debug("Could not set permissions on %s: %s", _sanitize_log(str(dst_real)), e)
 
     return Path(dst_real)
+
+
+def _sanitize_log(text: str, max_length: int = 200) -> str:
+    """
+    SECURITY: Sanitize user-controlled input before logging to prevent log injection (CWE-117).
+    Removes newlines, carriage returns, and other control characters.
+    Mirrors sanitize_for_logging() in app.py; duplicated here to avoid circular imports.
+    """
+    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text))
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+    return sanitized
 
 
 def sanitize_filename(text, max_length=50):
