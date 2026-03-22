@@ -12,7 +12,7 @@ import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
 from services.receipt_service import ReceiptService
@@ -520,13 +520,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", ctype)
                 # SECURITY: Use RFC 5987 percent-encoding for the filename so that
                 # no raw user-controlled bytes appear in the header value.
-                safe_name = quote(os.path.basename(target_real), safe="")
-                # SECURITY: pipe through sanitize_header_value so CodeQL's
-                # py/http-response-splitting taint flow is broken at this sink.
-                # quote() already encodes CR/LF as %0D/%0A, so this is a no-op
-                # in practice but is required for the static analysis to verify safety.
-                content_disp = sanitize_header_value("inline; filename*=UTF-8''" + safe_name)
-                self.send_header("Content-Disposition", content_disp)
+                # SECURITY: send "inline" without a filename to eliminate user-derived
+                # data from the header entirely (CWE-113). The browser falls back to
+                # the URL path for its own display name, which is already percent-encoded.
+                self.send_header("Content-Disposition", "inline")
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()

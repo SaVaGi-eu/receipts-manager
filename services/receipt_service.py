@@ -185,7 +185,9 @@ def safe_move_file(src: Path, dst_dir: Path, dst_name: str, allowed_root: Path) 
     try:
         Path(dst_real).chmod(0o640)
     except Exception as e:
-        logger.debug("Could not set permissions on %s: %s", _sanitize_log(str(dst_real)), e)
+        # SECURITY: do not log dst_real (user-derived path) to avoid CWE-117 log injection.
+        # The exception message from the OS is sufficient for debugging.
+        logger.debug("Could not set permissions on moved file: %s", e)
 
     return Path(dst_real)
 
