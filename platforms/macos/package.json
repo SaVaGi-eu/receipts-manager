@@ -47,10 +47,6 @@
         "to": "config.py"
       },
       {
-        "from": "../../ocr_service.py",
-        "to": "ocr_service.py"
-      },
-      {
         "from": "../../requirements.txt",
         "to": "requirements.txt"
       },
