@@ -87,8 +87,8 @@ platforms/macos/build/
 # Branding assets are stored in media/branding/ (source of truth)
 # platforms/macos/build/ is derived — populated by release.sh at build time
 
-# Data directories (user data should not be in repo)
-data/database/data.json
+# Data directories (user data — must never be committed)
+data/data.json
 data/backups/
 storage/
 !data/.gitkeep
