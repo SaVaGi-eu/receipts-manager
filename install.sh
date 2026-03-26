@@ -11,6 +11,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════╗
@@ -84,7 +86,7 @@ check_tesseract() {
 # Function to install Tesseract
 install_tesseract() {
     echo -e "\n${BLUE}═══ Installing Tesseract OCR ═══${NC}\n"
-    
+
     case "$OS" in
         Darwin)
             if command_exists brew; then
@@ -126,6 +128,35 @@ install_tesseract() {
     esac
 }
 
+# Function to prepare branding assets for electron-builder
+# Copies icon and DMG background from media/branding/ into platforms/macos/build/
+# Warns if assets are missing but does not abort — electron-builder will use its defaults.
+prepare_branding() {
+    local BRANDING_DIR="$SCRIPT_DIR/media/branding"
+    local BUILD_DIR="$SCRIPT_DIR/platforms/macos/build"
+    local MISSING=()
+
+    [ ! -f "$BRANDING_DIR/icon.icns" ]     && MISSING+=("media/branding/icon.icns")
+    [ ! -f "$BRANDING_DIR/icon.png" ]      && MISSING+=("media/branding/icon.png")
+    [ ! -f "$BRANDING_DIR/background.png" ] && MISSING+=("media/branding/background.png")
+
+    if [ ${#MISSING[@]} -gt 0 ]; then
+        echo -e "${YELLOW}⚠ Branding assets not found — build will use default Electron icon:${NC}"
+        for f in "${MISSING[@]}"; do
+            echo "    - $f"
+        done
+        echo "  See media/branding/README.md for instructions."
+        echo ""
+        return
+    fi
+
+    mkdir -p "$BUILD_DIR"
+    cp "$BRANDING_DIR/icon.icns"      "$BUILD_DIR/icon.icns"
+    cp "$BRANDING_DIR/icon.png"       "$BUILD_DIR/icon.png"
+    cp "$BRANDING_DIR/background.png" "$BUILD_DIR/background.png"
+    echo -e "${GREEN}✓ Branding assets ready.${NC}"
+}
+
 # Build macOS App
 build_macos_app() {
     echo -e "\n${BLUE}═══ Building macOS Application ═══${NC}\n"
@@ -163,6 +194,11 @@ build_macos_app() {
         BUILD_TARGET="--mac --x64"
         echo -e "${GREEN}Building for Intel Mac${NC}"
     fi
+
+    # Prepare branding assets
+    echo ""
+    echo "Preparing branding assets..."
+    prepare_branding
 
     # Navigate to macOS build directory
     cd platforms/macos
