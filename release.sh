@@ -15,6 +15,7 @@ NC='\033[0m'
 
 REPO="SaVaGi-eu/receipts-manager"
 ARCH="$(uname -m)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo -e "${BLUE}"
 cat << "EOF"
@@ -49,6 +50,37 @@ fi
 
 echo -e "${GREEN}✓ All prerequisites met.${NC}\n"
 
+# ── Check branding assets ────────────────────────────────────────────────────
+
+BRANDING_DIR="$SCRIPT_DIR/media/branding"
+ICON_ICNS="$BRANDING_DIR/icon.icns"
+ICON_PNG="$BRANDING_DIR/icon.png"
+BACKGROUND="$BRANDING_DIR/background.png"
+
+echo "Checking branding assets..."
+
+MISSING_ASSETS=()
+[ ! -f "$ICON_ICNS" ]   && MISSING_ASSETS+=("media/branding/icon.icns")
+[ ! -f "$ICON_PNG" ]    && MISSING_ASSETS+=("media/branding/icon.png")
+[ ! -f "$BACKGROUND" ]  && MISSING_ASSETS+=("media/branding/background.png")
+
+if [ ${#MISSING_ASSETS[@]} -gt 0 ]; then
+    echo -e "${RED}✗ Missing branding assets:${NC}"
+    for asset in "${MISSING_ASSETS[@]}"; do
+        echo "    - $asset"
+    done
+    echo ""
+    echo "Copy the files from platforms/macos/build/ if you have a previous build:"
+    echo "  cp platforms/macos/build/icon.icns   media/branding/"
+    echo "  cp platforms/macos/build/icon.png    media/branding/"
+    echo "  cp platforms/macos/build/background.png media/branding/"
+    echo ""
+    echo "Or see media/branding/README.md for instructions on generating them."
+    exit 1
+fi
+
+echo -e "${GREEN}✓ All branding assets present.${NC}\n"
+
 # ── Fetch existing releases from GitHub ─────────────────────────────────────
 
 echo "Fetching existing releases from GitHub..."
@@ -71,7 +103,6 @@ echo ""
 i=1
 declare -a TAG_ARRAY
 for tag in "${TAGS[@]}"; do
-    # strip the " (latest)" marker for the array value
     clean_tag="${tag% (latest)}"
     echo "  $i) $tag"
     TAG_ARRAY[$i]="$clean_tag"
@@ -85,16 +116,13 @@ echo ""
 read -p "Your choice [1-$i]: " choice
 
 if [[ "$choice" -eq "$NEW_OPTION" || ${#TAGS[@]} -eq 0 ]]; then
-    # Auto-suggest next patch version based on latest tag
     if [[ ${#TAG_ARRAY[@]} -gt 0 ]]; then
         LATEST="${TAG_ARRAY[1]}"
-        # Strip leading 'v' for arithmetic, then restore
         CLEAN="${LATEST#v}"
         MAJOR=$(echo "$CLEAN" | cut -d. -f1)
         MINOR=$(echo "$CLEAN" | cut -d. -f2)
         PATCH=$(echo "$CLEAN" | cut -d. -f3)
         NEXT_PATCH=$((PATCH + 1))
-        # Preserve 'v' prefix if original tag had it
         if [[ "$LATEST" == v* ]]; then
             SUGGESTED="v${MAJOR}.${MINOR}.${NEXT_PATCH}"
         else
@@ -144,8 +172,6 @@ echo -e "${GREEN}✓ package.json updated to $NPM_VERSION${NC}"
 # ── Bump version in templates/index.html (the in-app Settings screen) ────────
 
 echo -e "\n${BLUE}═══ Updating in-app version display ═══${NC}\n"
-# Replaces: <span id="appVersion">ANY.VERSION.HERE</span>
-# With:     <span id="appVersion">X.Y.Z</span>
 sed -i '' "s|<span id=\"appVersion\">[^<]*</span>|<span id=\"appVersion\">${NPM_VERSION}</span>|" templates/index.html
 echo -e "${GREEN}✓ templates/index.html updated to $NPM_VERSION${NC}"
 
@@ -156,6 +182,19 @@ git add platforms/macos/package.json platforms/macos/package-lock.json templates
 git commit -m "chore: bump version to ${APP_VERSION}"
 git push origin main
 echo -e "${GREEN}✓ Version bump committed and pushed${NC}"
+
+# ── Prepare build/ directory with branding assets ────────────────────────────
+
+echo -e "\n${BLUE}═══ Preparing branding assets ═══${NC}\n"
+
+BUILD_DIR="$SCRIPT_DIR/platforms/macos/build"
+mkdir -p "$BUILD_DIR"
+
+cp "$ICON_ICNS"  "$BUILD_DIR/icon.icns"
+cp "$ICON_PNG"   "$BUILD_DIR/icon.png"
+cp "$BACKGROUND" "$BUILD_DIR/background.png"
+
+echo -e "${GREEN}✓ Branding assets copied to platforms/macos/build/${NC}"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
@@ -217,7 +256,6 @@ if [ "$IS_NEW_RELEASE" = true ]; then
         --latest
 else
     echo "Uploading DMG to existing release $APP_VERSION..."
-    # Delete old asset with same name if it exists, then re-upload
     gh release upload "$APP_VERSION" "$DMG_FILE" \
         --repo "$REPO" \
         --clobber

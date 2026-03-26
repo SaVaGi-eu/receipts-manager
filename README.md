@@ -1,7 +1,7 @@
 # Receipt & Warranty Manager
 
 <p align="center">
-  <img src="screenshots/main-interface.png" alt="Receipt Manager Interface" width="800"/>
+  <img src="media/screenshots/main-interface.png" alt="Receipt Manager Interface" width="800"/>
 </p>
 
 A multilingual receipt and warranty management system with OCR support for scanning and organizing receipts, warranties, and related documents.
@@ -37,7 +37,7 @@ The installer will detect your system and offer appropriate options:
 ## 📋 Features
 
 <p align="center">
-  <img src="screenshots/add-item-dialog.png" alt="Add Item Dialog" width="600"/>
+  <img src="media/screenshots/add-item-dialog.png" alt="Add Item Dialog" width="600"/>
 </p>
 
 - 📸 **Receipt Scanning**: OCR-powered text extraction from receipt images
@@ -58,7 +58,7 @@ The installer will detect your system and offer appropriate options:
 ### 🍎 macOS Native App
 
 <p align="center">
-  <img src="screenshots/select%20config%20location.png" alt="First-time setup" width="500"/>
+  <img src="media/screenshots/select%20config%20location.png" alt="First-time setup" width="500"/>
 </p>
 
 The macOS app includes:
@@ -122,9 +122,12 @@ receipts-manager/
 │   ├── macos/              # macOS Electron app
 │   └── docker/             # Docker deployment
 │
+├── media/
+│   ├── screenshots/        # Application screenshots
+│   └── branding/           # App icon and DMG background assets
+│
 ├── templates/              # HTML templates
 ├── static/                 # CSS, JS, images
-├── screenshots/            # Application screenshots
 ├── docs/                   # Documentation
 ├── data/                   # Database (created on first run)
 └── storage/                # Receipt files (created on first run)

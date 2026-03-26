@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
@@ -70,18 +69,23 @@ package-lock.json
 .yarn/
 
 # Build artifacts
-dist/
 out/
 build/
+dist/
 platforms/macos/dist/
 platforms/macos/out/
 platforms/macos/node_modules/
 platforms/macos/build/
-*.dmg
 *.app
 *.pkg
 *.deb
 *.rpm
+
+# DMG files (generated release artifacts — not stored in repo)
+*.dmg
+
+# Branding assets are stored in media/branding/ (source of truth)
+# platforms/macos/build/ is derived — populated by release.sh at build time
 
 # Data directories (user data should not be in repo)
 data/database/data.json
@@ -145,7 +149,6 @@ $RECYCLE.BIN/
 
 # Archives
 *.7z
-*.dmg
 *.gz
 *.iso
 *.jar

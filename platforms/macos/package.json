@@ -24,6 +24,7 @@
     "appId": "eu.savagi.receipts-manager",
     "productName": "Receipt Manager",
     "asar": true,
+    "icon": "../../media/branding/icon.icns",
     "files": [
       "src/**/*",
       "package.json"
@@ -103,6 +104,7 @@
     },
     "dmg": {
       "title": "Receipt Manager ${version}",
+      "background": "../../media/branding/background.png",
       "window": {
         "width": 540,
         "height": 380
