@@ -1,7 +1,12 @@
 # Receipt & Warranty Manager
 
 <p align="center">
-  <img src="media/screenshots/main-interface.png" alt="Receipt Manager Interface" width="800"/>
+  <img src="media/screenshots/Main_screen.png" alt="Receipt Manager Interface" width="800"/>
+</p>
+<p>
+  <img src="media/screenshots/add_receipt.png" alt="Receipt Manager Add Receipt Interface" width="800"/>
+  <img src="media/screenshots/Settings.png" alt="Receipt Manager Interface" width="800"/>
+  <img src="media/screenshots/verify_receipt.png" alt="Receipt Manager Verify Receipt Interface" width="800"/>
 </p>
 
 A multilingual receipt and warranty management system with OCR support for scanning and organizing receipts, warranties, and related documents.
