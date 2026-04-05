@@ -1,6 +1,6 @@
 {
   "name": "receipt-warranty-manager",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "Receipt & Warranty Manager - macOS Desktop App",
   "repository": {
     "type": "git",
@@ -14,7 +14,7 @@
     "build:universal": "electron-builder --mac --universal"
   },
   "devDependencies": {
-    "electron": "^40.6.0",
+    "electron": "^40.8.5",
     "electron-builder": "^26.8.1"
   },
   "overrides": {
