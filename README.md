@@ -3,11 +3,32 @@
 <p align="center">
   <img src="media/screenshots/Main_screen.png" alt="Receipt Manager Interface" width="800"/>
 </p>
-<p align="center">
-  <img src="media/screenshots/add_receipt.png" alt="Receipt Manager Add Receipt Interface" width="300"/>
-  <img src="media/screenshots/Settings.png" alt="Receipt Manager Interface" width="300"/>
-  <img src="media/screenshots/verify_receipt.png" alt="Receipt Manager Verify Receipt Interface" width="300"/>
-</p>
+
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="media/screenshots/add_receipt.png" alt="Add Receipt" width="280"/>
+      <br/>
+      <sub><b>Add Receipt</b></sub>
+    </td>
+    <td width="30"></td>
+    <td align="center">
+      <img src="media/screenshots/Settings.png" alt="Settings" width="280"/>
+      <br/>
+      <sub><b>Settings</b></sub>
+    </td>
+    <td width="30"></td>
+    <td align="center">
+      <img src="media/screenshots/verify_receipt.png" alt="Verify Receipt" width="280"/>
+      <br/>
+      <sub><b>Verify Receipt</b></sub>
+    </td>
+  </tr>
+</table>
+
+
+
+
 
 A multilingual receipt and warranty management system with OCR support for scanning and organizing receipts, warranties, and related documents.
 
