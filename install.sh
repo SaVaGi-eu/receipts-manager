@@ -160,6 +160,31 @@ prepare_branding() {
     echo -e "${GREEN}✓ Branding assets ready.${NC}"
 }
 
+# Set up Python virtual environment (create or refresh) and activate it.
+# Creates the venv if missing. If requirements.txt is newer than the last
+# install marker, the venv is fully recreated. Leaves the venv activated.
+setup_venv() {
+    if [ ! -d "venv" ]; then
+        echo "Creating Python virtual environment..."
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        echo "Installing dependencies..."
+        pip install -r requirements.txt
+        touch venv/.requirements_installed
+    elif [ "requirements.txt" -nt "venv/.requirements_installed" ]; then
+        echo "requirements.txt has changed; recreating Python virtual environment..."
+        rm -rf venv
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        touch venv/.requirements_installed
+    else
+        source venv/bin/activate
+    fi
+}
+
 # Build macOS App
 build_macos_app() {
     echo -e "\n${BLUE}═══ Building macOS Application ═══${NC}\n"
