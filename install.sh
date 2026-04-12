@@ -209,7 +209,7 @@ build_macos_app() {
         npm install
     fi
 
-    # Create venv in root if it doesn't exist
+    # Create or refresh venv in root based on requirements.txt
     cd ../..
     if [ ! -d "venv" ]; then
         echo "Creating Python virtual environment..."
@@ -218,6 +218,19 @@ build_macos_app() {
         pip install --upgrade pip
         pip install -r requirements.txt
         deactivate
+        touch venv/.requirements_installed
+    else
+        # Refresh venv if requirements.txt is newer than the last install marker
+        if [ "requirements.txt" -nt "venv/.requirements_installed" ]; then
+            echo "requirements.txt has changed; recreating Python virtual environment..."
+            rm -rf venv
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            deactivate
+            touch venv/.requirements_installed
+        fi
     fi
 
     # Build the app
