@@ -294,20 +294,21 @@ function renderTable(rows) {
     <tr class="${rowClass}">
       <td data-column="id">${r.id ?? ''}</td>
       <td data-column="receipt_group_id">${escHtml(r.receipt_group_id ?? '')}</td>
-      <td data-column="brand">${escHtml(r.brand ?? '')}</td>
-      <td data-column="model">${escHtml(r.model ?? '')}</td>
-      <td data-column="location">${escHtml(r.location ?? '')}</td>
+      <td data-column="brand"          title="${escAttr(r.brand ?? '')}">${escHtml(r.brand ?? '')}</td>
+      <td data-column="model"          title="${escAttr(r.model ?? '')}">${escHtml(r.model ?? '')}</td>
+      <td data-column="location"       title="${escAttr(r.location ?? '')}">${escHtml(r.location ?? '')}</td>
       <td data-column="category">${escHtml(r.category ?? '')}</td>
-      <td data-column="users">${escHtml(normalizeUsers(r.users).join('; '))}</td>
-      <td data-column="project">${escHtml(r.project ?? '')}</td>
-      <td data-column="shop">${escHtml(r.shop ?? '')}</td>
+      <td data-column="users"          title="${escAttr(normalizeUsers(r.users).join('; '))}">${escHtml(normalizeUsers(r.users).join('; '))}</td>
+      <td data-column="project"        title="${escAttr(r.project ?? '')}">${escHtml(r.project ?? '')}</td>
+      <td data-column="shop"           title="${escAttr(r.shop ?? '')}">${escHtml(r.shop ?? '')}</td>
       <td data-column="purchase_date">${escHtml(r.purchase_date ?? '')}</td>
-      <td data-column="documentation">${escHtml(r.documentation ?? '')}</td>
+      <td data-column="documentation"  title="${escAttr(r.documentation ?? '')}">${escHtml(r.documentation ?? '')}</td>
       <td data-column="guarantee_end_date">${escHtml(r.guarantee_end_date ?? '')}</td>
       <td data-column="extended_warranty">${formatExtWarranty(r.extended_warranty)}</td>
       <td data-column="price">${formatPrice(r.price)}</td>
       <td data-column="file">${fileCell}</td>
       <td data-column="actions">
+        ${r.receipt_relative_path ? `<button type="button" class="btn-small btn-open" data-url="${escAttr(API.fileUrl(r.receipt_relative_path))}">Open</button>` : ''}
         <button type="button" class="btn-small btn-edit"   data-id="${r.id}">Edit</button>
         <button type="button" class="btn-small btn-delete" data-id="${r.id}">Delete</button>
       </td>
@@ -315,6 +316,9 @@ function renderTable(rows) {
   }).join('');
   if ($('itemCount')) $('itemCount').textContent = typeof t === 'function' ? t('itemCount', { count: rows.length }) : `${rows.length} items`;
   updateColumnVisibility();
+  qsa('#tableBody .btn-open').forEach(btn =>
+    btn.addEventListener('click', () => window.open(btn.dataset.url, '_blank'))
+  );
   qsa('#tableBody .btn-edit').forEach(btn =>
     btn.addEventListener('click', () => editItem(parseInt(btn.dataset.id)))
   );
@@ -387,6 +391,20 @@ async function recheckIntegrity() {
 }
 
 // ===================== FILE HANDLING =====================
+function setDropZoneFile(file) {
+  const dz = $('modalDropZone');
+  if (!dz) return;
+  const nameEl = $('dropZoneFileName');
+  if (nameEl) nameEl.textContent = file.name;
+  dz.classList.add('file-selected');
+}
+
+function resetDropZone() {
+  const dz = $('modalDropZone');
+  if (!dz) return;
+  dz.classList.remove('file-selected', 'drag-over');
+}
+
 async function handleFile(file) {
   if (!file) return;
   const formData = new FormData();
@@ -404,6 +422,7 @@ async function handleFile(file) {
 // ===================== MODAL — OPEN / CLOSE =====================
 function openModalForChoose() {
   const modal = $('ocrModal'); if (!modal) return;
+  resetDropZone();
   sessionGroupId = null;
   sessionItemIds = [];
   clearFormItemFields();
@@ -488,6 +507,7 @@ function clearFormItemFields() {
 function closeOcrModal() {
   const modal = $('ocrModal');
   if (modal) { modal.style.display = 'none'; $('ocrForm')?.reset(); }
+  resetDropZone();
   clearUserTags();
   sessionGroupId = null;
   sessionItemIds = [];
@@ -771,7 +791,7 @@ function setupEventListeners() {
   // Modal file input
   const modalFileInput = $('modalFileInput');
   if (modalFileInput) {
-    modalFileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) handleFile(f); });
+    modalFileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) { setDropZoneFile(f); handleFile(f); } });
   }
 
   // Modal drop zone (inside modal)
@@ -784,7 +804,7 @@ function setupEventListeners() {
     modalDropZone.addEventListener('dragleave', () => modalDropZone.classList.remove('drag-over'));
     modalDropZone.addEventListener('drop', e => {
       e.preventDefault(); modalDropZone.classList.remove('drag-over');
-      const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f);
+      const f = e.dataTransfer?.files?.[0]; if (f) { setDropZoneFile(f); handleFile(f); }
     });
   }
 

@@ -45,6 +45,39 @@
   box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
 }
 
+/* RM-111: Truncate long column text; full value shown in native tooltip on hover */
+#itemsTable td[data-column="brand"],
+#itemsTable td[data-column="model"],
+#itemsTable td[data-column="location"],
+#itemsTable td[data-column="shop"],
+#itemsTable td[data-column="documentation"],
+#itemsTable td[data-column="project"],
+#itemsTable td[data-column="users"] {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* RM-112: Visual feedback when a file is selected in the add-receipt drop zone */
+.drop-zone .file-selected-indicator {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1rem;
+}
+.drop-zone.file-selected .drop-zone-content {
+  display: none;
+}
+.drop-zone.file-selected .file-selected-indicator {
+  display: flex;
+}
+.drop-zone.file-selected {
+  border-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.06);
+}
+
 /* Requirement 3: Yellow warning banner at bottom of modal */
 .warning-banner {
   background: #fff3cd;
