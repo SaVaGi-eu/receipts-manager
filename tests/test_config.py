@@ -2,8 +2,6 @@
 
 import os
 
-import pytest
-
 
 def test_config_import():
     """Test that config module can be imported."""
