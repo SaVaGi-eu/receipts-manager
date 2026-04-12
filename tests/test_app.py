@@ -1,7 +1,5 @@
 """Tests for main application routes."""
 
-import pytest
-
 
 def test_homepage(client):
     """Test homepage loads successfully."""
