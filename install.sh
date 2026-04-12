@@ -274,11 +274,11 @@ build_macos_app() {
     if [ -d "platforms/macos/dist" ]; then
         echo -e "\n${GREEN}✓ Build successful!${NC}"
         echo -e "\n${BLUE}Application location:${NC}"
-        ls -lh platforms/macos/dist/*.dmg 2>/dev/null || ls -d platforms/macos/dist/*.app 2>/dev/null
+        ls -lh platforms/macos/dist/*.pkg 2>/dev/null || ls -d platforms/macos/dist/*.app 2>/dev/null
         echo -e "\n${YELLOW}To install:${NC}"
-        echo "  1. Open the DMG file in platforms/macos/dist/"
-        echo "  2. Drag Receipt Manager to Applications"
-        echo "  3. Double-click to run"
+        echo "  1. Double-click the PKG file in platforms/macos/dist/"
+        echo "  2. Follow the installer — enter your password when prompted"
+        echo "  3. Receipt Manager will be installed to /Applications and opened without Gatekeeper warnings"
     else
         echo -e "\n${RED}✗ Build failed${NC}"
         exit 1
@@ -379,7 +379,7 @@ show_menu() {
     echo ""
 
     if [[ "$OS" == "Darwin" ]]; then
-        echo "  1) Build macOS Application (.app + .dmg)"
+        echo "  1) Build macOS Application (.pkg)"
         echo "  2) Build Docker Container"
         echo "  3) Run Application Directly (development mode)"
         echo "  4) Exit"

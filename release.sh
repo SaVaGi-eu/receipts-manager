@@ -3,7 +3,7 @@
 # Receipt Manager - Release Script
 # Fetches existing GitHub releases, lets you pick or create a new version,
 # bumps the version in ALL source files (single source of truth),
-# commits & pushes, builds the macOS DMG, and uploads to GitHub Releases.
+# commits & pushes, builds the macOS PKG, and uploads to GitHub Releases.
 
 set -e
 
@@ -203,7 +203,7 @@ echo -e "${GREEN}✓ Branding assets copied to platforms/macos/build/${NC}"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
-echo -e "\n${BLUE}═══ Building macOS DMG ═══${NC}\n"
+echo -e "\n${BLUE}═══ Building macOS PKG ═══${NC}\n"
 
 # Ensure venv exists
 if [ ! -d "venv" ]; then
@@ -234,36 +234,36 @@ fi
 
 cd ../..
 
-DMG_FILE=$(ls platforms/macos/dist/*.dmg 2>/dev/null | head -n 1)
+PKG_FILE=$(ls platforms/macos/dist/*.pkg 2>/dev/null | head -n 1)
 
-if [ -z "$DMG_FILE" ]; then
-    echo -e "${RED}✗ Build failed — no DMG found in platforms/macos/dist/${NC}"
+if [ -z "$PKG_FILE" ]; then
+    echo -e "${RED}✗ Build failed — no PKG found in platforms/macos/dist/${NC}"
     exit 1
 fi
 
-# Rename DMG to ensure the filename matches the selected release version
-VERSIONED_DMG="platforms/macos/dist/ReceiptsManager-${NPM_VERSION}.dmg"
-if [ "$DMG_FILE" != "$VERSIONED_DMG" ]; then
-    mv "$DMG_FILE" "$VERSIONED_DMG"
+# Rename PKG to ensure the filename matches the selected release version
+VERSIONED_PKG="platforms/macos/dist/ReceiptsManager-${NPM_VERSION}.pkg"
+if [ "$PKG_FILE" != "$VERSIONED_PKG" ]; then
+    mv "$PKG_FILE" "$VERSIONED_PKG"
 fi
-DMG_FILE="$VERSIONED_DMG"
+PKG_FILE="$VERSIONED_PKG"
 
-echo -e "${GREEN}✓ Build successful: $DMG_FILE${NC}"
+echo -e "${GREEN}✓ Build successful: $PKG_FILE${NC}"
 
 # ── Upload to GitHub Releases ─────────────────────────────────────────────────
 
 echo -e "\n${BLUE}═══ Publishing to GitHub Releases ═══${NC}\n"
 
 if [ "$IS_NEW_RELEASE" = true ]; then
-    echo "Creating new GitHub release $APP_VERSION and uploading DMG..."
-    gh release create "$APP_VERSION" "$DMG_FILE" \
+    echo "Creating new GitHub release $APP_VERSION and uploading PKG..."
+    gh release create "$APP_VERSION" "$PKG_FILE" \
         --repo "$REPO" \
         --title "Release $APP_VERSION" \
         --notes "Release $APP_VERSION" \
         --latest
 else
-    echo "Uploading DMG to existing release $APP_VERSION..."
-    gh release upload "$APP_VERSION" "$DMG_FILE" \
+    echo "Uploading PKG to existing release $APP_VERSION..."
+    gh release upload "$APP_VERSION" "$PKG_FILE" \
         --repo "$REPO" \
         --clobber
 fi

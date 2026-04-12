@@ -99,29 +99,14 @@
       "category": "public.app-category.productivity",
       "identity": null,
       "target": [
-        "dmg"
+        "pkg"
       ]
     },
-    "dmg": {
-      "title": "Receipt Manager ${version}",
-      "background": "../../media/branding/background.png",
-      "window": {
-        "width": 540,
-        "height": 380
-      },
-      "contents": [
-        {
-          "x": 144,
-          "y": 200,
-          "type": "file"
-        },
-        {
-          "x": 396,
-          "y": 200,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
+    "pkg": {
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "isRelocatable": false,
+      "scripts": "build/pkg-scripts"
     }
   }
 }
