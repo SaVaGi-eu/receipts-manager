@@ -30,7 +30,7 @@ def test_add_receipt_page(client):
     """Test add receipt page loads."""
     response = client.get("/add")
     # Adjust based on your actual route
-    assert response.status_code in [200, 404]  # 404 if route doesn't exist yet
+    assert response.status_code == 200
 
 
 def test_404_error(client):
