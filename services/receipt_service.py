@@ -696,7 +696,12 @@ class ReceiptService:
                     if not is_multi:
                         needs_move = True
             if "guarantee_duration" in updates:
-                item["guarantee_duration"] = int(updates.get("guarantee_duration") or 0)
+                raw_duration = updates.get("guarantee_duration")
+                try:
+                    item["guarantee_duration"] = int(raw_duration or 0)
+                except (TypeError, ValueError):
+                    logger.warning("Invalid guarantee_duration value %r; defaulting to 0", raw_duration)
+                    item["guarantee_duration"] = 0
             if "guarantee_unit" in updates:
                 item["guarantee_unit"] = updates["guarantee_unit"]
             if "category" in updates:
