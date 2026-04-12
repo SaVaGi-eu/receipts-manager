@@ -346,8 +346,6 @@ class ReceiptService:
             return {"receipts": [], "items": [], "next_id": 1}
 
     def save(self, data: dict) -> bool:
-        from datetime import datetime as _dt
-
         try:
             new_content = json.dumps(data, indent=2, ensure_ascii=False)
             if self._data_file.exists():
@@ -364,7 +362,7 @@ class ReceiptService:
                 changed = True
 
             if changed:
-                ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 backup = self._backup_dir / f"data_backup_{ts}.json"
                 if self._data_file.exists():
                     shutil.copy2(self._data_file, backup)
