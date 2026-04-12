@@ -76,7 +76,8 @@ class StorageService:
                 if self._data_file.exists():
                     shutil.copy2(self._data_file, self._backup_dir / f"data_backup_{ts}.json")
                 backups = sorted(self._backup_dir.glob("data_backup_*.json"))
-                for b in backups[: max(0, len(backups) - _MAX_BACKUPS)]:
+                to_delete = backups[:-_MAX_BACKUPS] if _MAX_BACKUPS > 0 else backups
+                for b in to_delete:
                     b.unlink(missing_ok=True)
 
                 with self._data_file.open("w", encoding="utf-8") as f:
