@@ -242,6 +242,12 @@ def format_date_for_filename(date_str: str) -> str:
         return safe or "unknown"
 
 
+def _last_day_of_month(year: int, month: int) -> datetime:
+    if month == 12:
+        return datetime(year + 1, 1, 1) - timedelta(days=1)
+    return datetime(year, month + 1, 1) - timedelta(days=1)
+
+
 def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -> str:
     if duration == 0:
         return "N/A"
@@ -253,10 +259,7 @@ def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -
             month = dt.month + duration
             year = dt.year + (month - 1) // 12
             month = ((month - 1) % 12) + 1
-            if month == 12:
-                last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-            else:
-                last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+            last_day = _last_day_of_month(year, month)
             if dt.day <= last_day.day:
                 end_dt = last_day.replace(day=dt.day)
             else:
@@ -269,10 +272,7 @@ def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -
                 end_dt = datetime(year, month, day)
             except ValueError:
                 # fallback to last valid day of month
-                if month == 12:
-                    last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-                else:
-                    last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+                last_day = _last_day_of_month(year, month)
                 end_dt = last_day
         else:
             return "N/A"
@@ -346,8 +346,6 @@ class ReceiptService:
             return {"receipts": [], "items": [], "next_id": 1}
 
     def save(self, data: dict) -> bool:
-        from datetime import datetime as _dt
-
         try:
             new_content = json.dumps(data, indent=2, ensure_ascii=False)
             if self._data_file.exists():
@@ -364,7 +362,7 @@ class ReceiptService:
                 changed = True
 
             if changed:
-                ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 backup = self._backup_dir / f"data_backup_{ts}.json"
                 if self._data_file.exists():
                     shutil.copy2(self._data_file, backup)
@@ -581,7 +579,15 @@ class ReceiptService:
                 "receipt_relative_path": rel_path,
             }
             data.setdefault("receipts", []).append(receipt)
-            item_id = int(data.get("next_id", 1))
+            raw_next_id = data.get("next_id", 1)
+            try:
+                item_id = int(raw_next_id)
+            except (TypeError, ValueError):
+                logger.warning("Invalid next_id %r in data store; defaulting to 1", raw_next_id)
+                item_id = 1
+            if item_id < 1:
+                logger.warning("Non-positive next_id %r in data store; defaulting to 1", raw_next_id)
+                item_id = 1
             item = {
                 "id": item_id,
                 "receipt_group_id": rg_id,
@@ -696,7 +702,12 @@ class ReceiptService:
                     if not is_multi:
                         needs_move = True
             if "guarantee_duration" in updates:
-                item["guarantee_duration"] = int(updates.get("guarantee_duration") or 0)
+                raw_duration = updates.get("guarantee_duration")
+                try:
+                    item["guarantee_duration"] = int(raw_duration or 0)
+                except (TypeError, ValueError):
+                    logger.warning("Invalid guarantee_duration value %r; defaulting to 0", raw_duration)
+                    item["guarantee_duration"] = 0
             if "guarantee_unit" in updates:
                 item["guarantee_unit"] = updates["guarantee_unit"]
             if "category" in updates:
