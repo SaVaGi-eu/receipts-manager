@@ -56,15 +56,19 @@ def client(test_data_dir, test_storage_dir, monkeypatch):
 @pytest.fixture
 def sample_receipt_data():
     """Sample receipt data for testing."""
+    items = [
+        {"description": "Test Item 1", "price": 20.00},
+        {"description": "Test Item 2", "price": 22.50},
+    ]
     return {
         "id": "test-receipt-001",
         "merchant": "Test Store",
         "date": "2026-03-03",
-        "total": 42.50,
+        "total": sum(item["price"] for item in items),
         "currency": "€",
         "category": "Groceries",
         "tags": ["food", "monthly"],
-        "items": [{"description": "Test Item 1", "price": 20.00}, {"description": "Test Item 2", "price": 22.50}],
+        "items": items,
     }
 
 
