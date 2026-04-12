@@ -17,7 +17,7 @@ echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
-║        📦 Receipt & Warranty Manager Installer       ║
+║        📦 Receipt & Warranty Manager Installer        ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 EOF
