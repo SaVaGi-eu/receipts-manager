@@ -263,7 +263,19 @@ fi
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  ✓ Release $APP_VERSION published successfully!        ${NC}"
+INNER_WIDTH=55
+success_msg="  ✓ Release $APP_VERSION published successfully!"
+msg_len=${#success_msg}
+if [ "$msg_len" -lt "$INNER_WIDTH" ]; then
+    padding_len=$(( INNER_WIDTH - msg_len ))
+else
+    padding_len=0
+fi
+padding=""
+while [ ${#padding} -lt "$padding_len" ]; do
+    padding="${padding} "
+done
+echo -e "${GREEN}║${success_msg}${padding}║${NC}"
 echo -e "${GREEN}║  https://github.com/$REPO/releases/tag/$APP_VERSION   ${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════╝${NC}"
 echo ""
