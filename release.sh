@@ -172,7 +172,12 @@ echo -e "${GREEN}✓ package.json updated to $NPM_VERSION${NC}"
 # ── Bump version in templates/index.html (the in-app Settings screen) ────────
 
 echo -e "\n${BLUE}═══ Updating in-app version display ═══${NC}\n"
-sed -i '' "s|<span id=\"appVersion\">[^<]*</span>|<span id=\"appVersion\">${NPM_VERSION}</span>|" templates/index.html
+if [[ "$(uname)" == "Darwin" ]]; then
+    SED_INPLACE=("sed" "-i" "")
+else
+    SED_INPLACE=("sed" "-i")
+fi
+"${SED_INPLACE[@]}" "s|<span id=\"appVersion\">[^<]*</span>|<span id=\"appVersion\">${NPM_VERSION}</span>|" templates/index.html
 echo -e "${GREEN}✓ templates/index.html updated to $NPM_VERSION${NC}"
 
 # ── Commit & push version bumps ───────────────────────────────────────────────
@@ -204,11 +209,13 @@ echo -e "\n${BLUE}═══ Building macOS DMG ═══${NC}\n"
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
     python3 -m venv venv
-    source venv/bin/activate
-    pip install --upgrade pip --quiet
-    pip install -r requirements.txt --quiet
-    deactivate
 fi
+
+# Activate the virtual environment so subsequent Python commands use it
+# Note: this assumes `deactivate` will be called later when Python work is done.
+source venv/bin/activate
+pip install --upgrade pip --quiet
+pip install -r requirements.txt --quiet
 
 cd platforms/macos
 
@@ -263,7 +270,19 @@ fi
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  ✓ Release $APP_VERSION published successfully!        ${NC}"
+INNER_WIDTH=55
+success_msg="  ✓ Release $APP_VERSION published successfully!"
+msg_len=${#success_msg}
+if [ "$msg_len" -lt "$INNER_WIDTH" ]; then
+    padding_len=$(( INNER_WIDTH - msg_len ))
+else
+    padding_len=0
+fi
+padding=""
+while [ ${#padding} -lt "$padding_len" ]; do
+    padding="${padding} "
+done
+echo -e "${GREEN}║${success_msg}${padding}║${NC}"
 echo -e "${GREEN}║  https://github.com/$REPO/releases/tag/$APP_VERSION   ${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════╝${NC}"
 echo ""
