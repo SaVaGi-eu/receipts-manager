@@ -172,7 +172,12 @@ echo -e "${GREEN}✓ package.json updated to $NPM_VERSION${NC}"
 # ── Bump version in templates/index.html (the in-app Settings screen) ────────
 
 echo -e "\n${BLUE}═══ Updating in-app version display ═══${NC}\n"
-sed -i '' "s|<span id=\"appVersion\">[^<]*</span>|<span id=\"appVersion\">${NPM_VERSION}</span>|" templates/index.html
+if [[ "$(uname)" == "Darwin" ]]; then
+    SED_INPLACE=("sed" "-i" "")
+else
+    SED_INPLACE=("sed" "-i")
+fi
+"${SED_INPLACE[@]}" "s|<span id=\"appVersion\">[^<]*</span>|<span id=\"appVersion\">${NPM_VERSION}</span>|" templates/index.html
 echo -e "${GREEN}✓ templates/index.html updated to $NPM_VERSION${NC}"
 
 # ── Commit & push version bumps ───────────────────────────────────────────────
