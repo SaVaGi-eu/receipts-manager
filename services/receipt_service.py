@@ -19,6 +19,7 @@ from urllib.parse import unquote
 
 logger = logging.getLogger("receipt-manager")
 
+_RG_PATTERN = re.compile(r"RG-(\d+)")
 
 # ---------- Module-level helpers (moved from app.py) ----------
 
@@ -372,8 +373,8 @@ class ReceiptService:
                     for b in backups[:-20]:
                         b.unlink(missing_ok=True)
 
-            with self._data_file.open("w", encoding="utf-8") as f:
-                f.write(new_content)
+                with self._data_file.open("w", encoding="utf-8") as f:
+                    f.write(new_content)
             return True
         except Exception:
             logger.exception("Save error")
@@ -428,8 +429,10 @@ class ReceiptService:
                 try:
                     with self._lock:
                         data = self.load()
-                        data["integrity_issues"] = self._verify_file_integrity(data)
-                        self.save(data)
+                        new_issues = self._verify_file_integrity(data)
+                        if new_issues != data.get("integrity_issues"):
+                            data["integrity_issues"] = new_issues
+                            self.save(data)
                 except Exception:
                     logger.exception("Integrity worker error")
 
@@ -446,23 +449,34 @@ class ReceiptService:
     def get_suggestions(self) -> dict:
         with self._lock:
             data = self.load()
-        shops = [r["shop"] for r in data.get("receipts", []) if r.get("shop")]
-        brands = [i["brand"] for i in data.get("items", []) if i.get("brand")]
-        models = [i["model"] for i in data.get("items", []) if i.get("model")]
-        locations = [i["location"] for i in data.get("items", []) if i.get("location")]
-        docs = [r["documentation"] for r in data.get("receipts", []) if r.get("documentation")]
-        projects = [i["project"] for i in data.get("items", []) if i.get("project") and i["project"] != "N/A"]
-        users = [u for i in data.get("items", []) for u in i.get("users", [])]
-        categories = [i["category"] for i in data.get("items", []) if i.get("category")]
+        shops, docs = set(), set()
+        for r in data.get("receipts", []):
+            if r.get("shop"):
+                shops.add(r["shop"])
+            if r.get("documentation"):
+                docs.add(r["documentation"])
+        brands, models, locations, projects, users, categories = set(), set(), set(), set(), set(), set()
+        for i in data.get("items", []):
+            if i.get("brand"):
+                brands.add(i["brand"])
+            if i.get("model"):
+                models.add(i["model"])
+            if i.get("location"):
+                locations.add(i["location"])
+            if i.get("project") and i["project"] != "N/A":
+                projects.add(i["project"])
+            users.update(i.get("users", []))
+            if i.get("category"):
+                categories.add(i["category"])
         return {
-            "shops": sorted(set(shops)),
-            "brands": sorted(set(brands)),
-            "models": sorted(set(models)),
-            "locations": sorted(set(locations)),
-            "documentation": sorted(set(docs)),
-            "projects": sorted(set(projects)),
-            "users": sorted(set(users)),
-            "categories": sorted(set(categories)),
+            "shops": sorted(shops),
+            "brands": sorted(brands),
+            "models": sorted(models),
+            "locations": sorted(locations),
+            "documentation": sorted(docs),
+            "projects": sorted(projects),
+            "users": sorted(users),
+            "categories": sorted(categories),
         }
 
     def export_json(self) -> dict:
@@ -544,9 +558,7 @@ class ReceiptService:
             ext = ".bin"
             safe_base = "upload"
 
-        from datetime import datetime as _dt
-
-        ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         upload_dir = self._receipts_dir / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -630,9 +642,7 @@ class ReceiptService:
             ext = ".bin"
             safe_base = "upload"
 
-        from datetime import datetime as _dt
-
-        ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         doc_dir = self._receipts_dir / "documents"
         doc_dir.mkdir(parents=True, exist_ok=True)
 
@@ -824,10 +834,9 @@ class ReceiptService:
     # ---------- Private helpers ----------
 
     def _generate_group_id(self, data: dict) -> str:
-        ids = [r["receipt_group_id"] for r in data.get("receipts", [])]
         numbers = []
-        for rid in ids:
-            m = re.search(r"RG-(\d+)", rid)
+        for r in data.get("receipts", []):
+            m = _RG_PATTERN.search(r["receipt_group_id"])
             if m:
                 numbers.append(int(m.group(1)))
         return f"RG-{(max(numbers, default=0)+1):04d}"

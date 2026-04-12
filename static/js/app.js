@@ -387,7 +387,7 @@ async function handleImport(e) {
   try {
     const payload = JSON.parse(await f.text());
     await fetchJson(API.importJson, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    await loadData(); await loadSuggestions();
+    await Promise.all([loadData(), loadSuggestions()]);
     alert('Imported successfully.');
   } catch (err) { console.error('Import failed:', err); alert('Import failed (see Console).'); }
   finally { e.target.value = ''; }
@@ -636,7 +636,7 @@ async function handleFinish(e) {
     });
     if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
     closeOcrModal();
-    await loadData(); await loadSuggestions();
+    await Promise.all([loadData(), loadSuggestions()]);
   } catch (err) { console.error('Save error:', err); alert(`Save failed: ${err.message}`); }
 }
 
@@ -772,7 +772,7 @@ async function deleteItem(itemId) {
   try {
     const resp = await fetchJson(API.deleteItem(itemId), { method: 'DELETE' });
     if (!resp.success) { alert(`Delete failed: ${resp.error || 'Unknown error'}`); return; }
-    await loadData(); await loadSuggestions();
+    await Promise.all([loadData(), loadSuggestions()]);
   } catch (err) { console.error('Delete error:', err); alert(`Delete failed: ${err.message}`); }
 }
 
@@ -930,7 +930,6 @@ document.addEventListener('DOMContentLoaded', () => {
     pdInput.min = minDate.toISOString().split('T')[0];
   }
   loadSettings();
-  loadData();
-  loadSuggestions();
+  Promise.all([loadData(), loadSuggestions()]);
   setupEventListeners();
 });

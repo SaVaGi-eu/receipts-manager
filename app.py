@@ -14,7 +14,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
+from config import (
+    BACKUP_DIR,
+    DATA_FILE,
+    DATA_ROOT,
+    DATABASE_DIR,
+    RECEIPTS_DIR,
+    SETTINGS_FILE,
+    STORAGE_DIR,
+    save_data_path,
+)
 from services.receipt_service import ReceiptService
 
 # Basic configuration
@@ -25,6 +34,40 @@ STATIC_DIR = BASE_DIR / "static"
 
 # Allowed CORS origins
 ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8765"}
+
+_STATIC_CONTENT_TYPES = {
+    ".css": "text/css",
+    ".js": "application/javascript",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".webp": "image/webp",
+}
+
+_FILE_CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' https://cdn.jsdelivr.net; "
+    "style-src 'self'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -240,8 +283,6 @@ def _get_current_config():
     RM-80: Get current configuration for frontend display.
     Returns dict with storage_type, data_path, and configured status.
     """
-    from config import SETTINGS_FILE
-
     # Check for DATA_DIR environment variable first
     env_dir = os.environ.get("DATA_DIR")
     if env_dir:
@@ -299,18 +340,7 @@ class Handler(BaseHTTPRequestHandler):
         # SECURITY: Sanitize content_type to prevent header injection BEFORE using
         content_type_safe = sanitize_header_value(content_type)
         self.send_header("Content-Type", content_type_safe)
-        csp = (
-            "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net; "
-            "style-src 'self'; "
-            "img-src 'self' data:; "
-            "font-src 'self'; "
-            f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
-        self.send_header("Content-Security-Policy", csp)
+        self.send_header("Content-Security-Policy", _CSP)
         self.send_header("X-Frame-Options", "DENY")
         set_cors_headers(self)
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
@@ -378,18 +408,6 @@ class Handler(BaseHTTPRequestHandler):
             # py/http-response-splitting analysis sees no tainted data reaching
             # the send_header sink.
             suffix = os.path.splitext(candidate_real)[1].lower()
-            _STATIC_CONTENT_TYPES = {
-                ".css": "text/css",
-                ".js": "application/javascript",
-                ".json": "application/json",
-                ".png": "image/png",
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".gif": "image/gif",
-                ".svg": "image/svg+xml",
-                ".ico": "image/x-icon",
-                ".webp": "image/webp",
-            }
             ctype_safe = _STATIC_CONTENT_TYPES.get(suffix, "application/octet-stream")
 
             # Stream file to avoid large memory usage
@@ -506,15 +524,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
 
                 suffix = os.path.splitext(target_real)[1].lower()
-                file_content_types = {
-                    ".pdf": "application/pdf",
-                    ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg",
-                    ".png": "image/png",
-                    ".gif": "image/gif",
-                    ".webp": "image/webp",
-                }
-                ctype = file_content_types.get(suffix, "application/octet-stream")
+                ctype = _FILE_CONTENT_TYPES.get(suffix, "application/octet-stream")
 
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
@@ -560,11 +570,6 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return
 
-                # Import save_data_path from config
-                from config import save_data_path
-
-                # Validate and save the directory path.
-                # save_data_path() canonicalizes via realpath and validates internally.
                 if save_data_path(str(data_directory)):
                     self._set_headers(200)
                     self.wfile.write(
