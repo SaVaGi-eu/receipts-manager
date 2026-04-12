@@ -79,8 +79,8 @@ class StorageService:
                 for b in backups[: max(0, len(backups) - _MAX_BACKUPS)]:
                     b.unlink(missing_ok=True)
 
-            with self._data_file.open("w", encoding="utf-8") as f:
-                f.write(new_content)
+                with self._data_file.open("w", encoding="utf-8") as f:
+                    f.write(new_content)
             return True
         except Exception:
             logger.exception("Save error")
