@@ -75,7 +75,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   build-docker:
-    name: Build Docker Image
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -97,20 +97,18 @@ jobs:
           sleep 10
           curl -f http://localhost:8765 || exit 1
           docker stop test-container
-      - name: Export Docker image
+      - name: Log in to Docker Hub
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push to Docker Hub
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          docker save receipts-manager:latest | gzip > receipt-manager-docker.tar.gz
-      - name: Upload Docker image artifact
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: Receipt-Manager-Docker
-          path: receipt-manager-docker.tar.gz
-      - name: Add Docker image to release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
-        with:
-          files: receipt-manager-docker.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION="${GITHUB_REF_NAME#v}"
+          IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/receipts-manager"
+          docker tag receipts-manager:latest "$IMAGE:$VERSION"
+          docker tag receipts-manager:latest "$IMAGE:latest"
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"

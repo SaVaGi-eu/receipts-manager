@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   receipts-manager:
+    image: ${DOCKER_IMAGE:-receipts-manager:latest}
     build:
       context: ../..
       dockerfile: platforms/docker/Dockerfile

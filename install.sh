@@ -285,9 +285,9 @@ build_macos_app() {
     fi
 }
 
-# Build Docker Container
+# Run Docker Container (pull from Docker Hub, fall back to local build)
 build_docker() {
-    echo -e "\n${BLUE}═══ Building Docker Container ═══${NC}\n"
+    echo -e "\n${BLUE}═══ Docker Deployment ═══${NC}\n"
 
     check_docker || {
         echo -e "\n${RED}Docker is required.${NC}"
@@ -295,23 +295,37 @@ build_docker() {
         exit 1
     }
 
-    echo "Building Docker image..."
-    docker-compose build
+    DOCKER_HUB_IMAGE="savagi/receipts-manager:latest"
 
-    echo -e "\n${GREEN}✓ Docker image built!${NC}"
-    echo -e "\n${YELLOW}To start the container:${NC}"
-    echo "  docker-compose up -d"
-    echo -e "\n${YELLOW}To stop the container:${NC}"
-    echo "  docker-compose down"
-    echo -e "\n${YELLOW}Access the app at:${NC}"
-    echo "  http://localhost:8765"
+    # Try to pull from Docker Hub first; fall back to local build if unavailable
+    echo "Pulling image from Docker Hub..."
+    if docker pull "$DOCKER_HUB_IMAGE" 2>/dev/null; then
+        echo -e "${GREEN}✓ Image pulled: $DOCKER_HUB_IMAGE${NC}"
+        export DOCKER_IMAGE="$DOCKER_HUB_IMAGE"
+    else
+        echo -e "${YELLOW}! Docker Hub pull failed — building image locally instead.${NC}"
+        export DOCKER_IMAGE="receipts-manager:latest"
+        cd platforms/docker
+        docker build -f Dockerfile -t "$DOCKER_IMAGE" ../..
+        cd ../..
+        echo -e "${GREEN}✓ Image built locally.${NC}"
+    fi
+
+    echo -e "\n${YELLOW}To stop the container later:${NC}"
+    echo "  cd platforms/docker && docker-compose down"
 
     read -p "Start the container now? (Y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        cd platforms/docker
         docker-compose up -d
+        cd ../..
         echo -e "\n${GREEN}✓ Container started!${NC}"
-        echo "Open your browser to: http://localhost:8765"
+        echo -e "Open your browser to: ${BLUE}http://localhost:8765${NC}"
+    else
+        echo ""
+        echo "To start later:"
+        echo "  cd platforms/docker && DOCKER_IMAGE=\"$DOCKER_IMAGE\" docker-compose up -d"
     fi
 }
 
