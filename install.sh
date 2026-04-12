@@ -203,8 +203,11 @@ build_macos_app() {
     # Navigate to macOS build directory
     cd platforms/macos
 
-    # Install Node dependencies if needed
-    if [ ! -d "node_modules" ]; then
+    # Install Node dependencies in a reproducible way
+    if [ -f "package-lock.json" ]; then
+        echo "Installing Node.js dependencies with npm ci..."
+        npm ci
+    elif [ ! -d "node_modules" ]; then
         echo "Installing Node.js dependencies..."
         npm install
     fi
