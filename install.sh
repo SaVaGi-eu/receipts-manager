@@ -304,17 +304,8 @@ run_direct() {
         fi
     fi
 
-    # Create venv if it doesn't exist
-    if [ ! -d "venv" ]; then
-        echo "Creating Python virtual environment..."
-        python3 -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        echo "Installing dependencies..."
-        pip install -r requirements.txt
-    else
-        source venv/bin/activate
-    fi
+    # Set up Python virtual environment
+    setup_venv
 
     echo -e "\n${GREEN}Starting Receipt Manager...${NC}"
     echo "Access the app at: http://127.0.0.1:8765"
