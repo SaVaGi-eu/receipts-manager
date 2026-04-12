@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/vasilis/GitHub/receipts-manager && [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" == *.py ]] && source venv/bin/activate && python -m black \"$CLAUDE_TOOL_INPUT_FILE_PATH\" && python -m isort \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "cd /Users/vasilis/GitHub/receipts-manager && [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" == *.py ]] && source venv/bin/activate && python -m pytest tests/ -x -q --tb=short 2>&1 | tail -20 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

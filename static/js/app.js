@@ -276,6 +276,14 @@ function formatExtWarranty(ew) {
   return parts.join(' · ') || 'Yes';
 }
 
+// RM-147: convert stored YYYY-MMM-DD (e.g. 2025-Feb-27) to readable DD MMM YYYY (e.g. 27 Feb 2025)
+function formatDate(s) {
+  if (!s || s === 'N/A') return s || '';
+  const m = String(s).match(/^(\d{4})-([A-Za-z]{3})-(\d{2})$/);
+  if (!m) return s;
+  return `${m[3]} ${m[2]} ${m[1]}`;
+}
+
 function renderTable(rows) {
   const tbody = $('tableBody');
   if (!tbody) return;
@@ -301,9 +309,9 @@ function renderTable(rows) {
       <td data-column="users"          title="${escAttr(normalizeUsers(r.users).join('; '))}">${escHtml(normalizeUsers(r.users).join('; '))}</td>
       <td data-column="project"        title="${escAttr(r.project ?? '')}">${escHtml(r.project ?? '')}</td>
       <td data-column="shop"           title="${escAttr(r.shop ?? '')}">${escHtml(r.shop ?? '')}</td>
-      <td data-column="purchase_date">${escHtml(r.purchase_date ?? '')}</td>
+      <td data-column="purchase_date">${escHtml(formatDate(r.purchase_date ?? ''))}</td>
       <td data-column="documentation"  title="${escAttr(r.documentation ?? '')}">${escHtml(r.documentation ?? '')}</td>
-      <td data-column="guarantee_end_date">${escHtml(r.guarantee_end_date ?? '')}</td>
+      <td data-column="guarantee_end_date">${escHtml(formatDate(r.guarantee_end_date ?? ''))}</td>
       <td data-column="extended_warranty">${formatExtWarranty(r.extended_warranty)}</td>
       <td data-column="price">${formatPrice(r.price)}</td>
       <td data-column="file">${fileCell}</td>
