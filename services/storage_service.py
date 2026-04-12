@@ -22,14 +22,35 @@ class StorageService:
         self._data_file = Path(data_file)
         self._backup_dir = Path(backup_dir)
 
+    def _ensure_next_id(self, data: dict) -> None:
+        """
+        Ensure that data["next_id"] is set consistently based on existing items.
+
+        This centralizes the logic for repairing or initializing the next_id counter
+        from the current items list.
+        """
+        items = data.get("items", [])
+        max_id = 0
+        for item in items:
+            try:
+                item_id = item["id"]
+            except (TypeError, KeyError):
+                continue
+            if isinstance(item_id, int) and item_id > max_id:
+                max_id = item_id
+        # Only update next_id if it is missing or not greater than the current max_id,
+        # to avoid regressing a valid, larger next_id value.
+        current_next = data.get("next_id")
+        if not isinstance(current_next, int) or current_next <= max_id:
+            data["next_id"] = max_id + 1
+
     def load(self) -> dict:
         if not self._data_file.exists():
             return dict(_EMPTY)
         try:
             with self._data_file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            if "next_id" not in data:
-                data["next_id"] = max((i["id"] for i in data.get("items", [])), default=0) + 1
+            self._ensure_next_id(data)
             return data
         except Exception:
             logger.exception("Failed to load data file, returning empty state")
@@ -55,7 +76,7 @@ class StorageService:
                 if self._data_file.exists():
                     shutil.copy2(self._data_file, self._backup_dir / f"data_backup_{ts}.json")
                 backups = sorted(self._backup_dir.glob("data_backup_*.json"))
-                for b in backups[:-_MAX_BACKUPS]:
+                for b in backups[: max(0, len(backups) - _MAX_BACKUPS)]:
                     b.unlink(missing_ok=True)
 
             with self._data_file.open("w", encoding="utf-8") as f:
