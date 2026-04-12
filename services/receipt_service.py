@@ -204,7 +204,7 @@ def _sanitize_log(text: str, max_length: int = 200) -> str:
     return sanitized
 
 
-def sanitize_filename(text, max_length=50):
+def sanitize_filename(text: str, max_length: int = 50) -> str:
     if not text or text == "N/A":
         return "NA"
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
@@ -233,7 +233,7 @@ def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     return name or "file"
 
 
-def format_date_for_filename(date_str):
+def format_date_for_filename(date_str: str) -> str:
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
@@ -242,7 +242,7 @@ def format_date_for_filename(date_str):
         return safe or "unknown"
 
 
-def calculate_guarantee_end_date(purchase_date, duration, unit):
+def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -> str:
     if duration == 0:
         return "N/A"
     try:
