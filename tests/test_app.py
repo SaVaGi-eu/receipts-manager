@@ -5,7 +5,7 @@ def test_homepage(client):
     """Test homepage loads successfully."""
     response = client.get("/")
     assert response.status_code == 200
-    assert b"Receipt Manager" in response.data or b"receipt" in response.data.lower()
+    assert b"receipt" in response.data.lower()
 
 
 def test_api_data_endpoint(client):
