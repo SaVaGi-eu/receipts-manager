@@ -106,7 +106,8 @@ install_tesseract() {
                 echo "Installing Tesseract via apt-get..."
                 echo "This requires sudo privileges."
                 sudo apt-get update
-                sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-nld tesseract-ocr-ell tesseract-ocr-lav
+                sudo apt-get install -y tesseract-ocr
+                echo "You can install additional language packs as needed, e.g.: sudo apt-get install tesseract-ocr-eng"
                 echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
                 return 0
             elif command_exists yum; then
