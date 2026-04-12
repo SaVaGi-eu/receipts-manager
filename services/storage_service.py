@@ -64,9 +64,9 @@ class StorageService:
                 try:
                     existing = json.loads(self._data_file.read_text(encoding="utf-8"))
                     existing.pop("integrity_issues", None)
-                    cmp = json.loads(new_content)
+                    cmp = dict(data)
                     cmp.pop("integrity_issues", None)
-                    changed = json.dumps(cmp, sort_keys=True) != json.dumps(existing, sort_keys=True)
+                    changed = cmp != existing
                 except Exception:
                     logger.debug("Could not read existing data for change-detection; treating as changed")
 
