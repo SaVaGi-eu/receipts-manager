@@ -242,6 +242,12 @@ def format_date_for_filename(date_str: str) -> str:
         return safe or "unknown"
 
 
+def _last_day_of_month(year: int, month: int) -> datetime:
+    if month == 12:
+        return datetime(year + 1, 1, 1) - timedelta(days=1)
+    return datetime(year, month + 1, 1) - timedelta(days=1)
+
+
 def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -> str:
     if duration == 0:
         return "N/A"
@@ -253,10 +259,7 @@ def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -
             month = dt.month + duration
             year = dt.year + (month - 1) // 12
             month = ((month - 1) % 12) + 1
-            if month == 12:
-                last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-            else:
-                last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+            last_day = _last_day_of_month(year, month)
             if dt.day <= last_day.day:
                 end_dt = last_day.replace(day=dt.day)
             else:
@@ -269,10 +272,7 @@ def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -
                 end_dt = datetime(year, month, day)
             except ValueError:
                 # fallback to last valid day of month
-                if month == 12:
-                    last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-                else:
-                    last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+                last_day = _last_day_of_month(year, month)
                 end_dt = last_day
         else:
             return "N/A"
