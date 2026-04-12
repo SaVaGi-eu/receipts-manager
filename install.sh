@@ -106,7 +106,8 @@ install_tesseract() {
                 echo "Installing Tesseract via apt-get..."
                 echo "This requires sudo privileges."
                 sudo apt-get update
-                sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-nld tesseract-ocr-ell tesseract-ocr-lav
+                sudo apt-get install -y tesseract-ocr
+                echo "You can install additional language packs as needed, e.g.: sudo apt-get install tesseract-ocr-eng"
                 echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
                 return 0
             elif command_exists yum; then
@@ -114,6 +115,8 @@ install_tesseract() {
                 echo "This requires sudo privileges."
                 sudo yum install -y tesseract tesseract-langpack-eng tesseract-langpack-nld
                 echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
+                echo "Note: On yum-based systems, only English (eng) and Dutch (nld) language packs are installed by default."
+                echo "If you need additional languages such as Greek (ell) or Latvian (lav), please install the corresponding Tesseract language packages manually."
                 return 0
             else
                 echo -e "${RED}Unable to auto-install Tesseract.${NC}"
@@ -155,6 +158,31 @@ prepare_branding() {
     cp "$BRANDING_DIR/icon.png"       "$BUILD_DIR/icon.png"
     cp "$BRANDING_DIR/background.png" "$BUILD_DIR/background.png"
     echo -e "${GREEN}✓ Branding assets ready.${NC}"
+}
+
+# Set up Python virtual environment (create or refresh) and activate it.
+# Creates the venv if missing. If requirements.txt is newer than the last
+# install marker, the venv is fully recreated. Leaves the venv activated.
+setup_venv() {
+    if [ ! -d "venv" ]; then
+        echo "Creating Python virtual environment..."
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        echo "Installing dependencies..."
+        pip install -r requirements.txt
+        touch venv/.requirements_installed
+    elif [ "requirements.txt" -nt "venv/.requirements_installed" ]; then
+        echo "requirements.txt has changed; recreating Python virtual environment..."
+        rm -rf venv
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        touch venv/.requirements_installed
+    else
+        source venv/bin/activate
+    fi
 }
 
 # Build macOS App
@@ -203,13 +231,16 @@ build_macos_app() {
     # Navigate to macOS build directory
     cd platforms/macos
 
-    # Install Node dependencies if needed
-    if [ ! -d "node_modules" ]; then
+    # Install Node dependencies in a reproducible way
+    if [ -f "package-lock.json" ]; then
+        echo "Installing Node.js dependencies with npm ci..."
+        npm ci
+    elif [ ! -d "node_modules" ]; then
         echo "Installing Node.js dependencies..."
         npm install
     fi
 
-    # Create venv in root if it doesn't exist
+    # Create or refresh venv in root based on requirements.txt
     cd ../..
     if [ ! -d "venv" ]; then
         echo "Creating Python virtual environment..."
@@ -218,6 +249,19 @@ build_macos_app() {
         pip install --upgrade pip
         pip install -r requirements.txt
         deactivate
+        touch venv/.requirements_installed
+    else
+        # Refresh venv if requirements.txt is newer than the last install marker
+        if [ "requirements.txt" -nt "venv/.requirements_installed" ]; then
+            echo "requirements.txt has changed; recreating Python virtual environment..."
+            rm -rf venv
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            deactivate
+            touch venv/.requirements_installed
+        fi
     fi
 
     # Build the app
@@ -304,17 +348,8 @@ run_direct() {
         fi
     fi
 
-    # Create venv if it doesn't exist
-    if [ ! -d "venv" ]; then
-        echo "Creating Python virtual environment..."
-        python3 -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        echo "Installing dependencies..."
-        pip install -r requirements.txt
-    else
-        source venv/bin/activate
-    fi
+    # Set up Python virtual environment
+    setup_venv
 
     echo -e "\n${GREEN}Starting Receipt Manager...${NC}"
     echo "Access the app at: http://127.0.0.1:8765"
