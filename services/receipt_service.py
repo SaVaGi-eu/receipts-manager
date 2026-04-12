@@ -581,7 +581,15 @@ class ReceiptService:
                 "receipt_relative_path": rel_path,
             }
             data.setdefault("receipts", []).append(receipt)
-            item_id = int(data.get("next_id", 1))
+            raw_next_id = data.get("next_id", 1)
+            try:
+                item_id = int(raw_next_id)
+            except (TypeError, ValueError):
+                logger.warning("Invalid next_id %r in data store; defaulting to 1", raw_next_id)
+                item_id = 1
+            if item_id < 1:
+                logger.warning("Non-positive next_id %r in data store; defaulting to 1", raw_next_id)
+                item_id = 1
             item = {
                 "id": item_id,
                 "receipt_group_id": rg_id,
