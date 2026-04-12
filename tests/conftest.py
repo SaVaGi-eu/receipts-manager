@@ -3,7 +3,6 @@
 import json
 import os
 import tempfile
-
 import pytest
 
 # Set test environment variables before importing app
