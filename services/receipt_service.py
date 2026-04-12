@@ -233,7 +233,7 @@ def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     return name or "file"
 
 
-def format_date_for_filename(date_str):
+def format_date_for_filename(date_str: str) -> str:
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
