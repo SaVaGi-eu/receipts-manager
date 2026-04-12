@@ -204,7 +204,7 @@ def _sanitize_log(text: str, max_length: int = 200) -> str:
     return sanitized
 
 
-def sanitize_filename(text, max_length=50):
+def sanitize_filename(text: str, max_length: int = 50) -> str:
     if not text or text == "N/A":
         return "NA"
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
