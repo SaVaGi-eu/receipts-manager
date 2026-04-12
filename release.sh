@@ -204,11 +204,13 @@ echo -e "\n${BLUE}═══ Building macOS DMG ═══${NC}\n"
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
     python3 -m venv venv
-    source venv/bin/activate
-    pip install --upgrade pip --quiet
-    pip install -r requirements.txt --quiet
-    deactivate
 fi
+
+# Activate the virtual environment so subsequent Python commands use it
+# Note: this assumes `deactivate` will be called later when Python work is done.
+source venv/bin/activate
+pip install --upgrade pip --quiet
+pip install -r requirements.txt --quiet
 
 cd platforms/macos
 
