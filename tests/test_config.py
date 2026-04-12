@@ -23,3 +23,4 @@ def test_environment_variables(monkeypatch):
     # Test that config reads environment variables
     # Adjust based on your actual config implementation
     assert hasattr(config, "PORT") or hasattr(config, "port")
+    assert hasattr(config, "DEBUG") or hasattr(config, "debug")
