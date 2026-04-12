@@ -242,7 +242,7 @@ def format_date_for_filename(date_str):
         return safe or "unknown"
 
 
-def calculate_guarantee_end_date(purchase_date, duration, unit):
+def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -> str:
     if duration == 0:
         return "N/A"
     try:
