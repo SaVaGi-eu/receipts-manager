@@ -114,6 +114,8 @@ install_tesseract() {
                 echo "This requires sudo privileges."
                 sudo yum install -y tesseract tesseract-langpack-eng tesseract-langpack-nld
                 echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
+                echo "Note: On yum-based systems, only English (eng) and Dutch (nld) language packs are installed by default."
+                echo "If you need additional languages such as Greek (ell) or Latvian (lav), please install the corresponding Tesseract language packages manually."
                 return 0
             else
                 echo -e "${RED}Unable to auto-install Tesseract.${NC}"
