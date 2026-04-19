@@ -808,6 +808,8 @@ class ReceiptService:
                 item["category"] = updates["category"]
             if "price" in updates:
                 item["price"] = updates["price"]
+            if "quantity" in updates:
+                item["quantity"] = max(1, int(updates.get("quantity") or 1))
             if "extended_warranty" in updates:
                 item["extended_warranty"] = updates["extended_warranty"]
 

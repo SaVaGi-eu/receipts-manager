@@ -314,7 +314,7 @@
   <div id="ocrModal" class="modal">
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <h2 id="modalTitle" data-i18n="verifyReceipt">📄 Verify Receipt Data</h2>
+        <h2 id="modalTitle">📦 Add New Item</h2>
         <button id="closeModal" class="modal-close">&times;</button>
       </div>
 
@@ -338,6 +338,14 @@
           </div>
 
           <div class="existing-receipt-section">
+            <div class="existing-receipt-controls">
+              <label for="existingReceiptSort" data-i18n="sortBy">Sort by:</label>
+              <select id="existingReceiptSort" class="existing-receipt-sort">
+                <option value="group_id" data-i18n="sortGroupId">Group ID</option>
+                <option value="shop" data-i18n="sortShop">Shop</option>
+                <option value="date" data-i18n="sortDate">Date</option>
+              </select>
+            </div>
             <select id="existingReceiptSelect" class="existing-receipt-select">
               <option value="" data-i18n="selectReceiptOption">-- Add to existing document --</option>
             </select>
@@ -400,8 +408,19 @@
               <input type="text" id="modalProject" list="projectList" maxlength="100">
             </div>
             <div class="form-group">
-              <label for="modalPrice" data-i18n="labelPrice">Price</label>
+              <label for="modalQuantity" data-i18n="labelQuantity">Quantity</label>
+              <input type="number" id="modalQuantity" min="1" max="9999" step="1" value="1">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="modalPrice" data-i18n="labelUnitPrice">Unit Price</label>
               <input type="text" id="modalPrice" maxlength="10" placeholder="0.00" inputmode="decimal">
+            </div>
+            <div class="form-group">
+              <label data-i18n="lineTotal">Total</label>
+              <div id="lineTotalDisplay" class="line-total-display">—</div>
             </div>
           </div>
 

@@ -59,9 +59,18 @@
   "integrityIssues_other": "{{count}} προβλήματα ακεραιότητας εντοπίστηκαν.",
   "or": "Ή",
   "selectReceiptOption": "-- Επιλέξτε υπάρχουσα απόδειξη --",
-  "open": "Α",
+  "open": "Άνοιγμα",
   "logout": "🔓 Αποσύνδεση",
   "dateFormatTitle": "📅 Μορφή Ημερομηνίας",
   "dateFormatLabel": "Μορφή Ημερομηνίας:",
-  "addAnother": "Προσθήκη άλλου"
+  "addAnother": "Προσθήκη άλλου",
+  "sortBy": "Ταξινόμηση κατά:",
+  "sortGroupId": "ID Ομάδας",
+  "sortShop": "Κατάστημα",
+  "sortDate": "Ημερομηνία",
+  "addNewItem": "📦 Προσθήκη Νέου Στοιχείου",
+  "editItem": "✏️ Επεξεργασία Στοιχείου",
+  "labelQuantity": "Ποσότητα",
+  "labelUnitPrice": "Τιμή Μονάδας",
+  "lineTotal": "Σύνολο"
 }

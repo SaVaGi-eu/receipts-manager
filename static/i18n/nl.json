@@ -59,9 +59,18 @@
   "integrityIssues_other": "{{count}} integriteitsproblemen gedetecteerd.",
   "or": "OF",
   "selectReceiptOption": "-- Kies bestaand bonnetje --",
-  "open": "O",
+  "open": "Openen",
   "logout": "🔓 Uitloggen",
   "dateFormatTitle": "📅 Datumnotatie",
   "dateFormatLabel": "Datumnotatie:",
-  "addAnother": "Nog een toevoegen"
+  "addAnother": "Nog een toevoegen",
+  "sortBy": "Sorteren op:",
+  "sortGroupId": "Groep ID",
+  "sortShop": "Winkel",
+  "sortDate": "Datum",
+  "addNewItem": "📦 Nieuw Item Toevoegen",
+  "editItem": "✏️ Item Bewerken",
+  "labelQuantity": "Hoeveelheid",
+  "labelUnitPrice": "Eenheidsprijs",
+  "lineTotal": "Totaal"
 }

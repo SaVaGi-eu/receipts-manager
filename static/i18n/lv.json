@@ -59,9 +59,18 @@
   "integrityIssues_other": "{{count}} integritātes problēmas konstatētas.",
   "or": "VAI",
   "selectReceiptOption": "-- Izvēlieties esošo kvīti --",
-  "open": "A",
+  "open": "Atvērt",
   "logout": "🔓 Iziet",
   "dateFormatTitle": "📅 Datuma Formāts",
   "dateFormatLabel": "Datuma Formāts:",
-  "addAnother": "Pievienot vēl"
+  "addAnother": "Pievienot vēl",
+  "sortBy": "Kārtot pēc:",
+  "sortGroupId": "Grupas ID",
+  "sortShop": "Veikals",
+  "sortDate": "Datums",
+  "addNewItem": "📦 Pievienot Jaunu Vienumu",
+  "editItem": "✏️ Rediģēt Vienumu",
+  "labelQuantity": "Daudzums",
+  "labelUnitPrice": "Vienības Cena",
+  "lineTotal": "Kopā"
 }

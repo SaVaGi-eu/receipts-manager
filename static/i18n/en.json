@@ -59,9 +59,18 @@
   "integrityIssues_other": "{{count}} integrity issues detected.",
   "or": "OR",
   "selectReceiptOption": "-- Choose existing receipt --",
-  "open": "O",
+  "open": "Open",
   "logout": "🔓 Logout",
   "dateFormatTitle": "📅 Date Format",
   "dateFormatLabel": "Date Format:",
-  "addAnother": "Add Another"
+  "addAnother": "Add Another",
+  "sortBy": "Sort by:",
+  "sortGroupId": "Group ID",
+  "sortShop": "Shop",
+  "sortDate": "Date",
+  "addNewItem": "📦 Add New Item",
+  "editItem": "✏️ Edit Item",
+  "labelQuantity": "Quantity",
+  "labelUnitPrice": "Unit Price",
+  "lineTotal": "Total"
 }

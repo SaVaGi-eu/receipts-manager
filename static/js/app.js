@@ -210,10 +210,15 @@ function populateFilterDropdowns() {
 function populateExistingReceiptSelect() {
   const sel = $('existingReceiptSelect');
   if (!sel) return;
-  const receipts = allData.receipts || [];
-  sel.innerHTML = '<option value="">-- Choose existing receipt --</option>' +
+  const sortBy = $('existingReceiptSort')?.value || 'group_id';
+  const receipts = [...(allData.receipts || [])].sort((a, b) => {
+    if (sortBy === 'shop') return String(a.shop || '').localeCompare(String(b.shop || ''));
+    if (sortBy === 'date') return String(b.purchase_date || '').localeCompare(String(a.purchase_date || ''));
+    return String(a.receipt_group_id || '').localeCompare(String(b.receipt_group_id || ''));
+  });
+  sel.innerHTML = `<option value="">${t('selectReceiptOption') || '-- Choose existing receipt --'}</option>` +
     receipts.map(r => {
-      const label = [r.receipt_group_id, r.shop, r.purchase_date].filter(Boolean).join(' · ');
+      const label = [r.receipt_group_id, r.shop, formatDate(r.purchase_date)].filter(Boolean).join(' · ');
       return `<option value="${escAttr(r.receipt_group_id)}">${escHtml(label)}</option>`;
     }).join('');
 }
@@ -281,6 +286,7 @@ function buildRows() {
       guarantee_unit:      it.guarantee_unit      || 'months',
       extended_warranty:   it.extended_warranty   || null,
       price:               it.price != null ? it.price : null,
+      quantity:            it.quantity || 1,
       file:                r.receipt_filename || it.receipt_relative_path || '',
       receipt_relative_path: r.receipt_relative_path || it.receipt_relative_path || ''
     };
@@ -339,7 +345,9 @@ function renderTable(rows) {
       <td data-column="documentation">${cell(r.documentation)}</td>
       <td data-column="guarantee_end_date">${cell(formatDate(r.guarantee_end_date))}</td>
       <td data-column="extended_warranty">${cell(formatExtWarranty(r.extended_warranty))}</td>
-      <td data-column="price">${formatPrice(r.price)}</td>
+      <td data-column="price">${r.quantity > 1
+        ? `<span class="cell-truncate" title="Unit: ${escAttr(formatPrice(r.price))} × ${r.quantity}">${escHtml(formatPrice(r.price != null ? r.price * r.quantity : null))}</span>`
+        : formatPrice(r.price)}</td>
       <td data-column="file">${fileCell}</td>
       <td data-column="actions">
         ${openBtn}
@@ -498,11 +506,13 @@ function setModalMode(mode) {
     if (form)      form.style.display = '';
     if (btnAdd)    { btnAdd.style.display = ''; }
     if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = 'Finish'; btnFinish.classList.remove('btn-primary'); btnFinish.classList.add('btn-success'); }
+    const titleEl = $('modalTitle'); if (titleEl) titleEl.textContent = '📦 Add New Item';
   } else {
     if (uploadSec) uploadSec.style.display = 'none';
     if (form)      form.style.display = '';
     if (btnAdd)    { btnAdd.style.display = 'none'; }
     if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = 'Save'; btnFinish.classList.remove('btn-success'); btnFinish.classList.add('btn-primary'); }
+    const titleEl = $('modalTitle'); if (titleEl) titleEl.textContent = '✏️ Edit Item';
   }
 }
 
@@ -518,6 +528,8 @@ function clearFormItemFields() {
   const docPath = $('extWarrantyDocPath'); if (docPath) docPath.value = '';
   const docName = $('extWarrantyDocName'); if (docName) docName.textContent = '';
   const docLink = $('extWarrantyDocLink'); if (docLink) { docLink.href = '#'; docLink.classList.add('hidden'); }
+  const qty = $('modalQuantity'); if (qty) qty.value = '1';
+  const total = $('lineTotalDisplay'); if (total) total.textContent = '—';
   clearUserTags();
 }
 
@@ -546,6 +558,7 @@ function collectFormData() {
   const warrantyMonths = parseInt($('modalWarranty')?.value) || 0;
   const priceRaw      = ($('modalPrice')?.value || '').trim();
   const price         = priceRaw ? parseFloat(priceRaw) : null;
+  const quantity      = Math.max(1, parseInt($('modalQuantity')?.value) || 1);
 
   const ewChecked = $('extendedWarrantyCheckbox')?.checked || false;
   const extWarranty = ewChecked ? {
@@ -567,7 +580,7 @@ function collectFormData() {
   return {
     shop, purchase_date: formattedDate, brand, model, location, category,
     project, documentation, guarantee_duration: warrantyMonths, guarantee_unit: 'months',
-    price, extended_warranty: extWarranty, users: [...userTagsArray]
+    price, quantity, extended_warranty: extWarranty, users: [...userTagsArray]
   };
 }
 
@@ -599,31 +612,13 @@ async function handleAddAnother() {
     const itemId   = parseInt($('modalItemId').value);
     const formData = collectFormData();
 
+    // RM-182: save current item then open choose modal (with RM-181 pre-fill)
     const resp = await fetchJson(API.updateItem(itemId), {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
     });
     if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
-
-    const createResp = await fetchJson(API.createItem, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ receipt_group_id: sessionGroupId })
-    });
-    if (!createResp.success) { alert(`Failed to create next item: ${createResp.error}`); return; }
-
-    const newItemId = createResp.item.id;
-    sessionItemIds.push(newItemId);
-    $('modalItemId').value = newItemId;
-
-    const keepShop = $('modalShop').value;
-    const keepDate = $('modalPurchaseDate').value;
-    clearFormItemFields();
-    $('modalShop').value         = keepShop;
-    $('modalPurchaseDate').value = keepDate;
-    $('modalItemsPreview').style.display = 'none';
-
-    const brandInput = $('modalBrand');
-    if (brandInput) brandInput.focus();
-    await loadSuggestions();
+    await Promise.all([loadData(), loadSuggestions()]);
+    openModalForChoose();
   } catch (err) { console.error('Add Another error:', err); alert(`Error: ${err.message}`); }
   finally { if (btn) btn.disabled = false; }
 }
@@ -684,6 +679,10 @@ async function handleExistingReceiptSelect(e) {
       catch { $('modalPurchaseDate').value = ''; }
     }
     clearFormItemFields();
+    // RM-181: re-fill receipt-level fields after clear
+    if (receipt.documentation && receipt.documentation !== 'N/A') {
+      const docEl = $('modalDocumentation'); if (docEl) docEl.value = receipt.documentation;
+    }
     setModalMode('new');
     $('modalItemsPreview').style.display = 'none';
   } catch (err) { console.error('Existing receipt error:', err); alert(`Error: ${err.message}`); }
@@ -711,6 +710,7 @@ async function editItem(itemId) {
   $('modalDocumentation').value = receipt.documentation !== 'N/A' ? receipt.documentation : '';
   $('modalWarranty').value      = item.guarantee_duration || '';
   $('modalPrice').value         = item.price != null ? item.price : '';
+  const qtyEl = $('modalQuantity'); if (qtyEl) qtyEl.value = item.quantity || 1;
 
   const pd = receipt.purchase_date || '';
   if (pd && pd !== 'N/A') {
@@ -812,7 +812,18 @@ function setupEventListeners() {
     });
   }
 
+  bind('existingReceiptSort',   'change', populateExistingReceiptSelect);
   bind('existingReceiptSelect', 'change', handleExistingReceiptSelect);
+
+  // RM-186: live line total
+  const updateLineTotal = () => {
+    const qty   = Math.max(1, parseInt($('modalQuantity')?.value) || 1);
+    const price = parseFloat($('modalPrice')?.value);
+    const el    = $('lineTotalDisplay');
+    if (el) el.textContent = (!isNaN(price) && price >= 0) ? formatPrice(qty * price) : '—';
+  };
+  bind('modalPrice',    'input', updateLineTotal);
+  bind('modalQuantity', 'input', updateLineTotal);
 
   bind('searchInput',   'input',  filterAndRender);
   bind('projectFilter', 'change', filterAndRender);
