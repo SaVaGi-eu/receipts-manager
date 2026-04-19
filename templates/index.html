@@ -33,57 +33,59 @@
 
   <main class="app-main">
 
-    <!-- ===== Toolbar ===== -->
-    <section class="toolbar">
-      <div class="toolbar-left">
-        <input type="text" id="searchInput" data-i18n-placeholder="search" placeholder="🔍 Search..." class="search-input">
+    <!-- ===== Toolbar + filter dropdown wrapper ===== -->
+    <div class="toolbar-wrap">
+      <section class="toolbar">
+        <div class="toolbar-left">
+          <input type="text" id="searchInput" data-i18n-placeholder="search" placeholder="🔍 Search..." class="search-input">
 
-        <select id="projectFilter" class="filter-select">
-          <option value="" data-i18n="allProjects">All Projects</option>
-        </select>
+          <select id="projectFilter" class="filter-select">
+            <option value="" data-i18n="allProjects">All Projects</option>
+          </select>
 
-        <select id="statusFilter" class="filter-select">
-          <option value="" data-i18n="allStatuses">All Statuses</option>
-          <option value="active" data-i18n="statusActive">Active</option>
-          <option value="expiring" data-i18n="statusExpiring">Expiring Soon</option>
-          <option value="expired" data-i18n="statusExpired">Expired</option>
-        </select>
+          <select id="statusFilter" class="filter-select">
+            <option value="" data-i18n="allStatuses">All Statuses</option>
+            <option value="active" data-i18n="statusActive">Active</option>
+            <option value="expiring" data-i18n="statusExpiring">Expiring Soon</option>
+            <option value="expired" data-i18n="statusExpired">Expired</option>
+          </select>
 
-        <select id="userFilter" class="filter-select">
-          <option value="" data-i18n="allUsers">All Users</option>
-        </select>
+          <select id="userFilter" class="filter-select">
+            <option value="" data-i18n="allUsers">All Users</option>
+          </select>
+        </div>
+
+        <div class="toolbar-right">
+          <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
+          <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
+          <button id="filterBtn" class="btn-secondary" data-i18n="filterBtn">🔽 Filters<span id="filterBadge" class="filter-badge" style="display:none">0</span></button>
+          <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
+        </div>
+      </section>
+
+      <!-- ===== Filter panel (dropdown, overlays content below) ===== -->
+      <div id="filterPanel" class="filter-panel" style="display:none">
+        <div class="filter-panel-inner">
+          <div class="filter-fields-col">
+            <button class="filter-field-btn" data-field="shop"          data-i18n="colShop">Shop</button>
+            <button class="filter-field-btn" data-field="brand"         data-i18n="colBrand">Brand</button>
+            <button class="filter-field-btn" data-field="category"      data-i18n="colCategory">Category</button>
+            <button class="filter-field-btn" data-field="documentation" data-i18n="colDocumentation">Documentation</button>
+            <button class="filter-field-btn" data-field="location"      data-i18n="colLocation">Location</button>
+            <button class="filter-field-btn" data-field="purchase_date" data-i18n="colPurchaseDate">Purchase Date</button>
+          </div>
+          <div class="filter-values-col">
+            <div id="filterValuesContent"></div>
+          </div>
+        </div>
+        <div class="filter-panel-footer">
+          <button id="clearAllFiltersBtn" class="btn-secondary btn-small" data-i18n="clearAllFilters">Clear all</button>
+        </div>
       </div>
-
-      <div class="toolbar-right">
-        <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
-        <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
-        <button id="filterBtn" class="btn-secondary" data-i18n="filterBtn">🔎 Filter<span id="filterBadge" class="filter-badge" style="display:none">0</span></button>
-        <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
-      </div>
-    </section>
+    </div>
 
     <!-- ===== Active filter chips ===== -->
     <div id="activeFilterChips" class="active-filter-chips" style="display:none"></div>
-
-    <!-- ===== Filter panel ===== -->
-    <div id="filterPanel" class="filter-panel" style="display:none">
-      <div class="filter-panel-inner">
-        <div class="filter-fields-col">
-          <button class="filter-field-btn" data-field="shop"          data-i18n="colShop">Shop</button>
-          <button class="filter-field-btn" data-field="brand"         data-i18n="colBrand">Brand</button>
-          <button class="filter-field-btn" data-field="category"      data-i18n="colCategory">Category</button>
-          <button class="filter-field-btn" data-field="documentation" data-i18n="colDocumentation">Documentation</button>
-          <button class="filter-field-btn" data-field="location"      data-i18n="colLocation">Location</button>
-          <button class="filter-field-btn" data-field="purchase_date" data-i18n="colPurchaseDate">Purchase Date</button>
-        </div>
-        <div class="filter-values-col">
-          <div id="filterValuesContent"></div>
-        </div>
-      </div>
-      <div class="filter-panel-footer">
-        <button id="clearAllFiltersBtn" class="btn-secondary btn-small" data-i18n="clearAllFilters">Clear all</button>
-      </div>
-    </div>
 
     <!-- ===== Column toggle panel ===== -->
     <div id="columnPanel" class="column-panel">

@@ -1169,11 +1169,24 @@ input[readonly] {
 }
 .chip-remove:hover { opacity: 1; }
 
+.toolbar-wrap {
+  position: relative;
+  z-index: 100;
+  margin-bottom: 2rem;
+}
+
+.toolbar-wrap .toolbar {
+  margin-bottom: 0;
+}
+
 .filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
   background: var(--card-bg); border: 1px solid var(--border-color);
-  border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  margin-bottom: 1rem; overflow: hidden;
-  width: 100%;
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  overflow: hidden;
+  z-index: 200;
 }
 
 .filter-panel-inner {
