@@ -75,5 +75,10 @@
   "lineTotal": "Σύνολο",
   "rowDensityTitle": "📐 Ύψος Γραμμής",
   "compactRowsLabel": "Συμπαγείς γραμμές (μειωμένο ύψος)",
-  "colOrderTitle": "Σειρά στηλών:"
+  "colOrderTitle": "Σειρά στηλών:",
+  "colCategory": "Κατηγορία",
+  "invoiceItemsTitle": "📋 Στοιχεία",
+  "addRow": "+ Προσθήκη γραμμής",
+  "saveAll": "Αποθήκευση όλων",
+  "receiptTotal": "Σύνολο απόδειξης:"
 }

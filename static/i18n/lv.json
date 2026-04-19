@@ -75,5 +75,10 @@
   "lineTotal": "Kopā",
   "rowDensityTitle": "📐 Rindas Augstums",
   "compactRowsLabel": "Kompaktas rindas (samazināts augstums)",
-  "colOrderTitle": "Kolonnu secība:"
+  "colOrderTitle": "Kolonnu secība:",
+  "colCategory": "Kategorija",
+  "invoiceItemsTitle": "📋 Vienumi",
+  "addRow": "+ Pievienot rindu",
+  "saveAll": "Saglabāt visu",
+  "receiptTotal": "Kvīts kopsumma:"
 }

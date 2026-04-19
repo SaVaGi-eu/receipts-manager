@@ -75,5 +75,10 @@
   "lineTotal": "Total",
   "rowDensityTitle": "📐 Row Density",
   "compactRowsLabel": "Compact rows (reduced height)",
-  "colOrderTitle": "Column order:"
+  "colOrderTitle": "Column order:",
+  "colCategory": "Category",
+  "invoiceItemsTitle": "📋 Items",
+  "addRow": "+ Add Row",
+  "saveAll": "Save All",
+  "receiptTotal": "Receipt Total:"
 }

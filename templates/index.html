@@ -388,124 +388,95 @@
           <input type="hidden" id="modalReceiptGroupId">
           <input type="hidden" id="modalMode">
 
-          <div class="form-row">
-            <div class="form-group">
-              <label for="modalDocumentation"><span data-i18n="labelDocumentation">Documentation</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalDocumentation" list="docList" required maxlength="50">
-            </div>
-            <div class="form-group">
-              <label for="modalPurchaseDate"><span data-i18n="labelPurchaseDate">Purchase Date</span> <span class="required-asterisk">*</span></label>
-              <input type="date" id="modalPurchaseDate" required>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="modalShop"><span data-i18n="labelShop">Shop/Store</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalShop" list="shopList" required maxlength="50">
-            </div>
-            <div class="form-group">
-              <label for="modalWarranty"><span data-i18n="labelWarranty">Warranty (months)</span></label>
-              <input type="number" id="modalWarranty" min="0" max="999" step="1" data-i18n-placeholder="warrantyPlaceholder" placeholder="24">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="modalBrand"><span data-i18n="labelBrand">Brand</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalBrand" list="brandList" required maxlength="100">
-            </div>
-            <div class="form-group">
-              <label for="modalModel"><span data-i18n="labelModel">Model</span> <span class="required-asterisk">*</span></label>
-              <input type="text" id="modalModel" list="modelList" required maxlength="100">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="modalLocation" data-i18n="labelLocation">Location</label>
-              <input type="text" id="modalLocation" list="locationList" maxlength="100">
-            </div>
-            <div class="form-group">
-              <label for="modalCategory" data-i18n="labelCategory">Category</label>
-              <input type="text" id="modalCategory" list="categoryList" maxlength="50">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="modalProject" data-i18n="labelProject">Project</label>
-              <input type="text" id="modalProject" list="projectList" maxlength="100">
-            </div>
-            <div class="form-group">
-              <label for="modalQuantity" data-i18n="labelQuantity">Quantity</label>
-              <input type="number" id="modalQuantity" min="1" max="9999" step="1" value="1">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="modalPrice" data-i18n="labelUnitPrice">Unit Price</label>
-              <input type="text" id="modalPrice" maxlength="10" placeholder="0.00" inputmode="decimal">
-            </div>
-            <div class="form-group">
-              <label data-i18n="lineTotal">Total</label>
-              <div id="lineTotalDisplay" class="line-total-display">—</div>
-            </div>
-          </div>
-
-          <div class="form-group full-width">
-            <label>
-              <input type="checkbox" id="extendedWarrantyCheckbox">
-              <span data-i18n="labelExtendedWarranty">Extended Warranty Purchased?</span>
-            </label>
-          </div>
-
-          <div id="extendedWarrantyFields" class="extended-warranty-fields hidden">
+          <!-- Receipt header (shared across all items) -->
+          <div class="invoice-header-section">
             <div class="form-row">
               <div class="form-group">
-                <label for="extWarrantyProvider" data-i18n="labelExtWarrantyProvider">Provider Name</label>
-                <input type="text" id="extWarrantyProvider" maxlength="100">
+                <label for="modalDocumentation"><span data-i18n="labelDocumentation">Documentation</span> <span class="required-asterisk">*</span></label>
+                <input type="text" id="modalDocumentation" list="docList" required maxlength="50">
               </div>
               <div class="form-group">
-                <label for="extWarrantyMonths" data-i18n="labelExtWarrantyMonths">Extended Warranty (months)</label>
-                <input type="number" id="extWarrantyMonths" min="0" max="999" step="1" placeholder="12">
+                <label for="modalPurchaseDate"><span data-i18n="labelPurchaseDate">Purchase Date</span> <span class="required-asterisk">*</span></label>
+                <input type="date" id="modalPurchaseDate" required>
               </div>
             </div>
+
             <div class="form-row">
               <div class="form-group">
-                <label for="extWarrantyCost" data-i18n="labelExtWarrantyCost">Cost</label>
-                <input type="text" id="extWarrantyCost" maxlength="10" placeholder="50.00" inputmode="decimal">
+                <label for="modalShop"><span data-i18n="labelShop">Shop/Store</span> <span class="required-asterisk">*</span></label>
+                <input type="text" id="modalShop" list="shopList" required maxlength="50">
+              </div>
+              <div class="form-group">
+                <label for="modalWarranty"><span data-i18n="labelWarranty">Warranty (months)</span></label>
+                <input type="number" id="modalWarranty" min="0" max="999" step="1" data-i18n-placeholder="warrantyPlaceholder" placeholder="24">
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-group full-width">
-                <label for="extWarrantyDocInput" data-i18n="labelExtWarrantyDoc">Proof of Extended Warranty (optional)</label>
-                <div class="ext-doc-upload">
-                  <input type="file" id="extWarrantyDocInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
-                  <button type="button" id="extWarrantyDocBtn" class="btn-secondary btn-small" data-i18n="chooseFile">Choose file…</button>
-                  <span id="extWarrantyDocName" class="ext-doc-name"></span>
-                  <a id="extWarrantyDocLink" href="#" target="_blank" class="ext-doc-link hidden" data-i18n="viewDoc">View</a>
+
+            <div class="form-group full-width">
+              <label>
+                <input type="checkbox" id="extendedWarrantyCheckbox">
+                <span data-i18n="labelExtendedWarranty">Extended Warranty Purchased?</span>
+              </label>
+            </div>
+
+            <div id="extendedWarrantyFields" class="extended-warranty-fields hidden">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="extWarrantyProvider" data-i18n="labelExtWarrantyProvider">Provider Name</label>
+                  <input type="text" id="extWarrantyProvider" maxlength="100">
                 </div>
-                <input type="hidden" id="extWarrantyDocPath">
+                <div class="form-group">
+                  <label for="extWarrantyMonths" data-i18n="labelExtWarrantyMonths">Extended Warranty (months)</label>
+                  <input type="number" id="extWarrantyMonths" min="0" max="999" step="1" placeholder="12">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="extWarrantyCost" data-i18n="labelExtWarrantyCost">Cost</label>
+                  <input type="text" id="extWarrantyCost" maxlength="10" placeholder="50.00" inputmode="decimal">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group full-width">
+                  <label for="extWarrantyDocInput" data-i18n="labelExtWarrantyDoc">Proof of Extended Warranty (optional)</label>
+                  <div class="ext-doc-upload">
+                    <input type="file" id="extWarrantyDocInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+                    <button type="button" id="extWarrantyDocBtn" class="btn-secondary btn-small" data-i18n="chooseFile">Choose file…</button>
+                    <span id="extWarrantyDocName" class="ext-doc-name"></span>
+                    <a id="extWarrantyDocLink" href="#" target="_blank" class="ext-doc-link hidden" data-i18n="viewDoc">View</a>
+                  </div>
+                  <input type="hidden" id="extWarrantyDocPath">
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="form-group full-width">
-            <label data-i18n="labelUsers">Users</label>
-            <div id="userTagsContainer" class="tag-input-container">
-              <div id="userTags" class="user-tags"></div>
-              <input type="text" id="userTagInput" class="tag-input"
-                     data-i18n-placeholder="usersPlaceholder"
-                     placeholder="Type name and press Enter..."
-                     list="userList">
+          <!-- Invoice items table -->
+          <div class="invoice-items-section">
+            <h4 data-i18n="invoiceItemsTitle">📋 Items</h4>
+            <div class="invoice-table-wrapper">
+              <table id="invoiceItemsTable" class="invoice-items-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="colBrand">Brand</th>
+                    <th data-i18n="colModel">Model</th>
+                    <th data-i18n="colLocation">Location</th>
+                    <th data-i18n="colCategory">Category</th>
+                    <th data-i18n="colProject">Project</th>
+                    <th data-i18n="colUsers">Users</th>
+                    <th data-i18n="labelUnitPrice">Unit Price</th>
+                    <th data-i18n="labelQuantity">Qty</th>
+                    <th data-i18n="lineTotal">Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="invoiceTableBody"></tbody>
+              </table>
             </div>
-          </div>
-
-          <div id="modalItemsPreview" class="items-preview">
-            <h4 data-i18n="detectedItems">📦 Detected Items (preview)</h4>
-            <ul id="modalItemsList"></ul>
+            <div class="receipt-total-row">
+              <span data-i18n="receiptTotal">Receipt Total:</span>
+              <span id="receiptTotal" class="receipt-total-amount">—</span>
+            </div>
           </div>
 
           <div class="warning-banner">
@@ -513,9 +484,9 @@
           </div>
 
           <div class="modal-footer">
-            <button type="button" id="cancelModal"   class="btn-danger"       data-i18n="cancel">Cancel</button>
-            <button type="button" id="btnAddAnother" class="btn-add-another"  data-i18n="addAnother">Add Another</button>
-            <button type="submit" id="btnFinish"     class="btn-success"      data-i18n="saveReceipt">Finish</button>
+            <button type="button" id="addRowBtn" class="btn-secondary" style="margin-right:auto" data-i18n="addRow">+ Add Row</button>
+            <button type="button" id="cancelModal" class="btn-danger"  data-i18n="cancel">Cancel</button>
+            <button type="submit" id="btnFinish"   class="btn-success" data-i18n="saveAll">Save All</button>
           </div>
         </form>
       </div>

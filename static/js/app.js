@@ -12,6 +12,8 @@ let userTagsArray = [];
 let sessionGroupId  = null;
 let sessionItemIds  = [];
 let chooseColOrder  = ['group_id', 'shop', 'date'];
+let invoiceRows     = [];
+let nextRowId       = 0;
 
 // ===================== CONSTANTS =====================
 const CURRENCY_SYMBOLS = {
@@ -484,48 +486,41 @@ function openModalForNew(uploadResult) {
   } else { $('modalPurchaseDate').value = ''; }
 
   clearFormItemFields();
-
-  const itemsPreview = $('modalItemsPreview');
-  const itemsList    = $('modalItemsList');
-  if (ocr.items?.length > 0) {
-    itemsList.innerHTML = ocr.items.map(i => `<li>${escHtml(i.name)} — ${escHtml(i.price)}</li>`).join('');
-    itemsPreview.style.display = 'block';
-  } else { itemsPreview.style.display = 'none'; }
-
   setModalMode('new');
   modal.style.display = 'flex';
 }
 
 function setModalMode(mode) {
-  const btnAdd    = $('btnAddAnother');
   const btnFinish = $('btnFinish');
+  const addRowBtn = $('addRowBtn');
   const uploadSec = qs('.upload-select-section');
   const form      = $('ocrForm');
   if (mode === 'choose') {
     if (uploadSec) uploadSec.style.display = '';
     if (form)      form.style.display = 'none';
-    if (btnAdd)    btnAdd.style.display = 'none';
     if (btnFinish) btnFinish.style.display = 'none';
+    if (addRowBtn) addRowBtn.style.display = 'none';
   } else if (mode === 'new') {
     if (uploadSec) uploadSec.style.display = 'none';
     if (form)      form.style.display = '';
-    if (btnAdd)    { btnAdd.style.display = ''; }
-    if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = 'Finish'; btnFinish.classList.remove('btn-primary'); btnFinish.classList.add('btn-success'); }
+    if (addRowBtn) addRowBtn.style.display = '';
+    if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = t('saveAll') || 'Save All'; btnFinish.classList.remove('btn-primary'); btnFinish.classList.add('btn-success'); }
     const titleEl = $('modalTitle'); if (titleEl) titleEl.textContent = '📦 Add New Item';
   } else {
     if (uploadSec) uploadSec.style.display = 'none';
     if (form)      form.style.display = '';
-    if (btnAdd)    { btnAdd.style.display = 'none'; }
-    if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = 'Save'; btnFinish.classList.remove('btn-success'); btnFinish.classList.add('btn-primary'); }
+    if (addRowBtn) addRowBtn.style.display = '';
+    if (btnFinish) { btnFinish.style.display = ''; btnFinish.textContent = t('saveAll') || 'Save'; btnFinish.classList.remove('btn-success'); btnFinish.classList.add('btn-primary'); }
     const titleEl = $('modalTitle'); if (titleEl) titleEl.textContent = '✏️ Edit Item';
   }
 }
 
 function clearFormItemFields() {
-  ['modalBrand','modalModel','modalLocation','modalCategory','modalProject',
-   'modalDocumentation','modalWarranty','extWarrantyProvider','extWarrantyMonths',
-   'extWarrantyCost','modalPrice'
-  ].forEach(id => { const el = $(id); if (el) el.value = ''; });
+  // Reset invoice table to one blank row
+  invoiceRows = []; nextRowId = 0;
+  addInvoiceRow({});
+  // Reset extended warranty
+  ['extWarrantyProvider','extWarrantyMonths','extWarrantyCost'].forEach(id => { const el = $(id); if (el) el.value = ''; });
   const ewCb = $('extendedWarrantyCheckbox');
   if (ewCb) ewCb.checked = false;
   const ewFields = $('extendedWarrantyFields');
@@ -533,15 +528,12 @@ function clearFormItemFields() {
   const docPath = $('extWarrantyDocPath'); if (docPath) docPath.value = '';
   const docName = $('extWarrantyDocName'); if (docName) docName.textContent = '';
   const docLink = $('extWarrantyDocLink'); if (docLink) { docLink.href = '#'; docLink.classList.add('hidden'); }
-  const qty = $('modalQuantity'); if (qty) qty.value = '1';
-  const total = $('lineTotalDisplay'); if (total) total.textContent = '—';
-  clearUserTags();
 }
 
 function closeOcrModal() {
   const modal = $('ocrModal');
   if (modal) { modal.style.display = 'none'; $('ocrForm')?.reset(); }
-  clearUserTags();
+  invoiceRows = []; nextRowId = 0;
   sessionGroupId = null;
   sessionItemIds = [];
   const uploadSec = qs('.upload-select-section');
@@ -550,20 +542,182 @@ function closeOcrModal() {
   if (form) form.style.display = '';
 }
 
+// ===================== INVOICE TABLE (RM-187) =====================
+function syncInvoiceRowsFromDOM() {
+  qsa('#invoiceTableBody tr[data-row-id]').forEach(tr => {
+    const row = invoiceRows.find(r => r.id === parseInt(tr.dataset.rowId));
+    if (!row) return;
+    row.brand    = tr.querySelector('[data-field="brand"]')?.value    || '';
+    row.model    = tr.querySelector('[data-field="model"]')?.value    || '';
+    row.location = tr.querySelector('[data-field="location"]')?.value || '';
+    row.category = tr.querySelector('[data-field="category"]')?.value || '';
+    row.project  = tr.querySelector('[data-field="project"]')?.value  || '';
+    row.price    = tr.querySelector('[data-field="price"]')?.value    || '';
+    row.qty      = Math.max(1, parseInt(tr.querySelector('[data-field="qty"]')?.value) || 1);
+  });
+}
+
+function renderInvoiceTable() {
+  const tbody = $('invoiceTableBody');
+  if (!tbody) return;
+  const canDel = invoiceRows.length > 1;
+  tbody.innerHTML = invoiceRows.map(row => {
+    const chips = row.users.map(u =>
+      `<span class="row-user-chip">${escHtml(u)}<button type="button" class="row-chip-remove" data-user="${escAttr(u)}">&times;</button></span>`
+    ).join('');
+    const p = parseFloat(row.price);
+    const lineTotal = (!isNaN(p) && p >= 0) ? formatPrice(p * row.qty) : '—';
+    return `<tr data-row-id="${row.id}">
+      <td><input class="row-input"            data-field="brand"    value="${escAttr(row.brand)}"    list="brandList"    maxlength="100" placeholder="Brand *"></td>
+      <td><input class="row-input"            data-field="model"    value="${escAttr(row.model)}"    list="modelList"    maxlength="100" placeholder="Model *"></td>
+      <td><input class="row-input"            data-field="location" value="${escAttr(row.location)}" list="locationList" maxlength="100"></td>
+      <td><input class="row-input"            data-field="category" value="${escAttr(row.category)}" list="categoryList" maxlength="50"></td>
+      <td><input class="row-input"            data-field="project"  value="${escAttr(row.project)}"  list="projectList"  maxlength="100"></td>
+      <td><div class="row-users">${chips}<input type="text" class="row-user-input" list="userList" placeholder="+"></div></td>
+      <td><input class="row-input row-price-input" type="text"   data-field="price" value="${escAttr(row.price)}" inputmode="decimal" placeholder="0.00" maxlength="10"></td>
+      <td><input class="row-input row-qty-input"   type="number" data-field="qty"   value="${row.qty}" min="1" max="9999" step="1"></td>
+      <td class="row-line-total">${lineTotal}</td>
+      <td><button type="button" class="row-del-btn" data-row-id="${row.id}"${canDel ? '' : ' disabled'}>🗑️</button></td>
+    </tr>`;
+  }).join('');
+  updateReceiptTotal();
+}
+
+function updateRowLineTotal(tr) {
+  const p   = parseFloat(tr.querySelector('[data-field="price"]')?.value);
+  const qty = Math.max(1, parseInt(tr.querySelector('[data-field="qty"]')?.value) || 1);
+  const cell = tr.querySelector('.row-line-total');
+  if (cell) cell.textContent = (!isNaN(p) && p >= 0) ? formatPrice(p * qty) : '—';
+}
+
+function updateReceiptTotal() {
+  let total = 0, hasAny = false;
+  qsa('#invoiceTableBody tr').forEach(tr => {
+    const p   = parseFloat(tr.querySelector('[data-field="price"]')?.value);
+    const qty = Math.max(1, parseInt(tr.querySelector('[data-field="qty"]')?.value) || 1);
+    if (!isNaN(p) && p >= 0) { total += p * qty; hasAny = true; }
+  });
+  const el = $('receiptTotal');
+  if (el) el.textContent = hasAny ? formatPrice(total) : '—';
+}
+
+function addInvoiceRow(data = {}) {
+  syncInvoiceRowsFromDOM();
+  const id = nextRowId++;
+  invoiceRows.push({
+    id,
+    brand:    data.brand    || '',
+    model:    data.model    || '',
+    location: data.location || '',
+    category: data.category || '',
+    project:  data.project  || '',
+    users:    Array.isArray(data.users) ? [...data.users] : [],
+    price:    data.price    != null ? String(data.price) : '',
+    qty:      data.qty      || 1
+  });
+  renderInvoiceTable();
+}
+
+function removeInvoiceRow(id) {
+  if (invoiceRows.length <= 1) return;
+  syncInvoiceRowsFromDOM();
+  invoiceRows = invoiceRows.filter(r => r.id !== id);
+  renderInvoiceTable();
+}
+
+function renderUsersCell(rowId) {
+  const tr = document.querySelector(`#invoiceTableBody tr[data-row-id="${rowId}"]`);
+  if (!tr) return;
+  const row = invoiceRows.find(r => r.id === rowId);
+  if (!row) return;
+  const container = tr.querySelector('.row-users');
+  if (!container) return;
+  container.querySelectorAll('.row-user-chip').forEach(el => el.remove());
+  const input = container.querySelector('.row-user-input');
+  const frag = document.createDocumentFragment();
+  row.users.forEach(u => {
+    const span = document.createElement('span');
+    span.className = 'row-user-chip';
+    span.innerHTML = `${escHtml(u)}<button type="button" class="row-chip-remove" data-user="${escAttr(u)}">&times;</button>`;
+    frag.appendChild(span);
+  });
+  container.insertBefore(frag, input || null);
+}
+
+function addInvoiceUserChip(rowId, name) {
+  name = name.trim();
+  const row = invoiceRows.find(r => r.id === rowId);
+  if (!row || !name || row.users.includes(name)) return;
+  row.users.push(name);
+  renderUsersCell(rowId);
+}
+
+function removeInvoiceUserChip(rowId, name) {
+  const row = invoiceRows.find(r => r.id === rowId);
+  if (!row) return;
+  row.users = row.users.filter(u => u !== name);
+  renderUsersCell(rowId);
+}
+
+function setupInvoiceTableListeners() {
+  const tbody = $('invoiceTableBody');
+  if (!tbody) return;
+
+  tbody.addEventListener('click', e => {
+    const del = e.target.closest('.row-del-btn');
+    if (del && !del.disabled) { removeInvoiceRow(parseInt(del.dataset.rowId)); return; }
+    const chip = e.target.closest('.row-chip-remove');
+    if (chip) {
+      const rowId = parseInt(chip.closest('tr')?.dataset.rowId);
+      if (!isNaN(rowId)) removeInvoiceUserChip(rowId, chip.dataset.user);
+    }
+  });
+
+  tbody.addEventListener('input', e => {
+    const tr = e.target.closest('tr'); if (!tr) return;
+    const f = e.target.dataset.field;
+    if (f === 'price' || f === 'qty') { updateRowLineTotal(tr); updateReceiptTotal(); }
+  });
+
+  tbody.addEventListener('keydown', e => {
+    if (!e.target.classList.contains('row-user-input')) return;
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const rowId = parseInt(e.target.closest('tr')?.dataset.rowId);
+      const name = e.target.value.trim();
+      if (!isNaN(rowId) && name) { addInvoiceUserChip(rowId, name); e.target.value = ''; }
+    }
+  });
+
+  tbody.addEventListener('focusout', e => {
+    if (!e.target.classList.contains('row-user-input')) return;
+    const rowId = parseInt(e.target.closest('tr')?.dataset.rowId);
+    const name = e.target.value.trim();
+    if (!isNaN(rowId) && name) { addInvoiceUserChip(rowId, name); e.target.value = ''; }
+  });
+}
+
+function collectInvoiceRowData(rowIdx) {
+  const row = invoiceRows[rowIdx];
+  if (!row) return { brand: 'N/A', model: 'N/A', location: 'N/A', category: '', project: 'N/A', users: [], price: null, qty: 1 };
+  const tr = document.querySelector(`#invoiceTableBody tr[data-row-id="${row.id}"]`);
+  const brand    = (tr?.querySelector('[data-field="brand"]')?.value    || row.brand    || '').trim() || 'N/A';
+  const model    = (tr?.querySelector('[data-field="model"]')?.value    || row.model    || '').trim() || 'N/A';
+  const location = (tr?.querySelector('[data-field="location"]')?.value || row.location || '').trim() || 'N/A';
+  const category = (tr?.querySelector('[data-field="category"]')?.value || row.category || '').trim() || '';
+  const project  = (tr?.querySelector('[data-field="project"]')?.value  || row.project  || '').trim() || 'N/A';
+  const priceRaw = tr?.querySelector('[data-field="price"]')?.value ?? row.price;
+  const price    = priceRaw !== '' && priceRaw != null ? parseFloat(priceRaw) : null;
+  const qty      = Math.max(1, parseInt(tr?.querySelector('[data-field="qty"]')?.value) || row.qty || 1);
+  return { brand, model, location, category, project, users: [...(row.users || [])], price: isNaN(price) ? null : price, qty };
+}
+
 // ===================== FORM DATA =====================
 function collectFormData() {
   const shop          = ($('modalShop')?.value          || '').trim();
   const purchaseDate  = $('modalPurchaseDate')?.value   || '';
-  const brand         = ($('modalBrand')?.value         || '').trim() || 'N/A';
-  const model         = ($('modalModel')?.value         || '').trim() || 'N/A';
-  const location      = ($('modalLocation')?.value      || '').trim() || 'N/A';
-  const category      = ($('modalCategory')?.value      || '').trim();
-  const project       = ($('modalProject')?.value       || '').trim() || 'N/A';
   const documentation = ($('modalDocumentation')?.value || '').trim() || 'N/A';
   const warrantyMonths = parseInt($('modalWarranty')?.value) || 0;
-  const priceRaw      = ($('modalPrice')?.value || '').trim();
-  const price         = priceRaw ? parseFloat(priceRaw) : null;
-  const quantity      = Math.max(1, parseInt($('modalQuantity')?.value) || 1);
 
   const ewChecked = $('extendedWarrantyCheckbox')?.checked || false;
   const extWarranty = ewChecked ? {
@@ -582,28 +736,36 @@ function collectFormData() {
     } catch { /* keep original */ }
   }
 
+  // Read item fields from first row of invoice table (RM-191 will handle all rows)
+  const row0 = collectInvoiceRowData(0);
+
   return {
-    shop, purchase_date: formattedDate, brand, model, location, category,
-    project, documentation, guarantee_duration: warrantyMonths, guarantee_unit: 'months',
-    price, quantity, extended_warranty: extWarranty, users: [...userTagsArray]
+    shop, purchase_date: formattedDate,
+    brand: row0.brand, model: row0.model, location: row0.location,
+    category: row0.category, project: row0.project, users: row0.users,
+    price: row0.price, quantity: row0.qty,
+    documentation, guarantee_duration: warrantyMonths, guarantee_unit: 'months',
+    extended_warranty: extWarranty
   };
 }
 
 function validateForm() {
-  const shop  = ($('modalShop')?.value  || '').trim();
-  const pd    = $('modalPurchaseDate')?.value || '';
-  const brand = ($('modalBrand')?.value || '').trim();
-  const model = ($('modalModel')?.value || '').trim();
-  if (!shop)  { alert('Shop/Store is required.');    return false; }
-  if (!pd)    { alert('Purchase Date is required.'); return false; }
-  if (!brand) { alert('Brand is required.');         return false; }
-  if (!model) { alert('Model is required.');         return false; }
+  const shop = ($('modalShop')?.value || '').trim();
+  const pd   = $('modalPurchaseDate')?.value || '';
+  if (!shop) { alert('Shop/Store is required.');    return false; }
+  if (!pd)   { alert('Purchase Date is required.'); return false; }
   const pdDate  = new Date(pd);
   const today   = new Date(); today.setHours(0, 0, 0, 0);
   const minDate = new Date(today); minDate.setFullYear(minDate.getFullYear() - 100);
-  if (pdDate > today)   { alert('Purchase date cannot be in the future.');               return false; }
+  if (pdDate > today)   { alert('Purchase date cannot be in the future.');                   return false; }
   if (pdDate < minDate) { alert('Purchase date cannot be more than 100 years in the past.'); return false; }
-  const priceRaw = ($('modalPrice')?.value || '').trim();
+  // Validate first row
+  const firstTr = qs('#invoiceTableBody tr');
+  const brand = (firstTr?.querySelector('[data-field="brand"]')?.value || '').trim();
+  const model = (firstTr?.querySelector('[data-field="model"]')?.value || '').trim();
+  if (!brand) { alert('Brand is required for at least the first item.'); return false; }
+  if (!model) { alert('Model is required for at least the first item.'); return false; }
+  const priceRaw = (firstTr?.querySelector('[data-field="price"]')?.value || '').trim();
   if (priceRaw && isNaN(parseFloat(priceRaw))) { alert('Price must be a valid number.'); return false; }
   return true;
 }
@@ -684,12 +846,11 @@ async function handleExistingReceiptSelect(e) {
       catch { $('modalPurchaseDate').value = ''; }
     }
     clearFormItemFields();
-    // RM-181: re-fill receipt-level fields after clear
+    // RM-181: re-fill documentation after clear (it's a header field)
     if (receipt.documentation && receipt.documentation !== 'N/A') {
       const docEl = $('modalDocumentation'); if (docEl) docEl.value = receipt.documentation;
     }
     setModalMode('new');
-    $('modalItemsPreview').style.display = 'none';
   } catch (err) { console.error('Existing receipt error:', err); alert(`Error: ${err.message}`); }
 }
 
@@ -707,15 +868,8 @@ async function editItem(itemId) {
   $('modalMode').value           = 'edit';
 
   $('modalShop').value          = receipt.shop          !== 'N/A' ? receipt.shop          : '';
-  $('modalBrand').value         = item.brand            !== 'N/A' ? item.brand            : '';
-  $('modalModel').value         = item.model            !== 'N/A' ? item.model            : '';
-  $('modalLocation').value      = item.location         !== 'N/A' ? item.location         : '';
-  $('modalCategory').value      = item.category         || '';
-  $('modalProject').value       = item.project          !== 'N/A' ? item.project          : '';
   $('modalDocumentation').value = receipt.documentation !== 'N/A' ? receipt.documentation : '';
   $('modalWarranty').value      = item.guarantee_duration || '';
-  $('modalPrice').value         = item.price != null ? item.price : '';
-  const qtyEl = $('modalQuantity'); if (qtyEl) qtyEl.value = item.quantity || 1;
 
   const pd = receipt.purchase_date || '';
   if (pd && pd !== 'N/A') {
@@ -723,7 +877,18 @@ async function editItem(itemId) {
     catch { $('modalPurchaseDate').value = ''; }
   } else { $('modalPurchaseDate').value = ''; }
 
-  setUserTags(item.users || []);
+  // Populate invoice table with single row
+  invoiceRows = []; nextRowId = 0;
+  addInvoiceRow({
+    brand:    item.brand    !== 'N/A' ? item.brand    : '',
+    model:    item.model    !== 'N/A' ? item.model    : '',
+    location: item.location !== 'N/A' ? item.location : '',
+    category: item.category || '',
+    project:  item.project  !== 'N/A' ? item.project  : '',
+    users:    Array.isArray(item.users) ? item.users : normalizeUsers(item.users),
+    price:    item.price != null ? String(item.price) : '',
+    qty:      item.quantity || 1
+  });
 
   const ew   = item.extended_warranty;
   const ewCb = $('extendedWarrantyCheckbox');
@@ -747,7 +912,6 @@ async function editItem(itemId) {
     if (dlEl) { dlEl.href = '#'; dlEl.classList.add('hidden'); }
   }
 
-  $('modalItemsPreview').style.display = 'none';
   sessionGroupId = null;
   sessionItemIds = [];
   setModalMode('edit');
@@ -819,6 +983,8 @@ function setupEventListeners() {
 
   bind('existingReceiptSort',   'change', populateExistingReceiptSelect);
   bind('existingReceiptSelect', 'change', handleExistingReceiptSelect);
+  bind('addRowBtn', 'click', () => addInvoiceRow({}));
+  setupInvoiceTableListeners();
 
   // RM-185: compact rows toggle
   bind('compactRowsToggle', 'change', e => {
@@ -863,7 +1029,7 @@ function setupEventListeners() {
 
   bind('closeModal',    'click',  handleCancelModal);
   bind('cancelModal',   'click',  handleCancelModal);
-  bind('btnAddAnother', 'click',  handleAddAnother);
+
   bind('ocrForm',       'submit', saveOcrData);
 
   const modal = $('ocrModal');

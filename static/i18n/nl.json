@@ -75,5 +75,10 @@
   "lineTotal": "Totaal",
   "rowDensityTitle": "📐 Rijhoogte",
   "compactRowsLabel": "Compacte rijen (verminderde hoogte)",
-  "colOrderTitle": "Kolomvolgorde:"
+  "colOrderTitle": "Kolomvolgorde:",
+  "colCategory": "Categorie",
+  "invoiceItemsTitle": "📋 Artikelen",
+  "addRow": "+ Rij toevoegen",
+  "saveAll": "Alles opslaan",
+  "receiptTotal": "Bonnetje totaal:"
 }
