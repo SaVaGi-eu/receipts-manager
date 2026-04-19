@@ -828,16 +828,79 @@ async function handleAddAnother() {
 async function handleFinish(e) {
   e.preventDefault();
   if (!validateForm()) return;
-  const itemId   = parseInt($('modalItemId').value);
-  const formData = collectFormData();
+
+  syncInvoiceRowsFromDOM();
+  const itemId = parseInt($('modalItemId').value);
+
+  // Collect receipt header fields (shared across all rows)
+  const shop          = ($('modalShop')?.value          || '').trim();
+  const purchaseDate  = $('modalPurchaseDate')?.value   || '';
+  const documentation = ($('modalDocumentation')?.value || '').trim() || 'N/A';
+  const warrantyMonths = parseInt($('modalWarranty')?.value) || 0;
+  const ewChecked = $('extendedWarrantyCheckbox')?.checked || false;
+  const extWarranty = ewChecked ? {
+    provider:      ($('extWarrantyProvider')?.value || '').trim(),
+    months:        parseInt($('extWarrantyMonths')?.value) || 0,
+    cost:          parseFloat($('extWarrantyCost')?.value) || null,
+    document_path: ($('extWarrantyDocPath')?.value || '') || null
+  } : null;
+
+  let formattedDate = purchaseDate;
+  if (purchaseDate) {
+    try {
+      const d  = new Date(purchaseDate + 'T00:00:00');
+      const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      formattedDate = `${d.getFullYear()}-${mn[d.getMonth()]}-${String(d.getDate()).padStart(2,'0')}`;
+    } catch { /* keep original */ }
+  }
+
+  const header = {
+    shop, purchase_date: formattedDate, documentation,
+    guarantee_duration: warrantyMonths, guarantee_unit: 'months',
+    extended_warranty: extWarranty
+  };
+
+  const buildPayload = rowIdx => {
+    const row = collectInvoiceRowData(rowIdx);
+    return { ...header, brand: row.brand, model: row.model, location: row.location,
+      category: row.category, project: row.project, users: row.users,
+      price: row.price, quantity: row.qty };
+  };
+
+  const btn = $('btnFinish');
+  if (btn) btn.disabled = true;
   try {
-    const resp = await fetchJson(API.updateItem(itemId), {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
+    // Row 0: update the pre-created placeholder item
+    const resp0 = await fetchJson(API.updateItem(itemId), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPayload(0))
     });
-    if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
+    if (!resp0.success) { alert(`Save failed (row 1): ${resp0.error || 'Unknown error'}`); return; }
+
+    // Rows 1..N: create then fully update each additional row
+    for (let i = 1; i < invoiceRows.length; i++) {
+      const createResp = await fetchJson(API.createItem, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receipt_group_id: sessionGroupId })
+      });
+      if (!createResp.success) { alert(`Save failed (row ${i + 1}): ${createResp.error || 'Unknown error'}`); return; }
+      const newId = createResp.item.id;
+      sessionItemIds.push(newId);
+
+      const updateResp = await fetchJson(API.updateItem(newId), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload(i))
+      });
+      if (!updateResp.success) { alert(`Save failed (row ${i + 1}): ${updateResp.error || 'Unknown error'}`); return; }
+    }
+
     closeOcrModal();
     await loadData(); await loadSuggestions();
-  } catch (err) { console.error('Save error:', err); alert(`Save failed: ${err.message}`); }
+  } catch (err) {
+    console.error('Save error:', err); alert(`Save failed: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function handleCancelModal() {
