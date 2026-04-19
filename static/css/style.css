@@ -46,19 +46,6 @@
 }
 
 /* Requirement 3: Yellow warning banner at bottom of modal */
-.warning-banner {
-  background: #fff3cd;
-  border-left: 4px solid #ffc107;
-  padding: 1rem;
-  margin-top: 1.5rem;
-  margin-bottom: 1.5rem;
-  border-radius: 4px;
-  color: #856404;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
 
 /* Requirement 2: Modal drop zone styling */
 .drop-zone-modal {
@@ -1186,10 +1173,11 @@ input[readonly] {
   background: var(--card-bg); border: 1px solid var(--border-color);
   border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   margin-bottom: 1rem; overflow: hidden;
+  width: min(90vw, 900px);
 }
 
 .filter-panel-inner {
-  display: flex; min-height: 220px;
+  display: flex; min-height: clamp(220px, 35vh, 480px);
 }
 
 .filter-fields-col {
