@@ -72,5 +72,8 @@
   "editItem": "✏️ Rediģēt Vienumu",
   "labelQuantity": "Daudzums",
   "labelUnitPrice": "Vienības Cena",
-  "lineTotal": "Kopā"
+  "lineTotal": "Kopā",
+  "rowDensityTitle": "📐 Rindas Augstums",
+  "compactRowsLabel": "Kompaktas rindas (samazināts augstums)",
+  "colOrderTitle": "Kolonnu secība:"
 }

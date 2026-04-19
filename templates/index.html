@@ -229,6 +229,17 @@
           </div>
         </div>
 
+        <!-- Row Density (RM-185) -->
+        <div class="settings-section">
+          <h3 data-i18n="rowDensityTitle">📐 Row Density</h3>
+          <div class="settings-actions">
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.95rem;">
+              <input type="checkbox" id="compactRowsToggle">
+              <span data-i18n="compactRowsLabel">Compact rows (reduced height)</span>
+            </label>
+          </div>
+        </div>
+
         <div class="settings-section">
           <div class="settings-actions">
             <button id="saveSettingsBtn" class="btn-primary" data-i18n="saveSettings">💾 Save Settings</button>
@@ -341,6 +352,25 @@
             <div class="existing-receipt-controls">
               <label for="existingReceiptSort" data-i18n="sortBy">Sort by:</label>
               <select id="existingReceiptSort" class="existing-receipt-sort">
+                <option value="group_id" data-i18n="sortGroupId">Group ID</option>
+                <option value="shop" data-i18n="sortShop">Shop</option>
+                <option value="date" data-i18n="sortDate">Date</option>
+              </select>
+              <button type="button" id="chooseColOrderBtn" class="existing-receipt-sort" title="Column order" style="cursor:pointer;border-color:#ccc;">⚙️</button>
+            </div>
+            <div id="chooseColOrderPanel" class="choose-col-order-panel" style="display:none">
+              <span data-i18n="colOrderTitle">Column order:</span>
+              <select id="chooseCol1" class="existing-receipt-sort">
+                <option value="group_id" data-i18n="sortGroupId">Group ID</option>
+                <option value="shop" data-i18n="sortShop">Shop</option>
+                <option value="date" data-i18n="sortDate">Date</option>
+              </select>
+              <select id="chooseCol2" class="existing-receipt-sort">
+                <option value="group_id" data-i18n="sortGroupId">Group ID</option>
+                <option value="shop" data-i18n="sortShop">Shop</option>
+                <option value="date" data-i18n="sortDate">Date</option>
+              </select>
+              <select id="chooseCol3" class="existing-receipt-sort">
                 <option value="group_id" data-i18n="sortGroupId">Group ID</option>
                 <option value="shop" data-i18n="sortShop">Shop</option>
                 <option value="date" data-i18n="sortDate">Date</option>

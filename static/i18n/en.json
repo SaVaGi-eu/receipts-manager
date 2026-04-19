@@ -72,5 +72,8 @@
   "editItem": "✏️ Edit Item",
   "labelQuantity": "Quantity",
   "labelUnitPrice": "Unit Price",
-  "lineTotal": "Total"
+  "lineTotal": "Total",
+  "rowDensityTitle": "📐 Row Density",
+  "compactRowsLabel": "Compact rows (reduced height)",
+  "colOrderTitle": "Column order:"
 }

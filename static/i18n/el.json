@@ -72,5 +72,8 @@
   "editItem": "✏️ Επεξεργασία Στοιχείου",
   "labelQuantity": "Ποσότητα",
   "labelUnitPrice": "Τιμή Μονάδας",
-  "lineTotal": "Σύνολο"
+  "lineTotal": "Σύνολο",
+  "rowDensityTitle": "📐 Ύψος Γραμμής",
+  "compactRowsLabel": "Συμπαγείς γραμμές (μειωμένο ύψος)",
+  "colOrderTitle": "Σειρά στηλών:"
 }

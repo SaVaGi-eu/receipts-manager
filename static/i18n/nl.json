@@ -72,5 +72,8 @@
   "editItem": "✏️ Item Bewerken",
   "labelQuantity": "Hoeveelheid",
   "labelUnitPrice": "Eenheidsprijs",
-  "lineTotal": "Totaal"
+  "lineTotal": "Totaal",
+  "rowDensityTitle": "📐 Rijhoogte",
+  "compactRowsLabel": "Compacte rijen (verminderde hoogte)",
+  "colOrderTitle": "Kolomvolgorde:"
 }

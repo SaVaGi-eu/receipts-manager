@@ -11,6 +11,7 @@ let visibleColumns = new Set([
 let userTagsArray = [];
 let sessionGroupId  = null;
 let sessionItemIds  = [];
+let chooseColOrder  = ['group_id', 'shop', 'date'];
 
 // ===================== CONSTANTS =====================
 const CURRENCY_SYMBOLS = {
@@ -218,7 +219,8 @@ function populateExistingReceiptSelect() {
   });
   sel.innerHTML = `<option value="">${t('selectReceiptOption') || '-- Choose existing receipt --'}</option>` +
     receipts.map(r => {
-      const label = [r.receipt_group_id, r.shop, formatDate(r.purchase_date)].filter(Boolean).join(' · ');
+      const colValues = { group_id: r.receipt_group_id, shop: r.shop, date: formatDate(r.purchase_date) };
+      const label = chooseColOrder.map(k => colValues[k]).filter(Boolean).join(' · ');
       return `<option value="${escAttr(r.receipt_group_id)}">${escHtml(label)}</option>`;
     }).join('');
 }
@@ -453,10 +455,13 @@ function openModalForChoose() {
   sessionGroupId = null;
   sessionItemIds = [];
   clearFormItemFields();
+  syncChooseColSelects();
   populateExistingReceiptSelect();
   $('modalItemId').value = '';
   $('modalReceiptGroupId').value = '';
   const sel = $('existingReceiptSelect'); if (sel) sel.value = '';
+  // Hide the col order panel when opening fresh
+  const panel = $('chooseColOrderPanel'); if (panel) panel.style.display = 'none';
   setModalMode('choose');
   modal.style.display = 'flex';
 }
@@ -815,6 +820,25 @@ function setupEventListeners() {
   bind('existingReceiptSort',   'change', populateExistingReceiptSelect);
   bind('existingReceiptSelect', 'change', handleExistingReceiptSelect);
 
+  // RM-185: compact rows toggle
+  bind('compactRowsToggle', 'change', e => {
+    applyCompactRows(e.target.checked);
+    localStorage.setItem('rm_compact_rows', e.target.checked);
+  });
+
+  // RM-190: column order gear + selects
+  bind('chooseColOrderBtn', 'click', () => {
+    const panel = $('chooseColOrderPanel');
+    if (panel) {
+      const visible = panel.style.display !== 'none';
+      panel.style.display = visible ? 'none' : 'flex';
+      if (!visible) syncChooseColSelects();
+    }
+  });
+  bind('chooseCol1', 'change', () => handleChooseColChange(0));
+  bind('chooseCol2', 'change', () => handleChooseColChange(1));
+  bind('chooseCol3', 'change', () => handleChooseColChange(2));
+
   // RM-186: live line total
   const updateLineTotal = () => {
     const qty   = Math.max(1, parseInt($('modalQuantity')?.value) || 1);
@@ -920,7 +944,7 @@ function setupEventListeners() {
   window.addEventListener('languageChanged', () => filterAndRender());
 }
 
-// ===================== PERSISTENCE (RM-179, RM-184) =====================
+// ===================== PERSISTENCE (RM-179, RM-184, RM-185, RM-190) =====================
 function loadPersistedPreferences() {
   const savedCol = localStorage.getItem('rm_sort_column');
   const savedDir = localStorage.getItem('rm_sort_direction');
@@ -933,6 +957,46 @@ function loadPersistedPreferences() {
       qsa('.col-toggle').forEach(cb => { cb.checked = visibleColumns.has(cb.dataset.column); });
     } catch { /* keep defaults */ }
   }
+
+  // RM-185: compact rows
+  applyCompactRows(localStorage.getItem('rm_compact_rows') === 'true');
+
+  // RM-190: choose column order
+  const savedOrder = localStorage.getItem('rm_choose_col_order');
+  if (savedOrder) {
+    try {
+      const arr = JSON.parse(savedOrder);
+      if (Array.isArray(arr) && arr.length === 3) chooseColOrder = arr;
+    } catch { /* keep defaults */ }
+  }
+}
+
+// ===================== COMPACT ROWS (RM-185) =====================
+function applyCompactRows(enabled) {
+  const table = $('itemsTable');
+  if (table) table.classList.toggle('compact', enabled);
+  const toggle = $('compactRowsToggle');
+  if (toggle) toggle.checked = enabled;
+}
+
+// ===================== CHOOSE COLUMN ORDER (RM-190) =====================
+function syncChooseColSelects() {
+  ['chooseCol1', 'chooseCol2', 'chooseCol3'].forEach((id, i) => {
+    const el = $(id); if (el) el.value = chooseColOrder[i];
+  });
+}
+
+function handleChooseColChange(changedIdx) {
+  const ids = ['chooseCol1', 'chooseCol2', 'chooseCol3'];
+  const newVal = $(ids[changedIdx])?.value;
+  if (!newVal) return;
+  // Swap the other slot that already had this value
+  const swapIdx = chooseColOrder.findIndex((v, i) => i !== changedIdx && v === newVal);
+  if (swapIdx >= 0) chooseColOrder[swapIdx] = chooseColOrder[changedIdx];
+  chooseColOrder[changedIdx] = newVal;
+  syncChooseColSelects();
+  localStorage.setItem('rm_choose_col_order', JSON.stringify(chooseColOrder));
+  populateExistingReceiptSelect();
 }
 
 // ===================== AUTH (RM-177) =====================
