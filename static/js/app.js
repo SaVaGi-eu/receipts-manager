@@ -320,7 +320,7 @@ function renderTable(rows) {
       ? `<span class="cell-truncate"><a href="${API.fileUrl(filePath)}" target="_blank" class="file-link" title="${escAttr(filePath)}">${escHtml(r.file || filePath)}</a></span>`
       : (r.file ? cell(r.file) : '');
     const openBtn = filePath
-      ? `<button type="button" class="btn-small btn-open" data-id="${r.id}" data-path="${escAttr(filePath)}" data-i18n="open">O</button>`
+      ? `<button type="button" class="btn-small btn-open" data-id="${r.id}" data-path="${escAttr(filePath)}" data-i18n="open">Open</button>`
       : '';
     const status   = getStatus(r);
     const rowClass = status === 'expired' ? 'warranty-expired' : status === 'expiring' ? 'warranty-expiring' : '';
