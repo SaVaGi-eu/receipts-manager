@@ -1010,7 +1010,7 @@ async function editItem(itemId) {
     if (dlEl) { dlEl.href = '#'; dlEl.classList.add('hidden'); }
   }
 
-  sessionGroupId = null;
+  sessionGroupId = item.receipt_group_id;
   sessionItemIds = [];
   setModalMode('edit');
   const modal = $('ocrModal');
