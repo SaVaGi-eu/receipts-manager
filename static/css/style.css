@@ -672,7 +672,7 @@ input[readonly] {
 	  background: var(--card-bg);
 	  border-radius: 12px;
 	  box-shadow: var(--shadow);
-	  overflow: hidden;
+	  overflow: clip; /* 'hidden' breaks position:sticky on thead (RM-192) */
 	}
 
 	.table-wrapper {
