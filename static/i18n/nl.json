@@ -80,5 +80,11 @@
   "invoiceItemsTitle": "📋 Artikelen",
   "addRow": "+ Rij toevoegen",
   "saveAll": "Alles opslaan",
-  "receiptTotal": "Bonnetje totaal:"
+  "receiptTotal": "Bonnetje totaal:",
+  "filterBtn": "🔽 Filters",
+  "clearAllFilters": "Alles wissen",
+  "filterDateFrom": "Van",
+  "filterDateTo": "Tot",
+  "filterSearch": "Zoeken...",
+  "noFilterValues": "Geen waarden"
 }

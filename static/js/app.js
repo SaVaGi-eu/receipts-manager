@@ -14,6 +14,8 @@ let sessionItemIds  = [];
 let chooseColOrder  = ['group_id', 'shop', 'date'];
 let invoiceRows     = [];
 let nextRowId       = 0;
+let activeFilters   = {};
+let filterPanelField = 'shop';
 
 // ===================== CONSTANTS =====================
 const CURRENCY_SYMBOLS = {
@@ -25,6 +27,15 @@ const CURRENCY_SYMBOLS = {
 const CURRENCIES = [
   'EUR','USD','GBP','CHF','SEK','NOK','DKK','PLN','CZK','HUF',
   'RON','BGN','HRK','JPY','CNY','AUD','CAD','NZD','BRL','INR','KRW','TRY','ZAR','MXN'
+];
+
+const FILTER_FIELDS = [
+  { key: 'shop',          labelKey: 'colShop',          type: 'checkbox', search: true  },
+  { key: 'brand',         labelKey: 'colBrand',         type: 'checkbox', search: true  },
+  { key: 'category',      labelKey: 'colCategory',      type: 'checkbox', search: false },
+  { key: 'documentation', labelKey: 'colDocumentation', type: 'checkbox', search: false },
+  { key: 'location',      labelKey: 'colLocation',      type: 'checkbox', search: true  },
+  { key: 'purchase_date', labelKey: 'colPurchaseDate',  type: 'daterange'               },
 ];
 
 const API = {
@@ -92,6 +103,14 @@ function formatDate(dateStr) {
     case 'YYYY-MM-DD':  return `${year}-${mm}-${day}`;
     default:            return `${day}-${mon}-${year}`;  // DD-MMM-YYYY
   }
+}
+
+function parseDateToISO(dateStr) {
+  if (!dateStr || dateStr === 'N/A') return '';
+  const MONTHS = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
+  const m = /^(\d{4})-([A-Za-z]{3})-(\d{2})$/.exec(dateStr);
+  if (!m) return dateStr;
+  return `${m[1]}-${MONTHS[m[2]] || '00'}-${m[3]}`;
 }
 
 function formatPrice(price) {
@@ -402,6 +421,22 @@ function applyFilters(rows) {
         normalizeUsers(r.users).join('; '), r.file, formatPrice(r.price)
       ].map(x => String(x || '').toLowerCase()).join(' | ');
       if (!hay.includes(q)) return false;
+    }
+    // RM-193: panel filters
+    for (const f of FILTER_FIELDS) {
+      if (f.type === 'daterange') {
+        const range = activeFilters.purchase_date;
+        if (range?.from || range?.to) {
+          const iso = parseDateToISO(r.purchase_date);
+          if (range.from && iso < range.from) return false;
+          if (range.to   && iso > range.to)   return false;
+        }
+      } else {
+        const vals = activeFilters[f.key];
+        if (vals instanceof Set && vals.size > 0) {
+          if (!vals.has(String(r[f.key] || '').trim())) return false;
+        }
+      }
     }
     return true;
   });
@@ -943,6 +978,157 @@ async function deleteItem(itemId) {
   } catch (err) { console.error('Delete error:', err); alert(`Delete failed: ${err.message}`); }
 }
 
+// ===================== FILTER PANEL (RM-193) =====================
+function filterFieldLabel(key) {
+  const f = FILTER_FIELDS.find(x => x.key === key);
+  return (f && t(f.labelKey)) || key;
+}
+
+function getDistinctValues(fieldKey) {
+  const vals = new Set();
+  buildRows().forEach(r => {
+    const v = String(r[fieldKey] || '').trim();
+    if (v && v !== 'N/A') vals.add(v);
+  });
+  return [...vals].sort((a, b) => a.localeCompare(b));
+}
+
+function renderFilterValuesPane(fieldKey) {
+  const pane = $('filterValuesContent'); if (!pane) return;
+  const field = FILTER_FIELDS.find(f => f.key === fieldKey); if (!field) return;
+
+  if (field.type === 'daterange') {
+    const range = activeFilters.purchase_date || {};
+    pane.innerHTML = `
+      <div class="filter-daterange">
+        <label>${escHtml(t('filterDateFrom') || 'From')}</label>
+        <input type="date" id="filterDateFrom" value="${escAttr(range.from || '')}">
+        <label>${escHtml(t('filterDateTo') || 'To')}</label>
+        <input type="date" id="filterDateTo" value="${escAttr(range.to || '')}">
+      </div>`;
+    const syncDate = () => {
+      const from = $('filterDateFrom')?.value || '';
+      const to   = $('filterDateTo')?.value   || '';
+      if (from || to) activeFilters.purchase_date = { from, to };
+      else delete activeFilters.purchase_date;
+      updateFilterUI(); filterAndRender();
+    };
+    bind('filterDateFrom', 'change', syncDate);
+    bind('filterDateTo',   'change', syncDate);
+    return;
+  }
+
+  const values   = getDistinctValues(fieldKey);
+  const selected = activeFilters[fieldKey] || new Set();
+  const searchHtml = field.search
+    ? `<input type="text" id="filterValueSearch" class="filter-value-search" placeholder="${escAttr(t('filterSearch') || 'Search...')}">`
+    : '';
+  const listHtml = values.length
+    ? values.map(v => `<label class="filter-checkbox-label">
+        <input type="checkbox" class="filter-value-cb" data-field="${escAttr(fieldKey)}" data-value="${escAttr(v)}"${selected.has(v) ? ' checked' : ''}>
+        ${escHtml(v)}</label>`).join('')
+    : `<span class="filter-empty">${escHtml(t('noFilterValues') || 'No values')}</span>`;
+
+  pane.innerHTML = searchHtml + `<div id="filterCheckboxList" class="filter-checkbox-list">${listHtml}</div>`;
+
+  if (field.search) {
+    bind('filterValueSearch', 'input', e => {
+      const q = e.target.value.toLowerCase();
+      qsa('#filterCheckboxList .filter-checkbox-label').forEach(lbl =>
+        lbl.style.display = lbl.textContent.trim().toLowerCase().includes(q) ? '' : 'none'
+      );
+    });
+  }
+
+  qsa('#filterCheckboxList .filter-value-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const fk  = cb.dataset.field;
+      const val = cb.dataset.value;
+      if (!activeFilters[fk]) activeFilters[fk] = new Set();
+      if (cb.checked) activeFilters[fk].add(val);
+      else {
+        activeFilters[fk].delete(val);
+        if (!activeFilters[fk].size) delete activeFilters[fk];
+      }
+      updateFilterUI(); filterAndRender();
+    });
+  });
+}
+
+function countActiveFilters() {
+  return FILTER_FIELDS.reduce((n, f) => {
+    if (f.type === 'daterange') return n + ((activeFilters.purchase_date?.from || activeFilters.purchase_date?.to) ? 1 : 0);
+    return n + (activeFilters[f.key]?.size > 0 ? 1 : 0);
+  }, 0);
+}
+
+function updateFilterUI() {
+  const count = countActiveFilters();
+  const badge = $('filterBadge');
+  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? '' : 'none'; }
+
+  qsa('.filter-field-btn').forEach(btn => {
+    const fk = btn.dataset.field;
+    const on = fk === 'purchase_date'
+      ? !!(activeFilters.purchase_date?.from || activeFilters.purchase_date?.to)
+      : !!(activeFilters[fk]?.size);
+    btn.classList.toggle('has-filter', on);
+  });
+
+  renderFilterChips();
+}
+
+function renderFilterChips() {
+  const container = $('activeFilterChips'); if (!container) return;
+  const chips = [];
+  FILTER_FIELDS.forEach(f => {
+    if (f.type === 'daterange') {
+      const r = activeFilters.purchase_date;
+      if (r?.from || r?.to) {
+        const lbl = [r.from, r.to].filter(Boolean).join(' → ');
+        chips.push(`<span class="filter-chip"><strong>${escHtml(filterFieldLabel(f.key))}:</strong> ${escHtml(lbl)}<button type="button" class="chip-remove" data-field="purchase_date">&times;</button></span>`);
+      }
+    } else {
+      const vals = activeFilters[f.key];
+      if (vals?.size) {
+        [...vals].forEach(v =>
+          chips.push(`<span class="filter-chip"><strong>${escHtml(filterFieldLabel(f.key))}:</strong> ${escHtml(v)}<button type="button" class="chip-remove" data-field="${escAttr(f.key)}" data-value="${escAttr(v)}">&times;</button></span>`)
+        );
+      }
+    }
+  });
+  container.innerHTML = chips.join('');
+  container.style.display = chips.length ? '' : 'none';
+
+  qsa('#activeFilterChips .chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fk  = btn.dataset.field;
+      const val = btn.dataset.value;
+      if (fk === 'purchase_date') {
+        delete activeFilters.purchase_date;
+      } else {
+        activeFilters[fk]?.delete(val);
+        if (!activeFilters[fk]?.size) delete activeFilters[fk];
+      }
+      updateFilterUI(); filterAndRender();
+      if (filterPanelField === fk) renderFilterValuesPane(fk);
+    });
+  });
+}
+
+function clearAllFilters() {
+  activeFilters = {};
+  updateFilterUI(); filterAndRender();
+  renderFilterValuesPane(filterPanelField);
+}
+
+function openFilterPanel() {
+  const panel = $('filterPanel'); if (!panel) return;
+  panel.style.display = '';
+  qsa('.filter-field-btn').forEach(b => b.classList.toggle('active', b.dataset.field === filterPanelField));
+  renderFilterValuesPane(filterPanelField);
+}
+
 // ===================== SETTINGS =====================
 async function saveSettings() {
   const currency      = $('currencySelect')?.value      || 'EUR';
@@ -1105,6 +1291,32 @@ function setupEventListeners() {
     localStorage.setItem('rm_sort_direction', currentSort.direction);
     updateSortIndicators(); filterAndRender();
   }));
+
+  // RM-193: filter panel
+  bind('filterBtn', 'click', () => {
+    const panel = $('filterPanel');
+    if (!panel) return;
+    if (panel.style.display === 'none') { openFilterPanel(); }
+    else { panel.style.display = 'none'; }
+  });
+
+  document.addEventListener('click', e => {
+    const panel = $('filterPanel');
+    if (!panel || panel.style.display === 'none') return;
+    if (!panel.contains(e.target) && !$('filterBtn')?.contains(e.target)) {
+      panel.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.filter-field-btn');
+    if (!btn) return;
+    filterPanelField = btn.dataset.field;
+    qsa('.filter-field-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderFilterValuesPane(filterPanelField);
+  });
+
+  bind('clearAllFiltersBtn', 'click', clearAllFilters);
 
   // Re-render item count when language changes so the translation updates
   window.addEventListener('languageChanged', () => filterAndRender());

@@ -80,5 +80,11 @@
   "invoiceItemsTitle": "📋 Items",
   "addRow": "+ Add Row",
   "saveAll": "Save All",
-  "receiptTotal": "Receipt Total:"
+  "receiptTotal": "Receipt Total:",
+  "filterBtn": "🔽 Filters",
+  "clearAllFilters": "Clear All",
+  "filterDateFrom": "From",
+  "filterDateTo": "To",
+  "filterSearch": "Search...",
+  "noFilterValues": "No values"
 }

@@ -80,5 +80,11 @@
   "invoiceItemsTitle": "📋 Στοιχεία",
   "addRow": "+ Προσθήκη γραμμής",
   "saveAll": "Αποθήκευση όλων",
-  "receiptTotal": "Σύνολο απόδειξης:"
+  "receiptTotal": "Σύνολο απόδειξης:",
+  "filterBtn": "🔽 Φίλτρα",
+  "clearAllFilters": "Καθαρισμός όλων",
+  "filterDateFrom": "Από",
+  "filterDateTo": "Έως",
+  "filterSearch": "Αναζήτηση...",
+  "noFilterValues": "Δεν υπάρχουν τιμές"
 }

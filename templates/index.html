@@ -57,9 +57,33 @@
       <div class="toolbar-right">
         <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
         <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
+        <button id="filterBtn" class="btn-secondary" data-i18n="filterBtn">🔎 Filter<span id="filterBadge" class="filter-badge" style="display:none">0</span></button>
         <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
       </div>
     </section>
+
+    <!-- ===== Active filter chips ===== -->
+    <div id="activeFilterChips" class="active-filter-chips" style="display:none"></div>
+
+    <!-- ===== Filter panel ===== -->
+    <div id="filterPanel" class="filter-panel" style="display:none">
+      <div class="filter-panel-inner">
+        <div class="filter-fields-col">
+          <button class="filter-field-btn" data-field="shop"          data-i18n="colShop">Shop</button>
+          <button class="filter-field-btn" data-field="brand"         data-i18n="colBrand">Brand</button>
+          <button class="filter-field-btn" data-field="category"      data-i18n="colCategory">Category</button>
+          <button class="filter-field-btn" data-field="documentation" data-i18n="colDocumentation">Documentation</button>
+          <button class="filter-field-btn" data-field="location"      data-i18n="colLocation">Location</button>
+          <button class="filter-field-btn" data-field="purchase_date" data-i18n="colPurchaseDate">Purchase Date</button>
+        </div>
+        <div class="filter-values-col">
+          <div id="filterValuesContent"></div>
+        </div>
+      </div>
+      <div class="filter-panel-footer">
+        <button id="clearAllFiltersBtn" class="btn-secondary btn-small" data-i18n="clearAllFilters">Clear all</button>
+      </div>
+    </div>
 
     <!-- ===== Column toggle panel ===== -->
     <div id="columnPanel" class="column-panel">
