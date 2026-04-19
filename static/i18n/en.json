@@ -58,5 +58,10 @@
   "integrityIssues_one": "{{count}} integrity issue detected.",
   "integrityIssues_other": "{{count}} integrity issues detected.",
   "or": "OR",
-  "selectReceiptOption": "-- Choose existing receipt --"
+  "selectReceiptOption": "-- Choose existing receipt --",
+  "open": "O",
+  "logout": "🔓 Logout",
+  "dateFormatTitle": "📅 Date Format",
+  "dateFormatLabel": "Date Format:",
+  "addAnother": "Add Another"
 }

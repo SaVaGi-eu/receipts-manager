@@ -1,7 +1,7 @@
 // ===================== GLOBAL STATE =====================
 let allData    = { receipts: [], items: [], next_id: 1, integrity_issues: [] };
 let suggestions = { shops: [], brands: [], models: [], locations: [], documentation: [], projects: [], users: [], categories: [] };
-let appSettings = { currency: 'EUR', currency_display_format: 'symbol', warranty_expiration_warning_months: 3 };
+let appSettings = { currency: 'EUR', currency_display_format: 'symbol', warranty_expiration_warning_months: 3, date_format: 'DD-MMM-YYYY' };
 let currentSort  = { column: 'id', direction: 'asc' };
 let visibleColumns = new Set([
   'id', 'receipt_group_id', 'brand', 'model', 'location', 'category', 'users',
@@ -70,6 +70,26 @@ function exportCsv()  { downloadUrl(API.exportCsv); }
 
 function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s)  { return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function cell(text)  {
+  const s = String(text ?? '');
+  return `<span class="cell-truncate" title="${escAttr(s)}">${escHtml(s)}</span>`;
+}
+
+// RM-188: Format a stored YYYY-MMM-DD date string into the user's preferred display format
+function formatDate(dateStr) {
+  if (!dateStr || dateStr === 'N/A') return dateStr || '';
+  const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+  const m = /^(\d{4})-([A-Za-z]{3})-(\d{2})$/.exec(dateStr);
+  if (!m) return dateStr;
+  const year = m[1], mon = m[2], day = m[3];
+  const mm = String(MONTHS[mon] + 1).padStart(2, '0');
+  switch (appSettings.date_format || 'DD-MMM-YYYY') {
+    case 'DD/MM/YYYY':  return `${day}/${mm}/${year}`;
+    case 'MM/DD/YYYY':  return `${mm}/${day}/${year}`;
+    case 'YYYY-MM-DD':  return `${year}-${mm}-${day}`;
+    default:            return `${day}-${mon}-${year}`;  // DD-MMM-YYYY
+  }
+}
 
 function formatPrice(price) {
   if (price == null || price === '') return '—';
@@ -150,6 +170,8 @@ function renderSettingsUI() {
   if (fmtSel) fmtSel.value = appSettings.currency_display_format || 'symbol';
   const warnInp = $('warrantyWarningInput');
   if (warnInp) warnInp.value = appSettings.warranty_expiration_warning_months ?? 3;
+  const dateFmtSel = $('dateFormatSelect');
+  if (dateFmtSel) dateFmtSel.value = appSettings.date_format || 'DD-MMM-YYYY';
 }
 
 // ===================== DATALISTS =====================
@@ -276,12 +298,12 @@ function formatExtWarranty(ew) {
   return parts.join(' · ') || 'Yes';
 }
 
-// RM-147: convert stored YYYY-MMM-DD (e.g. 2025-Feb-27) to readable DD MMM YYYY (e.g. 27 Feb 2025)
-function formatDate(s) {
-  if (!s || s === 'N/A') return s || '';
-  const m = String(s).match(/^(\d{4})-([A-Za-z]{3})-(\d{2})$/);
-  if (!m) return s;
-  return `${m[3]} ${m[2]} ${m[1]}`;
+function updateItemCount(count) {
+  const el = $('itemCount');
+  if (!el) return;
+  el.textContent = typeof t === 'function' && typeof i18next !== 'undefined' && i18next.isInitialized
+    ? t('itemCount', { count })
+    : `${count} items`;
 }
 
 function renderTable(rows) {
@@ -289,43 +311,47 @@ function renderTable(rows) {
   if (!tbody) return;
   if (!rows || rows.length === 0) {
     tbody.innerHTML = `<tr class="empty-state"><td colspan="16"><div class="empty-message"><span class="empty-icon">📦</span><p>No items yet. Click "Add Receipt" to get started!</p></div></td></tr>`;
-    if ($('itemCount')) $('itemCount').textContent = typeof t === 'function' ? t('itemCount', { count: 0 }) : '0 items';
+    updateItemCount(0);
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const fileCell = r.receipt_relative_path
-      ? `<a href="${API.fileUrl(r.receipt_relative_path)}" target="_blank" class="file-link" title="${escAttr(r.receipt_relative_path)}">${escHtml(r.file || r.receipt_relative_path)}</a>`
-      : (r.file ? escHtml(r.file) : '');
+    const filePath = r.receipt_relative_path || '';
+    const fileCell = filePath
+      ? `<span class="cell-truncate"><a href="${API.fileUrl(filePath)}" target="_blank" class="file-link" title="${escAttr(filePath)}">${escHtml(r.file || filePath)}</a></span>`
+      : (r.file ? cell(r.file) : '');
+    const openBtn = filePath
+      ? `<button type="button" class="btn-small btn-open" data-id="${r.id}" data-path="${escAttr(filePath)}" data-i18n="open">O</button>`
+      : '';
     const status   = getStatus(r);
     const rowClass = status === 'expired' ? 'warranty-expired' : status === 'expiring' ? 'warranty-expiring' : '';
     return `
     <tr class="${rowClass}">
       <td data-column="id">${r.id ?? ''}</td>
-      <td data-column="receipt_group_id">${escHtml(r.receipt_group_id ?? '')}</td>
-      <td data-column="brand"          title="${escAttr(r.brand ?? '')}">${escHtml(r.brand ?? '')}</td>
-      <td data-column="model"          title="${escAttr(r.model ?? '')}">${escHtml(r.model ?? '')}</td>
-      <td data-column="location"       title="${escAttr(r.location ?? '')}">${escHtml(r.location ?? '')}</td>
-      <td data-column="category">${escHtml(r.category ?? '')}</td>
-      <td data-column="users"          title="${escAttr(normalizeUsers(r.users).join('; '))}">${escHtml(normalizeUsers(r.users).join('; '))}</td>
-      <td data-column="project"        title="${escAttr(r.project ?? '')}">${escHtml(r.project ?? '')}</td>
-      <td data-column="shop"           title="${escAttr(r.shop ?? '')}">${escHtml(r.shop ?? '')}</td>
-      <td data-column="purchase_date">${escHtml(formatDate(r.purchase_date ?? ''))}</td>
-      <td data-column="documentation"  title="${escAttr(r.documentation ?? '')}">${escHtml(r.documentation ?? '')}</td>
-      <td data-column="guarantee_end_date">${escHtml(formatDate(r.guarantee_end_date ?? ''))}</td>
-      <td data-column="extended_warranty">${formatExtWarranty(r.extended_warranty)}</td>
+      <td data-column="receipt_group_id">${cell(r.receipt_group_id)}</td>
+      <td data-column="brand">${cell(r.brand)}</td>
+      <td data-column="model">${cell(r.model)}</td>
+      <td data-column="location">${cell(r.location)}</td>
+      <td data-column="category">${cell(r.category)}</td>
+      <td data-column="users">${cell(normalizeUsers(r.users).join('; '))}</td>
+      <td data-column="project">${cell(r.project)}</td>
+      <td data-column="shop">${cell(r.shop)}</td>
+      <td data-column="purchase_date">${cell(formatDate(r.purchase_date))}</td>
+      <td data-column="documentation">${cell(r.documentation)}</td>
+      <td data-column="guarantee_end_date">${cell(formatDate(r.guarantee_end_date))}</td>
+      <td data-column="extended_warranty">${cell(formatExtWarranty(r.extended_warranty))}</td>
       <td data-column="price">${formatPrice(r.price)}</td>
       <td data-column="file">${fileCell}</td>
       <td data-column="actions">
-        ${r.receipt_relative_path ? `<button type="button" class="btn-small btn-open" data-url="${escAttr(API.fileUrl(r.receipt_relative_path))}">Open</button>` : ''}
+        ${openBtn}
         <button type="button" class="btn-small btn-edit"   data-id="${r.id}">Edit</button>
         <button type="button" class="btn-small btn-delete" data-id="${r.id}">Delete</button>
       </td>
     </tr>`;
   }).join('');
-  if ($('itemCount')) $('itemCount').textContent = typeof t === 'function' ? t('itemCount', { count: rows.length }) : `${rows.length} items`;
+  updateItemCount(rows.length);
   updateColumnVisibility();
   qsa('#tableBody .btn-open').forEach(btn =>
-    btn.addEventListener('click', () => window.open(btn.dataset.url, '_blank'))
+    btn.addEventListener('click', () => window.open(API.fileUrl(btn.dataset.path), '_blank'))
   );
   qsa('#tableBody .btn-edit').forEach(btn =>
     btn.addEventListener('click', () => editItem(parseInt(btn.dataset.id)))
@@ -387,7 +413,7 @@ async function handleImport(e) {
   try {
     const payload = JSON.parse(await f.text());
     await fetchJson(API.importJson, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    await Promise.all([loadData(), loadSuggestions()]);
+    await loadData(); await loadSuggestions();
     alert('Imported successfully.');
   } catch (err) { console.error('Import failed:', err); alert('Import failed (see Console).'); }
   finally { e.target.value = ''; }
@@ -399,20 +425,6 @@ async function recheckIntegrity() {
 }
 
 // ===================== FILE HANDLING =====================
-function setDropZoneFile(file) {
-  const dz = $('modalDropZone');
-  if (!dz) return;
-  const nameEl = $('dropZoneFileName');
-  if (nameEl) nameEl.textContent = file.name;
-  dz.classList.add('file-selected');
-}
-
-function resetDropZone() {
-  const dz = $('modalDropZone');
-  if (!dz) return;
-  dz.classList.remove('file-selected', 'drag-over');
-}
-
 async function handleFile(file) {
   if (!file) return;
   const formData = new FormData();
@@ -430,7 +442,6 @@ async function handleFile(file) {
 // ===================== MODAL — OPEN / CLOSE =====================
 function openModalForChoose() {
   const modal = $('ocrModal'); if (!modal) return;
-  resetDropZone();
   sessionGroupId = null;
   sessionItemIds = [];
   clearFormItemFields();
@@ -478,7 +489,6 @@ function setModalMode(mode) {
   const uploadSec = qs('.upload-select-section');
   const form      = $('ocrForm');
   if (mode === 'choose') {
-    // Show upload/existing-receipt chooser; hide form and action buttons until a receipt is chosen
     if (uploadSec) uploadSec.style.display = '';
     if (form)      form.style.display = 'none';
     if (btnAdd)    btnAdd.style.display = 'none';
@@ -505,7 +515,6 @@ function clearFormItemFields() {
   if (ewCb) ewCb.checked = false;
   const ewFields = $('extendedWarrantyFields');
   if (ewFields) ewFields.classList.add('hidden');
-  // Reset ext warranty doc fields
   const docPath = $('extWarrantyDocPath'); if (docPath) docPath.value = '';
   const docName = $('extWarrantyDocName'); if (docName) docName.textContent = '';
   const docLink = $('extWarrantyDocLink'); if (docLink) { docLink.href = '#'; docLink.classList.add('hidden'); }
@@ -515,11 +524,9 @@ function clearFormItemFields() {
 function closeOcrModal() {
   const modal = $('ocrModal');
   if (modal) { modal.style.display = 'none'; $('ocrForm')?.reset(); }
-  resetDropZone();
   clearUserTags();
   sessionGroupId = null;
   sessionItemIds = [];
-  // Restore visibility for next open
   const uploadSec = qs('.upload-select-section');
   if (uploadSec) uploadSec.style.display = '';
   const form = $('ocrForm');
@@ -573,13 +580,11 @@ function validateForm() {
   if (!pd)    { alert('Purchase Date is required.'); return false; }
   if (!brand) { alert('Brand is required.');         return false; }
   if (!model) { alert('Model is required.');         return false; }
-  // RM-122: purchase date must not be in the future and not more than 100 years ago
   const pdDate  = new Date(pd);
   const today   = new Date(); today.setHours(0, 0, 0, 0);
   const minDate = new Date(today); minDate.setFullYear(minDate.getFullYear() - 100);
   if (pdDate > today)   { alert('Purchase date cannot be in the future.');               return false; }
   if (pdDate < minDate) { alert('Purchase date cannot be more than 100 years in the past.'); return false; }
-  // RM-122: Price format
   const priceRaw = ($('modalPrice')?.value || '').trim();
   if (priceRaw && isNaN(parseFloat(priceRaw))) { alert('Price must be a valid number.'); return false; }
   return true;
@@ -599,7 +604,6 @@ async function handleAddAnother() {
     });
     if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
 
-    // Create new placeholder item in the same group
     const createResp = await fetchJson(API.createItem, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ receipt_group_id: sessionGroupId })
@@ -610,7 +614,6 @@ async function handleAddAnother() {
     sessionItemIds.push(newItemId);
     $('modalItemId').value = newItemId;
 
-    // Keep shop and date, clear item-specific fields
     const keepShop = $('modalShop').value;
     const keepDate = $('modalPurchaseDate').value;
     clearFormItemFields();
@@ -636,7 +639,7 @@ async function handleFinish(e) {
     });
     if (!resp.success) { alert(`Save failed: ${resp.error || 'Unknown error'}`); return; }
     closeOcrModal();
-    await Promise.all([loadData(), loadSuggestions()]);
+    await loadData(); await loadSuggestions();
   } catch (err) { console.error('Save error:', err); alert(`Save failed: ${err.message}`); }
 }
 
@@ -644,11 +647,8 @@ async function handleCancelModal() {
   if (sessionItemIds.length > 0) {
     const confirmed = confirm('Are you sure you want to cancel? Unsaved changes will be lost.');
     if (!confirmed) return;
-    // Only delete items that were created as placeholders for a NEW receipt upload
-    // (not for existing-receipt mode, where the file belongs to an existing group)
     const mode = $('modalMode')?.value;
     if (mode === 'new' && sessionGroupId) {
-      // Check if this group existed before this session (existing-receipt) or was just uploaded
       const existedBefore = (allData.receipts || []).some(r => r.receipt_group_id === sessionGroupId);
       if (!existedBefore) {
         for (const id of sessionItemIds) {
@@ -662,7 +662,6 @@ async function handleCancelModal() {
   closeOcrModal();
 }
 
-// Existing receipt flow (RM-123): selecting an existing receipt creates a new item in that group
 async function handleExistingReceiptSelect(e) {
   const groupId = e.target.value;
   if (!groupId) return;
@@ -690,7 +689,6 @@ async function handleExistingReceiptSelect(e) {
   } catch (err) { console.error('Existing receipt error:', err); alert(`Error: ${err.message}`); }
 }
 
-// Form submit handler proxy
 async function saveOcrData(e) { return handleFinish(e); }
 
 // ===================== EDIT ITEM =====================
@@ -772,19 +770,20 @@ async function deleteItem(itemId) {
   try {
     const resp = await fetchJson(API.deleteItem(itemId), { method: 'DELETE' });
     if (!resp.success) { alert(`Delete failed: ${resp.error || 'Unknown error'}`); return; }
-    await Promise.all([loadData(), loadSuggestions()]);
+    await loadData(); await loadSuggestions();
   } catch (err) { console.error('Delete error:', err); alert(`Delete failed: ${err.message}`); }
 }
 
 // ===================== SETTINGS =====================
 async function saveSettings() {
-  const currency     = $('currencySelect')?.value     || 'EUR';
-  const format       = $('currencyFormatSelect')?.value || 'symbol';
+  const currency      = $('currencySelect')?.value      || 'EUR';
+  const format        = $('currencyFormatSelect')?.value || 'symbol';
   const warningMonths = parseInt($('warrantyWarningInput')?.value) || 3;
+  const dateFormat    = $('dateFormatSelect')?.value    || 'DD-MMM-YYYY';
   try {
     appSettings = await fetchJson(API.settings, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ currency, currency_display_format: format, warranty_expiration_warning_months: warningMonths })
+      body: JSON.stringify({ currency, currency_display_format: format, warranty_expiration_warning_months: warningMonths, date_format: dateFormat })
     });
     filterAndRender();
     alert('Settings saved.');
@@ -793,16 +792,13 @@ async function saveSettings() {
 
 // ===================== EVENT LISTENERS =====================
 function setupEventListeners() {
-  // "Add Receipt" button → open modal in choose mode (upload OR existing receipt)
   bind('addReceiptBtn', 'click', openModalForChoose);
 
-  // Modal file input
   const modalFileInput = $('modalFileInput');
   if (modalFileInput) {
-    modalFileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) { setDropZoneFile(f); handleFile(f); } });
+    modalFileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) handleFile(f); });
   }
 
-  // Modal drop zone (inside modal)
   const modalDropZone = $('modalDropZone');
   if (modalDropZone) {
     const browseLink = modalDropZone.querySelector('.browse-link');
@@ -812,45 +808,37 @@ function setupEventListeners() {
     modalDropZone.addEventListener('dragleave', () => modalDropZone.classList.remove('drag-over'));
     modalDropZone.addEventListener('drop', e => {
       e.preventDefault(); modalDropZone.classList.remove('drag-over');
-      const f = e.dataTransfer?.files?.[0]; if (f) { setDropZoneFile(f); handleFile(f); }
+      const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f);
     });
   }
 
-  // Existing receipt dropdown (RM-123)
   bind('existingReceiptSelect', 'change', handleExistingReceiptSelect);
 
-  // Toolbar
   bind('searchInput',   'input',  filterAndRender);
   bind('projectFilter', 'change', filterAndRender);
   bind('statusFilter',  'change', filterAndRender);
   bind('userFilter',    'change', filterAndRender);
   bind('refreshBtn',    'click',  () => { loadData(); loadSuggestions(); });
 
-  // Column toggle
   bind('columnToggleBtn',  'click', () => { const p = $('columnPanel'); if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; });
   bind('closeColumnPanel', 'click', () => { const p = $('columnPanel'); if (p) p.style.display = 'none'; });
 
-  // Integrity banner
   bind('recheckBtn',     'click', recheckIntegrity);
   bind('closeBannerBtn', 'click', () => { const b = $('integrityBanner'); if (b) b.style.display = 'none'; });
 
-  // OCR modal buttons
   bind('closeModal',    'click',  handleCancelModal);
   bind('cancelModal',   'click',  handleCancelModal);
   bind('btnAddAnother', 'click',  handleAddAnother);
   bind('ocrForm',       'submit', saveOcrData);
 
-  // Close modal on backdrop click
   const modal = $('ocrModal');
   if (modal) modal.addEventListener('click', e => { if (e.target === modal) handleCancelModal(); });
 
-  // Extended warranty toggle
   bind('extendedWarrantyCheckbox', 'change', e => {
     const fields = $('extendedWarrantyFields');
     if (fields) fields.classList.toggle('hidden', !e.target.checked);
   });
 
-  // RM-77: ext warranty document upload
   bind('extWarrantyDocBtn', 'click', () => $('extWarrantyDocInput')?.click());
   const ewDocInput = $('extWarrantyDocInput');
   if (ewDocInput) {
@@ -881,7 +869,6 @@ function setupEventListeners() {
     });
   }
 
-  // User tag input
   const tagInput = $('userTagInput');
   if (tagInput) {
     tagInput.addEventListener('keydown', e => {
@@ -896,32 +883,57 @@ function setupEventListeners() {
     });
   }
 
-  // Settings
   bind('saveSettingsBtn', 'click', saveSettings);
   bind('menuBackupBtn',   'click', exportJson);
   bind('menuExportBtn',   'click', exportCsv);
   bind('menuRestoreBtn',  'click', () => $('importInput')?.click());
   bind('importInput',     'change', handleImport);
 
-  // Column visibility toggles
   qsa('.col-toggle').forEach(t => t.addEventListener('change', e => {
     const col = e.target.dataset.column; if (!col) return;
     if (e.target.checked) visibleColumns.add(col); else visibleColumns.delete(col);
+    localStorage.setItem('rm_visible_columns', JSON.stringify([...visibleColumns]));
     updateColumnVisibility();
   }));
 
-  // Sortable headers
   qsa('th.sortable').forEach(th => th.addEventListener('click', () => {
     const col = th.dataset.column; if (!col) return;
     if (currentSort.column === col) currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
     else { currentSort.column = col; currentSort.direction = 'asc'; }
+    localStorage.setItem('rm_sort_column', currentSort.column);
+    localStorage.setItem('rm_sort_direction', currentSort.direction);
     updateSortIndicators(); filterAndRender();
   }));
+
+  // Re-render item count when language changes so the translation updates
+  window.addEventListener('languageChanged', () => filterAndRender());
+}
+
+// ===================== PERSISTENCE (RM-179, RM-184) =====================
+function loadPersistedPreferences() {
+  const savedCol = localStorage.getItem('rm_sort_column');
+  const savedDir = localStorage.getItem('rm_sort_direction');
+  if (savedCol) { currentSort.column = savedCol; currentSort.direction = savedDir || 'asc'; }
+
+  const savedCols = localStorage.getItem('rm_visible_columns');
+  if (savedCols) {
+    try {
+      visibleColumns = new Set(JSON.parse(savedCols));
+      qsa('.col-toggle').forEach(cb => { cb.checked = visibleColumns.has(cb.dataset.column); });
+    } catch { /* keep defaults */ }
+  }
+}
+
+// ===================== AUTH (RM-177) =====================
+async function checkAuthAndShowLogout() {
+  try {
+    const status = await fetchJson('/api/auth-status');
+    if (status.auth_enabled) { const btn = $('logoutBtn'); if (btn) btn.style.display = ''; }
+  } catch { /* non-critical */ }
 }
 
 // ===================== INIT =====================
-document.addEventListener('DOMContentLoaded', () => {
-  // RM-122: set purchase date constraints dynamically
+function appInit() {
   const pdInput = $('modalPurchaseDate');
   if (pdInput) {
     const today   = new Date();
@@ -929,7 +941,24 @@ document.addEventListener('DOMContentLoaded', () => {
     pdInput.max = today.toISOString().split('T')[0];
     pdInput.min = minDate.toISOString().split('T')[0];
   }
+  loadPersistedPreferences();
   loadSettings();
-  Promise.all([loadData(), loadSuggestions()]);
+  loadData();
+  loadSuggestions();
   setupEventListeners();
+  checkAuthAndShowLogout();
+}
+
+// Wait for i18next to be ready before starting the app
+// This ensures t() works correctly from the very first render
+window.addEventListener('i18nextReady', appInit);
+
+// Fallback: if i18nextReady never fires (e.g. CDN failure), start anyway after DOM load
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (typeof i18next === 'undefined' || !i18next.isInitialized) {
+      console.warn('[app] i18nextReady never fired, starting app without i18n');
+      appInit();
+    }
+  }, 3000);
 });

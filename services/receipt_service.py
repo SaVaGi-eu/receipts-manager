@@ -4,6 +4,7 @@ Moved to services/ package as part of RM-115 folder structure refactor.
 """
 
 import csv
+import hashlib
 import json
 import logging
 import os
@@ -19,7 +20,6 @@ from urllib.parse import unquote
 
 logger = logging.getLogger("receipt-manager")
 
-_RG_PATTERN = re.compile(r"RG-(\d+)")
 
 # ---------- Module-level helpers (moved from app.py) ----------
 
@@ -205,7 +205,7 @@ def _sanitize_log(text: str, max_length: int = 200) -> str:
     return sanitized
 
 
-def sanitize_filename(text: str, max_length: int = 50) -> str:
+def sanitize_filename(text, max_length=50):
     if not text or text == "N/A":
         return "NA"
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
@@ -234,7 +234,7 @@ def sanitize_full_filename(name: str, max_length: int = 200) -> str:
     return name or "file"
 
 
-def format_date_for_filename(date_str: str) -> str:
+def format_date_for_filename(date_str):
     try:
         dt = datetime.strptime(date_str, "%Y-%b-%d")
         return dt.strftime("%Y%b%d")
@@ -243,13 +243,7 @@ def format_date_for_filename(date_str: str) -> str:
         return safe or "unknown"
 
 
-def _last_day_of_month(year: int, month: int) -> datetime:
-    if month == 12:
-        return datetime(year + 1, 1, 1) - timedelta(days=1)
-    return datetime(year, month + 1, 1) - timedelta(days=1)
-
-
-def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -> str:
+def calculate_guarantee_end_date(purchase_date, duration, unit):
     if duration == 0:
         return "N/A"
     try:
@@ -260,7 +254,10 @@ def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -
             month = dt.month + duration
             year = dt.year + (month - 1) // 12
             month = ((month - 1) % 12) + 1
-            last_day = _last_day_of_month(year, month)
+            if month == 12:
+                last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                last_day = datetime(year, month + 1, 1) - timedelta(days=1)
             if dt.day <= last_day.day:
                 end_dt = last_day.replace(day=dt.day)
             else:
@@ -273,7 +270,10 @@ def calculate_guarantee_end_date(purchase_date: str, duration: int, unit: str) -
                 end_dt = datetime(year, month, day)
             except ValueError:
                 # fallback to last valid day of month
-                last_day = _last_day_of_month(year, month)
+                if month == 12:
+                    last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    last_day = datetime(year, month + 1, 1) - timedelta(days=1)
                 end_dt = last_day
         else:
             return "N/A"
@@ -323,6 +323,9 @@ def _today_ymmmdd():
 
 
 class ReceiptService:
+    # RM-168: supported extensions for drop-folder auto-import
+    _DROP_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg"}
+
     def __init__(self, data_file, data_root, receipts_dir, storage_dir, backup_dir):
         self._data_file = Path(data_file)
         self._data_root = Path(data_root)
@@ -330,6 +333,11 @@ class ReceiptService:
         self._storage_dir = Path(storage_dir)
         self._backup_dir = Path(backup_dir)
         self._lock = threading.Lock()
+        # RM-168: create the user-facing drop folder on startup
+        try:
+            (self._receipts_dir / "drop").mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     # ---------- Persistence ----------
 
@@ -347,6 +355,8 @@ class ReceiptService:
             return {"receipts": [], "items": [], "next_id": 1}
 
     def save(self, data: dict) -> bool:
+        from datetime import datetime as _dt
+
         try:
             new_content = json.dumps(data, indent=2, ensure_ascii=False)
             if self._data_file.exists():
@@ -363,7 +373,7 @@ class ReceiptService:
                 changed = True
 
             if changed:
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                ts = _dt.now().strftime("%Y%m%d_%H%M%S")
                 backup = self._backup_dir / f"data_backup_{ts}.json"
                 if self._data_file.exists():
                     shutil.copy2(self._data_file, backup)
@@ -373,8 +383,8 @@ class ReceiptService:
                     for b in backups[:-20]:
                         b.unlink(missing_ok=True)
 
-                with self._data_file.open("w", encoding="utf-8") as f:
-                    f.write(new_content)
+            with self._data_file.open("w", encoding="utf-8") as f:
+                f.write(new_content)
             return True
         except Exception:
             logger.exception("Save error")
@@ -385,6 +395,7 @@ class ReceiptService:
     def check_integrity(self) -> list:
         with self._lock:
             data = self.load()
+            self._scan_drop_folder(data)
             issues = self._verify_file_integrity(data)
             data["integrity_issues"] = issues
             self.save(data)
@@ -422,6 +433,100 @@ class ReceiptService:
 
         return issues
 
+    def _scan_drop_folder(self, data) -> int:
+        """RM-168: Detect files dropped into the drop folder and auto-import them.
+
+        Caller must hold self._lock. Mutates *data* in-place; caller is responsible
+        for saving. Returns the number of newly imported files.
+        """
+        drop_dir = self._receipts_dir / "drop"
+        if not drop_dir.exists():
+            return 0
+
+        known_hashes: set = set(data.get("drop_hashes", []))
+        upload_dir = self._receipts_dir / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        imported = 0
+        from datetime import datetime as _dt
+
+        for file_path in sorted(drop_dir.iterdir()):
+            if not file_path.is_file():
+                continue
+            if file_path.suffix.lower() not in self._DROP_EXTENSIONS:
+                continue
+
+            # SECURITY: validate file is directly inside drop_dir (no traversal)
+            try:
+                file_path.relative_to(drop_dir)
+            except ValueError:
+                continue
+
+            try:
+                file_bytes = file_path.read_bytes()
+                file_hash = hashlib.sha256(file_bytes).hexdigest()
+            except Exception:
+                continue
+
+            if file_hash in known_hashes:
+                # Already imported — silently remove to keep drop folder clean
+                try:
+                    file_path.unlink()
+                except Exception:
+                    pass
+                continue
+
+            try:
+                ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+                safe_base = sanitize_filename(file_path.stem, max_length=80)
+                ext = file_path.suffix.lower()
+                saved_name = f"{ts}_{safe_base}{ext}"
+                dest = upload_dir / saved_name
+
+                shutil.copy2(str(file_path), str(dest))
+                rel_path = str(dest.relative_to(self._data_root))
+
+                rg_id = self._generate_group_id(data)
+                receipt = {
+                    "receipt_group_id": rg_id,
+                    "shop": "N/A",
+                    "purchase_date": _today_ymmmdd(),
+                    "documentation": "N/A",
+                    "receipt_filename": saved_name,
+                    "receipt_relative_path": rel_path,
+                }
+                data.setdefault("receipts", []).append(receipt)
+                item_id = int(data.get("next_id", 1))
+                item = {
+                    "id": item_id,
+                    "receipt_group_id": rg_id,
+                    "brand": "N/A",
+                    "model": "N/A",
+                    "location": "N/A",
+                    "category": "",
+                    "users": [],
+                    "project": "N/A",
+                    "guarantee_duration": 0,
+                    "guarantee_unit": "months",
+                    "guarantee_end_date": "N/A",
+                    "price": None,
+                    "extended_warranty": None,
+                    "receipt_relative_path": rel_path,
+                }
+                data.setdefault("items", []).append(item)
+                data["next_id"] = item_id + 1
+
+                known_hashes.add(file_hash)
+                data["drop_hashes"] = list(known_hashes)
+
+                file_path.unlink()
+                imported += 1
+                logger.info("Drop import: %s → %s", _sanitize_log(file_path.name), _sanitize_log(saved_name))
+            except Exception:
+                logger.exception("Drop import failed for %s", _sanitize_log(file_path.name))
+
+        return imported
+
     def start_integrity_worker(self):
         def worker():
             while True:
@@ -429,10 +534,9 @@ class ReceiptService:
                 try:
                     with self._lock:
                         data = self.load()
-                        new_issues = self._verify_file_integrity(data)
-                        if new_issues != data.get("integrity_issues"):
-                            data["integrity_issues"] = new_issues
-                            self.save(data)
+                        self._scan_drop_folder(data)
+                        data["integrity_issues"] = self._verify_file_integrity(data)
+                        self.save(data)
                 except Exception:
                     logger.exception("Integrity worker error")
 
@@ -449,34 +553,23 @@ class ReceiptService:
     def get_suggestions(self) -> dict:
         with self._lock:
             data = self.load()
-        shops, docs = set(), set()
-        for r in data.get("receipts", []):
-            if r.get("shop"):
-                shops.add(r["shop"])
-            if r.get("documentation"):
-                docs.add(r["documentation"])
-        brands, models, locations, projects, users, categories = set(), set(), set(), set(), set(), set()
-        for i in data.get("items", []):
-            if i.get("brand"):
-                brands.add(i["brand"])
-            if i.get("model"):
-                models.add(i["model"])
-            if i.get("location"):
-                locations.add(i["location"])
-            if i.get("project") and i["project"] != "N/A":
-                projects.add(i["project"])
-            users.update(i.get("users", []))
-            if i.get("category"):
-                categories.add(i["category"])
+        shops = [r["shop"] for r in data.get("receipts", []) if r.get("shop")]
+        brands = [i["brand"] for i in data.get("items", []) if i.get("brand")]
+        models = [i["model"] for i in data.get("items", []) if i.get("model")]
+        locations = [i["location"] for i in data.get("items", []) if i.get("location")]
+        docs = [r["documentation"] for r in data.get("receipts", []) if r.get("documentation")]
+        projects = [i["project"] for i in data.get("items", []) if i.get("project") and i["project"] != "N/A"]
+        users = [u for i in data.get("items", []) for u in i.get("users", [])]
+        categories = [i["category"] for i in data.get("items", []) if i.get("category")]
         return {
-            "shops": sorted(shops),
-            "brands": sorted(brands),
-            "models": sorted(models),
-            "locations": sorted(locations),
-            "documentation": sorted(docs),
-            "projects": sorted(projects),
-            "users": sorted(users),
-            "categories": sorted(categories),
+            "shops": sorted(set(shops)),
+            "brands": sorted(set(brands)),
+            "models": sorted(set(models)),
+            "locations": sorted(set(locations)),
+            "documentation": sorted(set(docs)),
+            "projects": sorted(set(projects)),
+            "users": sorted(set(users)),
+            "categories": sorted(set(categories)),
         }
 
     def export_json(self) -> dict:
@@ -558,7 +651,9 @@ class ReceiptService:
             ext = ".bin"
             safe_base = "upload"
 
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        from datetime import datetime as _dt
+
+        ts = _dt.now().strftime("%Y%m%d_%H%M%S")
         upload_dir = self._receipts_dir / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -591,15 +686,7 @@ class ReceiptService:
                 "receipt_relative_path": rel_path,
             }
             data.setdefault("receipts", []).append(receipt)
-            raw_next_id = data.get("next_id", 1)
-            try:
-                item_id = int(raw_next_id)
-            except (TypeError, ValueError):
-                logger.warning("Invalid next_id %r in data store; defaulting to 1", raw_next_id)
-                item_id = 1
-            if item_id < 1:
-                logger.warning("Non-positive next_id %r in data store; defaulting to 1", raw_next_id)
-                item_id = 1
+            item_id = int(data.get("next_id", 1))
             item = {
                 "id": item_id,
                 "receipt_group_id": rg_id,
@@ -642,7 +729,9 @@ class ReceiptService:
             ext = ".bin"
             safe_base = "upload"
 
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        from datetime import datetime as _dt
+
+        ts = _dt.now().strftime("%Y%m%d_%H%M%S")
         doc_dir = self._receipts_dir / "documents"
         doc_dir.mkdir(parents=True, exist_ok=True)
 
@@ -712,12 +801,7 @@ class ReceiptService:
                     if not is_multi:
                         needs_move = True
             if "guarantee_duration" in updates:
-                raw_duration = updates.get("guarantee_duration")
-                try:
-                    item["guarantee_duration"] = int(raw_duration or 0)
-                except (TypeError, ValueError):
-                    logger.warning("Invalid guarantee_duration value %r; defaulting to 0", raw_duration)
-                    item["guarantee_duration"] = 0
+                item["guarantee_duration"] = int(updates.get("guarantee_duration") or 0)
             if "guarantee_unit" in updates:
                 item["guarantee_unit"] = updates["guarantee_unit"]
             if "category" in updates:
@@ -814,13 +898,14 @@ class ReceiptService:
             "currency": "EUR",
             "currency_display_format": "symbol",
             "warranty_expiration_warning_months": 3,
+            "date_format": "DD-MMM-YYYY",
         }
         stored = data.get("app_settings", {})
         return {**defaults, **stored}
 
     def update_settings(self, updates: dict) -> dict:
         """Persist allowed app-level settings and return the updated values."""
-        allowed = {"currency", "currency_display_format", "warranty_expiration_warning_months"}
+        allowed = {"currency", "currency_display_format", "warranty_expiration_warning_months", "date_format"}
         with self._lock:
             data = self.load()
             settings = data.get("app_settings", {})
@@ -834,9 +919,10 @@ class ReceiptService:
     # ---------- Private helpers ----------
 
     def _generate_group_id(self, data: dict) -> str:
+        ids = [r["receipt_group_id"] for r in data.get("receipts", [])]
         numbers = []
-        for r in data.get("receipts", []):
-            m = _RG_PATTERN.search(r["receipt_group_id"])
+        for rid in ids:
+            m = re.search(r"RG-(\d+)", rid)
             if m:
                 numbers.append(int(m.group(1)))
         return f"RG-{(max(numbers, default=0)+1):04d}"

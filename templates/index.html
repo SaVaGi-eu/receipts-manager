@@ -27,6 +27,7 @@
       <!-- RM-80: Menu Button -->
       <button id="menuBtn" class="btn-secondary" data-i18n="menu">⚙️ Settings</button>
       <span id="itemCount" class="item-count">0 items</span>
+      <a id="logoutBtn" href="/logout" class="btn-secondary" style="display:none" data-i18n="logout">🔓 Logout</a>
     </div>
   </header>
 
@@ -111,7 +112,8 @@
           </thead>
           <tbody id="tableBody">
             <tr class="empty-state">
-              <td colspan="16">
+              <td colspan="15">
+              <td colspan="12">
                 <div class="empty-message">
                   <span class="empty-icon">📦</span>
                   <p data-i18n="noItems">No items yet. Click "Add Receipt" to get started!</p>
@@ -148,7 +150,7 @@
         <div class="settings-section">
           <h3 data-i18n="languageTitle">🌐 Language</h3>
           <div class="settings-actions">
-            <select id="languageSelect" class="language-select-menu">
+            <select id="languageSelect" class="settings-select" style="width:100%">
               <option value="en">🇬🇧 English</option>
               <option value="el">🇬🇷 Ελληνικά</option>
               <option value="nl">🇳🇱 Nederlands</option>
@@ -211,6 +213,22 @@
           </div>
         </div>
 
+        <!-- Date Format Settings (RM-188) -->
+        <div class="settings-section">
+          <h3 data-i18n="dateFormatTitle">📅 Date Format</h3>
+          <div class="settings-actions">
+            <div class="settings-row">
+              <label for="dateFormatSelect" data-i18n="dateFormatLabel">Date Format:</label>
+              <select id="dateFormatSelect" class="settings-select">
+                <option value="DD-MMM-YYYY">DD-MMM-YYYY (19-Apr-2026)</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY (19/04/2026)</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY (04/19/2026)</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD (2026-04-19)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="settings-section">
           <div class="settings-actions">
             <button id="saveSettingsBtn" class="btn-primary" data-i18n="saveSettings">💾 Save Settings</button>
@@ -221,7 +239,7 @@
         <div class="settings-section">
           <h3 data-i18n="aboutTitle">ℹ️ About</h3>
           <div class="app-info">
-            <p><strong data-i18n="version">Version:</strong> <span id="appVersion">2.4.0</span></p>
+            <p><strong data-i18n="version">Version:</strong> <span id="appVersion">2.3.3</span></p>
             <p><strong data-i18n="repository">Repository:</strong> <a href="https://github.com/SaVaGi-eu/receipts-manager" target="_blank">GitHub</a></p>
           </div>
         </div>
@@ -311,11 +329,6 @@
                 <a href="#" class="browse-link" data-i18n="clickBrowse">click to browse</a>
               </p>
               <p class="drop-hint" data-i18n="supported">Supported: PDF, JPG, PNG (max 50MB)</p>
-            </div>
-            <div class="file-selected-indicator">
-              <span class="drop-icon">⏳</span>
-              <p id="dropZoneFileName" class="drop-hint"></p>
-              <p class="drop-hint">Uploading…</p>
             </div>
           </div>
           <input type="file" id="modalFileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">

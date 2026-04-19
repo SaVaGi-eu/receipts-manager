@@ -58,5 +58,10 @@
   "integrityIssues_one": "{{count}} πρόβλημα ακεραιότητας εντοπίστηκε.",
   "integrityIssues_other": "{{count}} προβλήματα ακεραιότητας εντοπίστηκαν.",
   "or": "Ή",
-  "selectReceiptOption": "-- Επιλέξτε υπάρχουσα απόδειξη --"
+  "selectReceiptOption": "-- Επιλέξτε υπάρχουσα απόδειξη --",
+  "open": "Α",
+  "logout": "🔓 Αποσύνδεση",
+  "dateFormatTitle": "📅 Μορφή Ημερομηνίας",
+  "dateFormatLabel": "Μορφή Ημερομηνίας:",
+  "addAnother": "Προσθήκη άλλου"
 }

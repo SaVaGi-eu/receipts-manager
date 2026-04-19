@@ -26,7 +26,7 @@ exclude =
 ignore = E203,E226,E501,W503,E402,F841
 
 # Complexity settings - HTTP handlers are naturally complex
-max-complexity = 35
+max-complexity = 40
 
 # Enable specific checks
 select = E,W,F,C

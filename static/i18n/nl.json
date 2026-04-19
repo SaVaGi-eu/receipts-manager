@@ -58,5 +58,10 @@
   "integrityIssues_one": "{{count}} integriteitsprobleem gedetecteerd.",
   "integrityIssues_other": "{{count}} integriteitsproblemen gedetecteerd.",
   "or": "OF",
-  "selectReceiptOption": "-- Kies bestaand bonnetje --"
+  "selectReceiptOption": "-- Kies bestaand bonnetje --",
+  "open": "O",
+  "logout": "🔓 Uitloggen",
+  "dateFormatTitle": "📅 Datumnotatie",
+  "dateFormatLabel": "Datumnotatie:",
+  "addAnother": "Nog een toevoegen"
 }

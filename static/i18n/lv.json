@@ -58,5 +58,10 @@
   "integrityIssues_one": "{{count}} integritātes problēma konstatēta.",
   "integrityIssues_other": "{{count}} integritātes problēmas konstatētas.",
   "or": "VAI",
-  "selectReceiptOption": "-- Izvēlieties esošo kvīti --"
+  "selectReceiptOption": "-- Izvēlieties esošo kvīti --",
+  "open": "A",
+  "logout": "🔓 Iziet",
+  "dateFormatTitle": "📅 Datuma Formāts",
+  "dateFormatLabel": "Datuma Formāts:",
+  "addAnother": "Pievienot vēl"
 }
