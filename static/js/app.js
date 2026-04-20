@@ -381,6 +381,7 @@ function renderTable(rows) {
   }).join('');
   updateItemCount(rows.length);
   updateColumnVisibility();
+  requestAnimationFrame(() => { syncColumnWidths(); syncTableHeight(); });
   qsa('#tableBody .btn-open').forEach(btn =>
     btn.addEventListener('click', () => window.open(API.fileUrl(btn.dataset.path), '_blank'))
   );
@@ -395,6 +396,7 @@ function renderTable(rows) {
 function updateColumnVisibility() {
   qsa('th[data-column]').forEach(th => { th.style.display = visibleColumns.has(th.dataset.column) ? '' : 'none'; });
   qsa('#itemsTable td[data-column]').forEach(td => { td.style.display = visibleColumns.has(td.dataset.column) ? '' : 'none'; });
+  requestAnimationFrame(syncColumnWidths);
 }
 
 function updateSortIndicators() {
@@ -403,6 +405,39 @@ function updateSortIndicators() {
     if (th.dataset.column === currentSort.column)
       th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
   });
+}
+
+// ===================== TABLE HEADER SYNC (RM-192) =====================
+function syncColumnWidths() {
+  const headerTable = $('itemsTableHeader');
+  const bodyTable   = $('itemsTable');
+  if (!headerTable || !bodyTable) return;
+  const headerThs = Array.from(headerTable.querySelectorAll('thead th'));
+  const firstRow  = bodyTable.querySelector('tbody tr:first-child:not(.empty-state)');
+  if (!firstRow) {
+    // Empty state: just match total table width so the header doesn't collapse
+    headerTable.style.width = Math.max(bodyTable.offsetWidth, 1200) + 'px';
+    return;
+  }
+  const bodyTds = Array.from(firstRow.querySelectorAll('td'));
+  bodyTds.forEach((td, i) => {
+    if (headerThs[i]) headerThs[i].style.width = td.offsetWidth + 'px';
+  });
+  headerTable.style.width = bodyTable.offsetWidth + 'px';
+}
+
+function syncTableHeight() {
+  const bodyWrap = $('tableBodyWrap');
+  if (!bodyWrap) return;
+  const top = bodyWrap.getBoundingClientRect().top;
+  bodyWrap.style.height = Math.max(200, window.innerHeight - Math.max(0, top) - 32) + 'px';
+}
+
+function syncTableScroll() {
+  const hw = $('tableHeaderWrap');
+  const bw = $('tableBodyWrap');
+  if (!hw || !bw) return;
+  bw.addEventListener('scroll', () => { hw.scrollLeft = bw.scrollLeft; });
 }
 
 function applyFilters(rows) {
@@ -1380,6 +1415,10 @@ function setupEventListeners() {
   });
 
   bind('clearAllFiltersBtn', 'click', clearAllFilters);
+
+  // RM-192: lock header, sync scroll and height
+  syncTableScroll();
+  window.addEventListener('resize', () => { syncColumnWidths(); syncTableHeight(); });
 
   // Re-render item count when language changes so the translation updates
   window.addEventListener('languageChanged', () => filterAndRender());

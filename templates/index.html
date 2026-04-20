@@ -114,8 +114,9 @@
 
     <!-- ===== Items Table ===== -->
     <section class="table-section">
-      <div class="table-wrapper">
-        <table id="itemsTable" class="items-table">
+      <!-- Fixed header — never scrolls vertically; horizontal scroll synced with body via JS -->
+      <div class="table-header-wrap" id="tableHeaderWrap">
+        <table class="items-table items-table--header" id="itemsTableHeader" aria-hidden="true">
           <thead>
             <tr>
               <th data-column="id" class="sortable"><span data-i18n="colId">ID</span></th>
@@ -136,10 +137,14 @@
               <th data-column="actions"><span data-i18n="colActions">Actions</span></th>
             </tr>
           </thead>
+        </table>
+      </div>
+      <!-- Scrollable body — fills remaining viewport height; horizontal scroll drives header above -->
+      <div class="table-body-wrap" id="tableBodyWrap">
+        <table id="itemsTable" class="items-table">
           <tbody id="tableBody">
             <tr class="empty-state">
-              <td colspan="15">
-              <td colspan="12">
+              <td colspan="16">
                 <div class="empty-message">
                   <span class="empty-icon">📦</span>
                   <p data-i18n="noItems">No items yet. Click "Add Receipt" to get started!</p>
