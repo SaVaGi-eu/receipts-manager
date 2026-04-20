@@ -30,12 +30,15 @@ const CURRENCIES = [
 ];
 
 const FILTER_FIELDS = [
-  { key: 'shop',          labelKey: 'colShop',          type: 'checkbox', search: true  },
-  { key: 'brand',         labelKey: 'colBrand',         type: 'checkbox', search: true  },
-  { key: 'category',      labelKey: 'colCategory',      type: 'checkbox', search: false },
-  { key: 'documentation', labelKey: 'colDocumentation', type: 'checkbox', search: false },
-  { key: 'location',      labelKey: 'colLocation',      type: 'checkbox', search: true  },
-  { key: 'purchase_date', labelKey: 'colPurchaseDate',  type: 'daterange'               },
+  { key: 'shop',          labelKey: 'colShop',       type: 'checkbox', search: true                },
+  { key: 'brand',         labelKey: 'colBrand',      type: 'checkbox', search: true                },
+  { key: 'category',      labelKey: 'colCategory',   type: 'checkbox', search: false, noValue: true },
+  { key: 'documentation', labelKey: 'filterDocType', type: 'checkbox', search: false               },
+  { key: 'location',      labelKey: 'colLocation',   type: 'checkbox', search: true,  noValue: true },
+  { key: 'purchase_date', labelKey: 'colPurchaseDate', type: 'daterange'                            },
+  { key: 'project',       labelKey: 'filterProject', type: 'checkbox', search: false, noValue: true },
+  { key: 'status',        labelKey: 'filterStatus',  type: 'checkbox', search: false, noValue: true },
+  { key: 'users',         labelKey: 'filterUser',    type: 'checkbox', search: true,  noValue: true },
 ];
 
 const API = {
@@ -171,7 +174,6 @@ async function loadSuggestions() {
   try {
     suggestions = await fetchJson(API.suggestions);
     populateDataLists();
-    populateFilterDropdowns();
   } catch (err) { console.error('Error loading suggestions:', err); }
 }
 
@@ -212,22 +214,6 @@ function populateDataLists() {
   set('categoryList', suggestions.categories);
 }
 
-function populateFilterDropdowns() {
-  const projectFilter = $('projectFilter');
-  if (projectFilter) {
-    const cur = projectFilter.value;
-    projectFilter.innerHTML = '<option value="">All Projects</option>' +
-      (suggestions.projects || []).map(p => `<option value="${escAttr(String(p))}">${escHtml(p)}</option>`).join('');
-    projectFilter.value = cur;
-  }
-  const userFilter = $('userFilter');
-  if (userFilter) {
-    const cur = userFilter.value;
-    userFilter.innerHTML = '<option value="">All Users</option>' +
-      (suggestions.users || []).map(u => `<option value="${escAttr(String(u))}">${escHtml(u)}</option>`).join('');
-    userFilter.value = cur;
-  }
-}
 
 function populateExistingReceiptSelect() {
   const sel = $('existingReceiptSelect');
@@ -440,15 +426,11 @@ function syncTableScroll() {
   bw.addEventListener('scroll', () => { hw.scrollLeft = bw.scrollLeft; });
 }
 
+const NO_VALUE_KEY = '__no_value__';
+
 function applyFilters(rows) {
-  const q       = ($('searchInput')?.value  || '').trim().toLowerCase();
-  const project = $('projectFilter')?.value || '';
-  const status  = $('statusFilter')?.value  || '';
-  const user    = $('userFilter')?.value    || '';
+  const q = ($('searchInput')?.value || '').trim().toLowerCase();
   return (rows || []).filter(r => {
-    if (project && String(r.project || '') !== project)           return false;
-    if (status  && getStatus(r) !== status)                       return false;
-    if (user    && !normalizeUsers(r.users).includes(user))       return false;
     if (q) {
       const hay = [
         r.id, r.receipt_group_id, r.brand, r.model, r.location, r.category,
@@ -468,8 +450,16 @@ function applyFilters(rows) {
         }
       } else {
         const vals = activeFilters[f.key];
-        if (vals instanceof Set && vals.size > 0) {
-          if (!vals.has(String(r[f.key] || '').trim())) return false;
+        if (!(vals instanceof Set) || vals.size === 0) continue;
+        if (f.key === 'users') {
+          const rowUsers = normalizeUsers(r.users);
+          const noValMatch = vals.has(NO_VALUE_KEY) && rowUsers.length === 0;
+          const valMatch   = rowUsers.some(u => vals.has(u));
+          if (!noValMatch && !valMatch) return false;
+        } else {
+          const fieldVal = f.key === 'status' ? getStatus(r) : String(r[f.key] || '').trim();
+          const isEmpty  = !fieldVal || fieldVal === 'N/A';
+          if (!((vals.has(NO_VALUE_KEY) && isEmpty) || (!isEmpty && vals.has(fieldVal)))) return false;
         }
       }
     }
@@ -1085,8 +1075,14 @@ function filterFieldLabel(key) {
 function getDistinctValues(fieldKey) {
   const vals = new Set();
   buildRows().forEach(r => {
-    const v = String(r[fieldKey] || '').trim();
-    if (v && v !== 'N/A') vals.add(v);
+    if (fieldKey === 'status') {
+      vals.add(getStatus(r));
+    } else if (fieldKey === 'users') {
+      normalizeUsers(r.users).forEach(u => vals.add(u));
+    } else {
+      const v = String(r[fieldKey] || '').trim();
+      if (v && v !== 'N/A') vals.add(v);
+    }
   });
   return [...vals].sort((a, b) => a.localeCompare(b));
 }
@@ -1121,13 +1117,18 @@ function renderFilterValuesPane(fieldKey) {
   const searchHtml = field.search
     ? `<input type="text" id="filterValueSearch" class="filter-value-search" placeholder="${escAttr(t('filterSearch') || 'Search...')}">`
     : '';
-  const listHtml = values.length
+  const noValueHtml = field.noValue
+    ? `<label class="filter-checkbox-label filter-no-value-label">
+        <input type="checkbox" class="filter-value-cb" data-field="${escAttr(fieldKey)}" data-value="${NO_VALUE_KEY}"${selected.has(NO_VALUE_KEY) ? ' checked' : ''}>
+        <em>${escHtml(t('filterNoValue') || 'No value')}</em></label>`
+    : '';
+  const itemsHtml = values.length
     ? values.map(v => `<label class="filter-checkbox-label">
         <input type="checkbox" class="filter-value-cb" data-field="${escAttr(fieldKey)}" data-value="${escAttr(v)}"${selected.has(v) ? ' checked' : ''}>
         ${escHtml(v)}</label>`).join('')
-    : `<span class="filter-empty">${escHtml(t('noFilterValues') || 'No values')}</span>`;
+    : (!field.noValue ? `<span class="filter-empty">${escHtml(t('noFilterValues') || 'No value')}</span>` : '');
 
-  pane.innerHTML = searchHtml + `<div id="filterCheckboxList" class="filter-checkbox-list">${listHtml}</div>`;
+  pane.innerHTML = searchHtml + `<div id="filterCheckboxList" class="filter-checkbox-list">${noValueHtml}${itemsHtml}</div>`;
 
   if (field.search) {
     bind('filterValueSearch', 'input', e => {
@@ -1299,11 +1300,8 @@ function setupEventListeners() {
   bind('modalPrice',    'input', updateLineTotal);
   bind('modalQuantity', 'input', updateLineTotal);
 
-  bind('searchInput',   'input',  filterAndRender);
-  bind('projectFilter', 'change', filterAndRender);
-  bind('statusFilter',  'change', filterAndRender);
-  bind('userFilter',    'change', filterAndRender);
-  bind('refreshBtn',    'click',  () => { loadData(); loadSuggestions(); });
+  bind('searchInput', 'input',  filterAndRender);
+  bind('refreshBtn',  'click',  () => { loadData(); loadSuggestions(); });
 
   bind('columnToggleBtn',  'click', () => { const p = $('columnPanel'); if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none'; });
   bind('closeColumnPanel', 'click', () => { const p = $('columnPanel'); if (p) p.style.display = 'none'; });
