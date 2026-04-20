@@ -38,27 +38,12 @@
       <section class="toolbar">
         <div class="toolbar-left">
           <input type="text" id="searchInput" data-i18n-placeholder="search" placeholder="🔍 Search..." class="search-input">
-
-          <select id="projectFilter" class="filter-select">
-            <option value="" data-i18n="allProjects">All Projects</option>
-          </select>
-
-          <select id="statusFilter" class="filter-select">
-            <option value="" data-i18n="allStatuses">All Statuses</option>
-            <option value="active" data-i18n="statusActive">Active</option>
-            <option value="expiring" data-i18n="statusExpiring">Expiring Soon</option>
-            <option value="expired" data-i18n="statusExpired">Expired</option>
-          </select>
-
-          <select id="userFilter" class="filter-select">
-            <option value="" data-i18n="allUsers">All Users</option>
-          </select>
+          <button id="filterBtn" class="btn-secondary" data-i18n="filterBtn">🔽 Filter<span id="filterBadge" class="filter-badge" style="display:none">0</span></button>
         </div>
 
         <div class="toolbar-right">
           <button id="addReceiptBtn" class="btn-add-receipt" data-i18n="addReceipt">📝 Add Receipt</button>
           <button id="refreshBtn" class="btn-secondary" data-i18n="refresh">🔄 Refresh</button>
-          <button id="filterBtn" class="btn-secondary" data-i18n="filterBtn">🔽 Filters<span id="filterBadge" class="filter-badge" style="display:none">0</span></button>
           <button id="columnToggleBtn" class="btn-secondary" data-i18n="columns">🔧 Columns</button>
         </div>
       </section>
