@@ -20,7 +20,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY app.py config.py ocr_service.py check_deps.py ./
+COPY app.py config.py receipt_service.py ./
+COPY services/ ./services/
 COPY templates/ ./templates/
 COPY static/ ./static/
 
