@@ -184,9 +184,13 @@ echo -e "${GREEN}✓ templates/index.html updated to $NPM_VERSION${NC}"
 
 echo -e "\n${BLUE}═══ Committing version bumps ═══${NC}\n"
 git add platforms/macos/package.json platforms/macos/package-lock.json templates/index.html
-git commit -m "chore: bump version to ${APP_VERSION}"
-git push origin main
-echo -e "${GREEN}✓ Version bump committed and pushed${NC}"
+if git diff --cached --quiet; then
+    echo -e "${YELLOW}⚠ Version already at $NPM_VERSION — skipping version bump commit${NC}"
+else
+    git commit -m "chore: bump version to ${APP_VERSION}"
+    git push origin main
+    echo -e "${GREEN}✓ Version bump committed and pushed${NC}"
+fi
 
 # ── Prepare build/ directory with branding assets ────────────────────────────
 
@@ -266,6 +270,35 @@ else
     gh release upload "$APP_VERSION" "$PKG_FILE" \
         --repo "$REPO" \
         --clobber
+fi
+
+# ── Build and push Docker image ───────────────────────────────────────────────
+
+echo -e "\n${BLUE}═══ Building and pushing Docker image ═══${NC}\n"
+
+if ! command -v docker &> /dev/null; then
+    echo -e "${YELLOW}⚠ Docker not found — skipping Docker image build/push${NC}"
+else
+    # Docker Hub username: env var > repo owner (lowercase)
+    if [ -z "$DOCKERHUB_USERNAME" ]; then
+        DOCKERHUB_USERNAME="$(echo "$REPO" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')"
+    fi
+    DOCKER_IMAGE="$DOCKERHUB_USERNAME/receipts-manager"
+
+    echo "Building $DOCKER_IMAGE:$NPM_VERSION ..."
+    docker build -f platforms/docker/Dockerfile \
+        -t "$DOCKER_IMAGE:$NPM_VERSION" \
+        -t "$DOCKER_IMAGE:latest" \
+        .
+    echo -e "${GREEN}✓ Docker image built${NC}"
+
+    echo "Pushing to Docker Hub..."
+    if ! docker push "$DOCKER_IMAGE:$NPM_VERSION"; then
+        echo -e "${YELLOW}⚠ Push failed — are you logged in? Run: docker login${NC}"
+    else
+        docker push "$DOCKER_IMAGE:latest"
+        echo -e "${GREEN}✓ Docker image pushed: $DOCKER_IMAGE:$NPM_VERSION and $DOCKER_IMAGE:latest${NC}"
+    fi
 fi
 
 echo ""
