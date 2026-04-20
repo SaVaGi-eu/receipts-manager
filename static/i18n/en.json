@@ -81,10 +81,15 @@
   "addRow": "+ Add Row",
   "saveAll": "Save All",
   "receiptTotal": "Receipt Total:",
-  "filterBtn": "🔽 Filters",
+  "filterBtn": "🔽 Filter",
   "clearAllFilters": "Clear All",
   "filterDateFrom": "From",
   "filterDateTo": "To",
   "filterSearch": "Search...",
-  "noFilterValues": "No values"
+  "noFilterValues": "No value",
+  "filterNoValue": "No value",
+  "filterDocType": "Document Type",
+  "filterProject": "Project",
+  "filterStatus": "Status",
+  "filterUser": "User"
 }

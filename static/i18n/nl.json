@@ -81,10 +81,15 @@
   "addRow": "+ Rij toevoegen",
   "saveAll": "Alles opslaan",
   "receiptTotal": "Bonnetje totaal:",
-  "filterBtn": "🔽 Filters",
+  "filterBtn": "🔽 Filter",
   "clearAllFilters": "Alles wissen",
   "filterDateFrom": "Van",
   "filterDateTo": "Tot",
   "filterSearch": "Zoeken...",
-  "noFilterValues": "Geen waarden"
+  "noFilterValues": "Geen waarde",
+  "filterNoValue": "Geen waarde",
+  "filterDocType": "Documenttype",
+  "filterProject": "Project",
+  "filterStatus": "Status",
+  "filterUser": "Gebruiker"
 }

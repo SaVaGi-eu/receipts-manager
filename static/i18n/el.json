@@ -81,10 +81,15 @@
   "addRow": "+ Προσθήκη γραμμής",
   "saveAll": "Αποθήκευση όλων",
   "receiptTotal": "Σύνολο απόδειξης:",
-  "filterBtn": "🔽 Φίλτρα",
+  "filterBtn": "🔽 Φίλτρο",
   "clearAllFilters": "Καθαρισμός όλων",
   "filterDateFrom": "Από",
   "filterDateTo": "Έως",
   "filterSearch": "Αναζήτηση...",
-  "noFilterValues": "Δεν υπάρχουν τιμές"
+  "noFilterValues": "Χωρίς τιμή",
+  "filterNoValue": "Χωρίς τιμή",
+  "filterDocType": "Τύπος Εγγράφου",
+  "filterProject": "Έργο",
+  "filterStatus": "Κατάσταση",
+  "filterUser": "Χρήστης"
 }

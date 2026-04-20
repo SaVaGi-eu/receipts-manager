@@ -1213,7 +1213,7 @@ input[readonly] {
 }
 
 .filter-panel-inner {
-  display: flex; min-height: clamp(260px, 40vh, 560px);
+  display: flex; max-height: clamp(200px, 40vh, 420px);
 }
 
 .filter-fields-col {
@@ -1261,6 +1261,8 @@ input[readonly] {
 .filter-checkbox-label input { cursor: pointer; accent-color: var(--primary-color); }
 
 .filter-empty { color: #999; font-size: 0.85rem; font-style: italic; }
+
+.filter-no-value-label { border-bottom: 1px solid var(--border-color); margin-bottom: 0.35rem; padding-bottom: 0.35rem; color: #777; }
 
 .filter-daterange {
   display: flex; flex-direction: column; gap: 0.5rem; max-width: 220px;

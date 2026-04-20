@@ -1190,9 +1190,10 @@ function renderFilterChips() {
     } else {
       const vals = activeFilters[f.key];
       if (vals?.size) {
-        [...vals].forEach(v =>
-          chips.push(`<span class="filter-chip"><strong>${escHtml(filterFieldLabel(f.key))}:</strong> ${escHtml(v)}<button type="button" class="chip-remove" data-field="${escAttr(f.key)}" data-value="${escAttr(v)}">&times;</button></span>`)
-        );
+        [...vals].forEach(v => {
+          const label = v === NO_VALUE_KEY ? (t('filterNoValue') || 'No value') : v;
+          chips.push(`<span class="filter-chip"><strong>${escHtml(filterFieldLabel(f.key))}:</strong> ${escHtml(label)}<button type="button" class="chip-remove" data-field="${escAttr(f.key)}" data-value="${escAttr(v)}">&times;</button></span>`);
+        });
       }
     }
   });

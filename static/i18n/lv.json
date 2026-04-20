@@ -81,10 +81,15 @@
   "addRow": "+ Pievienot rindu",
   "saveAll": "Saglabāt visu",
   "receiptTotal": "Kvīts kopsumma:",
-  "filterBtn": "🔽 Filtri",
+  "filterBtn": "🔽 Filtrs",
   "clearAllFilters": "Notīrīt visu",
   "filterDateFrom": "No",
   "filterDateTo": "Līdz",
   "filterSearch": "Meklēt...",
-  "noFilterValues": "Nav vērtību"
+  "noFilterValues": "Nav vērtības",
+  "filterNoValue": "Nav vērtības",
+  "filterDocType": "Dokumenta veids",
+  "filterProject": "Projekts",
+  "filterStatus": "Statuss",
+  "filterUser": "Lietotājs"
 }
