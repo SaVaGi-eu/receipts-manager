@@ -189,7 +189,7 @@ input[readonly] {
 
 /* Modal wide variant */
 .modal-wide {
-  max-width: 800px;
+  max-width: 860px;
 }
 
 /* RM-77: Extended warranty fields */
@@ -761,11 +761,23 @@ input[readonly] {
     .modal-content {
       background: var(--card-bg);
       border-radius: 16px;
-      max-width: 700px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
+      width: min(100%, var(--modal-max-width, 700px));
+      max-height: min(90vh, calc(100vh - 4rem));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .modal-wide {
+      --modal-max-width: 860px;
+    }
+
+    .modal-body {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
     }
 
     .modal-header {
@@ -1054,7 +1066,7 @@ input[readonly] {
   border-bottom: 2px solid var(--border-color);
 }
 
-.invoice-items-section { margin-bottom: 0.5rem; }
+.invoice-items-section { margin-bottom: 0.5rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 .invoice-items-section h4 {
   font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #555;
