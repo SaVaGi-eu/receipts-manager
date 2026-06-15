@@ -21,7 +21,7 @@ echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
-║        🚀 Receipt & Warranty Manager Release         ║
+║        🚀 Receipt & Warranty Manager Release          ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 EOF
@@ -279,9 +279,9 @@ echo -e "\n${BLUE}═══ Building and pushing Docker image ═══${NC}\n"
 if ! command -v docker &> /dev/null; then
     echo -e "${YELLOW}⚠ Docker not found — skipping Docker image build/push${NC}"
 else
-    # Docker Hub username: env var > repo owner (lowercase)
+    # Docker Hub username: env var > hardcoded default
     if [ -z "$DOCKERHUB_USERNAME" ]; then
-        DOCKERHUB_USERNAME="$(echo "$REPO" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')"
+        DOCKERHUB_USERNAME="willigiann"
     fi
     DOCKER_IMAGE="$DOCKERHUB_USERNAME/receipts-manager"
 
