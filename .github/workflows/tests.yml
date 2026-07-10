@@ -65,10 +65,11 @@ jobs:
 
       - name: Run security checks
         run: |
-          # Fail only on medium+ severity findings. The low-severity findings here
-          # are reviewed and benign (subprocess use for native file dialogs with
-          # static args, sentinel default-credential constants, skip-on-error).
-          bandit -r . -c pyproject.toml --severity-level medium
+          # All previously-reviewed low-severity findings are now suppressed inline
+          # with '# nosec Bxxx -- reason' at their exact locations (see app.py and
+          # services/receipt_service.py), so bandit runs at its default severity —
+          # any genuinely new finding, low or otherwise, will fail the build.
+          bandit -r . -c pyproject.toml
           safety check
 
   docker-test:

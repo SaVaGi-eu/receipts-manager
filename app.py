@@ -11,7 +11,7 @@ import logging
 import os
 import platform
 import re
-import subprocess
+import subprocess  # nosec B404 -- used only to invoke the native folder-picker dialogs below, all with static argv lists (no shell=True, no user-controlled command)
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -51,8 +51,10 @@ _SESSION_COOKIE = "rm_session"
 _SESSION_TTL = 8 * 3600  # 8 hours
 
 # SECURITY: known insecure defaults that must never be used when auth is enabled.
-_DEFAULT_PASSWORD = "changeme"
-_DEFAULT_SECRET_KEY = "dev-secret-not-for-production"
+# These are sentinel values compared against, not credentials in use — _validate_auth_config()
+# below refuses to start the server if either is still set to these.
+_DEFAULT_PASSWORD = "changeme"  # nosec B105
+_DEFAULT_SECRET_KEY = "dev-secret-not-for-production"  # nosec B105
 
 
 def _validate_auth_config() -> None:
@@ -153,7 +155,8 @@ def _open_file_dialog_macos():
     end try
     """
     try:
-        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True, timeout=60)
+        # Static argv list, no shell=True, no user-controlled input.
+        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True, timeout=60)  # nosec
         if result.returncode == 0:
             path = result.stdout.strip()
             if path == "USER_CANCELLED":
@@ -178,7 +181,8 @@ def _open_file_dialog_macos():
 
 def _open_file_dialog_linux():
     try:
-        result = subprocess.run(
+        # Static argv list, no shell=True, no user-controlled input.
+        result = subprocess.run(  # nosec
             ["zenity", "--file-selection", "--directory", "--title=Select Data Directory"],
             capture_output=True,
             text=True,
@@ -191,7 +195,8 @@ def _open_file_dialog_linux():
     except Exception as e:
         logger.debug("zenity file dialog failed: %s", e)
     try:
-        result = subprocess.run(
+        # Static argv list, no shell=True, no user-controlled input.
+        result = subprocess.run(  # nosec
             ["kdialog", "--getexistingdirectory", ".", "Select Data Directory"],
             capture_output=True,
             text=True,
@@ -230,7 +235,10 @@ except Exception as e:
     sys.exit(3)
 """
     try:
-        result = subprocess.run([sys.executable, "-c", dialog_script], capture_output=True, text=True, timeout=60)
+        # sys.executable is an absolute path; dialog_script is a static string, no shell=True.
+        result = subprocess.run(  # nosec
+            [sys.executable, "-c", dialog_script], capture_output=True, text=True, timeout=60
+        )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         elif result.returncode == 1:

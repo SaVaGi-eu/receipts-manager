@@ -468,7 +468,9 @@ class ReceiptService:
             try:
                 file_bytes = file_path.read_bytes()
                 file_hash = hashlib.sha256(file_bytes).hexdigest()
-            except Exception:
+            except Exception:  # nosec B112 -- an unreadable dropped file is simply skipped this scan; the next
+                # scheduled scan (start_integrity_worker) retries it, so silently continuing is intentional, not a
+                # swallowed security-relevant error.
                 continue
 
             if file_hash in known_hashes:
