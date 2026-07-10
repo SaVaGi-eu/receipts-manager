@@ -1,25 +1,24 @@
-"""Tests for configuration module."""
+"""Tests for the configuration module."""
+
+import importlib
 
 
 def test_config_import():
-    """Test that config module can be imported."""
+    """The config module can be imported."""
     import config
 
     assert config is not None
 
 
-def test_environment_variables(monkeypatch):
-    """Test environment variable handling."""
-    monkeypatch.setenv("PORT", "9999")
-    monkeypatch.setenv("DEBUG", "True")
-
-    # Reload config to pick up new env vars
-    import importlib
+def test_data_root_resolved_from_env(tmp_path, monkeypatch):
+    """DATA_DIR drives the resolved data-directory layout."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
 
     import config
 
     importlib.reload(config)
 
-    # Test that config reads environment variables
-    # Adjust based on your actual config implementation
-    assert hasattr(config, "PORT") or hasattr(config, "port")
+    assert config.DATA_ROOT is not None
+    assert config.DATABASE_DIR == config.DATA_ROOT / "database"
+    assert config.STORAGE_DIR == config.DATA_ROOT / "storage"
+    assert config.DATA_FILE == config.DATABASE_DIR / "data.json"

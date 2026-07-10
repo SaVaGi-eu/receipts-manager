@@ -1,86 +1,59 @@
-"""Pytest configuration and fixtures."""
+"""Pytest fixtures for the standalone (Flask-free) HTTP server in app.py.
 
+The application resolves its data directory from the DATA_DIR environment
+variable at import time, so each fixture sets DATA_DIR to a temporary directory
+and reloads ``config``/``app`` before starting a real ThreadingHTTPServer on an
+ephemeral port. Tests then talk to it over HTTP like any external client.
+"""
+
+import importlib
 import json
-import os
+import threading
+from http.server import ThreadingHTTPServer
 
 import pytest
 
-# Set test environment variables before importing app
-os.environ["TESTING"] = "1"
-os.environ["DEBUG"] = "False"
+
+@pytest.fixture
+def data_dir(tmp_path, monkeypatch):
+    """Create an isolated data directory and point DATA_DIR at it."""
+    d = tmp_path / "data"
+    (d / "database" / "backups").mkdir(parents=True)
+    (d / "storage" / "_Receipts").mkdir(parents=True)
+    (d / "database" / "data.json").write_text(
+        json.dumps({"receipts": [], "items": [], "next_id": 1}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DATA_DIR", str(d))
+    return d
 
 
 @pytest.fixture
-def test_data_dir(tmp_path):
-    """Create a temporary data directory for tests."""
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
+def base_url(data_dir):
+    """Start the real HTTP server on a random port and yield its base URL."""
+    import config
 
-    # Create subdirectories
-    (data_dir / "database").mkdir()
-    (data_dir / "backups").mkdir()
+    importlib.reload(config)
+    import app as app_module
 
-    # Create empty database
-    db_file = data_dir / "database" / "data.json"
-    db_file.write_text(json.dumps({"receipts": [], "warranties": []}))
+    importlib.reload(app_module)
 
-    return data_dir
+    from services.receipt_service import ReceiptService
 
+    app_module.service = ReceiptService(
+        config.DATA_FILE,
+        config.DATA_ROOT,
+        config.RECEIPTS_DIR,
+        config.STORAGE_DIR,
+        config.BACKUP_DIR,
+    )
 
-@pytest.fixture
-def test_storage_dir(tmp_path):
-    """Create a temporary storage directory for tests."""
-    storage_dir = tmp_path / "storage"
-    storage_dir.mkdir()
-    return storage_dir
-
-
-@pytest.fixture
-def client(test_data_dir, test_storage_dir, monkeypatch):
-    """Create a test client for the Flask app."""
-    # Set environment variables
-    monkeypatch.setenv("DATA_DIR", str(test_data_dir))
-    monkeypatch.setenv("STORAGE_DIR", str(test_storage_dir))
-    monkeypatch.setenv("TESTING", "1")
-
-    # Import app after setting env vars
-    from app import app
-
-    app.config["TESTING"] = True
-    app.config["WTF_CSRF_ENABLED"] = False
-
-    with app.test_client() as client:
-        yield client
-
-
-@pytest.fixture
-def sample_receipt_data():
-    """Sample receipt data for testing."""
-    items = [
-        {"description": "Test Item 1", "price": 20.00},
-        {"description": "Test Item 2", "price": 22.50},
-    ]
-    return {
-        "id": "test-receipt-001",
-        "merchant": "Test Store",
-        "date": "2026-03-03",
-        "total": sum(item["price"] for item in items),
-        "currency": "€",
-        "category": "Groceries",
-        "tags": ["food", "monthly"],
-        "items": items,
-    }
-
-
-@pytest.fixture
-def sample_warranty_data():
-    """Sample warranty data for testing."""
-    return {
-        "id": "test-warranty-001",
-        "product": "Test Product",
-        "manufacturer": "Test Manufacturer",
-        "purchase_date": "2026-01-01",
-        "expiry_date": "2027-01-01",
-        "serial_number": "SN123456",
-        "receipt_id": "test-receipt-001",
-    }
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), app_module.Handler)
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
