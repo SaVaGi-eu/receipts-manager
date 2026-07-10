@@ -27,7 +27,22 @@ if ! command -v brew &> /dev/null; then
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "📦 Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # SECURITY: download the installer to a file over HTTPS and run it as a
+        # separate step instead of piping curl straight into bash. This ensures
+        # the download completed fully before anything executes (a truncated
+        # pipe can run a partial script) and lets a cautious user inspect it.
+        BREW_INSTALLER="$(mktemp)"
+        if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$BREW_INSTALLER"; then
+            echo "   Installer downloaded to: $BREW_INSTALLER"
+            echo "   (You may inspect it now; press Ctrl-C within 3s to abort.)"
+            sleep 3
+            /bin/bash "$BREW_INSTALLER"
+            rm -f "$BREW_INSTALLER"
+        else
+            rm -f "$BREW_INSTALLER"
+            echo "❌ Could not download the Homebrew installer. Install manually: https://brew.sh"
+            exit 1
+        fi
 
         # Check if installation succeeded
         if ! command -v brew &> /dev/null; then
@@ -165,15 +180,28 @@ if [ "$VENV_NEEDS_CREATION" = true ]; then
             # Manually install pip
             echo "📦 Installing pip..."
 
-            if curl -sS https://bootstrap.pypa.io/get-pip.py | "$VENV_PYTHON" > /dev/null 2>&1; then
-                if [ -f "$VENV_PIP" ] && "$VENV_PIP" --version > /dev/null 2>&1; then
-                    echo "✅ pip installed successfully"
-                else
-                    echo "❌ pip installation verification failed"
-                    exit 1
-                fi
+            # SECURITY: bootstrap pip from the Python standard library (ensurepip)
+            # instead of piping a remotely-downloaded get-pip.py straight into the
+            # interpreter. ensurepip uses the wheel bundled with CPython — no
+            # network fetch, nothing untrusted to execute.
+            PIP_OK=false
+            if "$VENV_PYTHON" -m ensurepip --upgrade > /dev/null 2>&1; then
+                PIP_OK=true
             else
-                echo "❌ Failed to install pip"
+                # Fallback: download get-pip.py to a file over HTTPS, then run it
+                # (still not piped directly from curl into python).
+                GETPIP="$(mktemp)"
+                if curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$GETPIP" \
+                    && "$VENV_PYTHON" "$GETPIP" > /dev/null 2>&1; then
+                    PIP_OK=true
+                fi
+                rm -f "$GETPIP"
+            fi
+
+            if [ "$PIP_OK" = true ] && [ -f "$VENV_PIP" ] && "$VENV_PIP" --version > /dev/null 2>&1; then
+                echo "✅ pip installed successfully"
+            else
+                echo "❌ pip installation verification failed"
                 exit 1
             fi
         else

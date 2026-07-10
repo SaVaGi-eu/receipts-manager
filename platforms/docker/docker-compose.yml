@@ -8,16 +8,27 @@ services:
       dockerfile: platforms/docker/Dockerfile
     container_name: receipts-manager
     ports:
-      - "8765:8765"
+      # SECURITY: publish to the host loopback only so the app is not exposed to
+      # the whole LAN/internet. Change to "8765:8765" only if you intentionally
+      # want network access — and only with authentication enabled below.
+      - "127.0.0.1:8765:8765"
     volumes:
       - receipt-data:/app/data
       - receipt-storage:/app/storage
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8765
+      - HOST=0.0.0.0
+      # SECURITY: enable authentication and supply strong secrets. The app
+      # refuses to start if AUTH_ENABLED=true with the default password/secret.
+      # Provide these via a .env file or your shell environment — never commit them.
+      - AUTH_ENABLED=${AUTH_ENABLED:-true}
+      - AUTH_USERNAME=${AUTH_USERNAME:-admin}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:?set AUTH_PASSWORD in your environment/.env}
+      - SECRET_KEY=${SECRET_KEY:?set SECRET_KEY to a long random value in your environment/.env}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python3", "-c", "import http.client; conn = http.client.HTTPConnection('localhost', 8765); conn.request('GET', '/'); response = conn.getresponse(); exit(0 if response.status == 200 else 1)"]
+      test: ["CMD", "python3", "-c", "import http.client; conn = http.client.HTTPConnection('localhost', 8765); conn.request('GET', '/health'); response = conn.getresponse(); exit(0 if response.status == 200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -89,6 +89,7 @@ platforms/macos/build/
 
 # Data directories (user data — must never be committed)
 data/data.json
+data/database/
 data/backups/
 storage/
 !data/.gitkeep
