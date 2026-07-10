@@ -224,7 +224,7 @@ function populateExistingReceiptSelect() {
     if (sortBy === 'date') return String(b.purchase_date || '').localeCompare(String(a.purchase_date || ''));
     return String(a.receipt_group_id || '').localeCompare(String(b.receipt_group_id || ''));
   });
-  sel.innerHTML = `<option value="">${t('selectReceiptOption') || '-- Choose existing receipt --'}</option>` +
+  sel.innerHTML = `<option value="">${escHtml(t('selectReceiptOption') || '-- Choose existing receipt --')}</option>` +
     receipts.map(r => {
       const colValues = { group_id: r.receipt_group_id, shop: r.shop, date: formatDate(r.purchase_date) };
       const label = chooseColOrder.map(k => colValues[k]).filter(Boolean).join(' · ');
@@ -335,13 +335,13 @@ function renderTable(rows) {
       ? `<span class="cell-truncate"><a href="${API.fileUrl(filePath)}" target="_blank" class="file-link" title="${escAttr(filePath)}">${escHtml(r.file || filePath)}</a></span>`
       : (r.file ? cell(r.file) : '');
     const openBtn = filePath
-      ? `<button type="button" class="btn-small btn-open" data-id="${r.id}" data-path="${escAttr(filePath)}" data-i18n="open">Open</button>`
+      ? `<button type="button" class="btn-small btn-open" data-id="${escAttr(String(r.id ?? ''))}" data-path="${escAttr(filePath)}" data-i18n="open">Open</button>`
       : '';
     const status   = getStatus(r);
     const rowClass = status === 'expired' ? 'warranty-expired' : status === 'expiring' ? 'warranty-expiring' : '';
     return `
     <tr class="${rowClass}">
-      <td data-column="id">${r.id ?? ''}</td>
+      <td data-column="id">${escHtml(String(r.id ?? ''))}</td>
       <td data-column="receipt_group_id">${cell(r.receipt_group_id)}</td>
       <td data-column="brand">${cell(r.brand)}</td>
       <td data-column="model">${cell(r.model)}</td>
@@ -354,14 +354,14 @@ function renderTable(rows) {
       <td data-column="documentation">${cell(r.documentation)}</td>
       <td data-column="guarantee_end_date">${cell(formatDate(r.guarantee_end_date))}</td>
       <td data-column="extended_warranty">${cell(formatExtWarranty(r.extended_warranty))}</td>
-      <td data-column="price">${r.quantity > 1
-        ? `<span class="cell-truncate" title="Unit: ${escAttr(formatPrice(r.price))} × ${r.quantity}">${escHtml(formatPrice(r.price != null ? r.price * r.quantity : null))}</span>`
-        : formatPrice(r.price)}</td>
+      <td data-column="price">${Number(r.quantity) > 1
+        ? `<span class="cell-truncate" title="Unit: ${escAttr(formatPrice(r.price))} × ${escAttr(String(Number(r.quantity)))}">${escHtml(formatPrice(r.price != null ? r.price * Number(r.quantity) : null))}</span>`
+        : escHtml(formatPrice(r.price))}</td>
       <td data-column="file">${fileCell}</td>
       <td data-column="actions">
         ${openBtn}
-        <button type="button" class="btn-small btn-edit"   data-id="${r.id}">Edit</button>
-        <button type="button" class="btn-small btn-delete" data-id="${r.id}">Delete</button>
+        <button type="button" class="btn-small btn-edit"   data-id="${escAttr(String(r.id ?? ''))}">Edit</button>
+        <button type="button" class="btn-small btn-delete" data-id="${escAttr(String(r.id ?? ''))}">Delete</button>
       </td>
     </tr>`;
   }).join('');

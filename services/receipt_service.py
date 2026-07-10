@@ -325,6 +325,9 @@ def _today_ymmmdd():
 class ReceiptService:
     # RM-168: supported extensions for drop-folder auto-import
     _DROP_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg"}
+    # SECURITY: only accept known document/image types on upload so attacker-
+    # controlled content (e.g. .html/.svg/.js) cannot be stored and later served.
+    _ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
     def __init__(self, data_file, data_root, receipts_dir, storage_dir, backup_dir):
         self._data_file = Path(data_file)
@@ -336,8 +339,8 @@ class ReceiptService:
         # RM-168: create the user-facing drop folder on startup
         try:
             (self._receipts_dir / "drop").mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not create drop folder: %s", e)
 
     # ---------- Persistence ----------
 
@@ -472,8 +475,8 @@ class ReceiptService:
                 # Already imported — silently remove to keep drop folder clean
                 try:
                     file_path.unlink()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Could not remove duplicate drop file: %s", e)
                 continue
 
             try:
@@ -651,6 +654,10 @@ class ReceiptService:
             ext = ".bin"
             safe_base = "upload"
 
+        # SECURITY: enforce an extension allow-list before writing to disk.
+        if ext not in self._ALLOWED_UPLOAD_EXTENSIONS:
+            raise ValueError("Unsupported file type")
+
         from datetime import datetime as _dt
 
         ts = _dt.now().strftime("%Y%m%d_%H%M%S")
@@ -729,6 +736,10 @@ class ReceiptService:
             ext = ".bin"
             safe_base = "upload"
 
+        # SECURITY: enforce an extension allow-list before writing to disk.
+        if ext not in self._ALLOWED_UPLOAD_EXTENSIONS:
+            raise ValueError("Unsupported file type")
+
         from datetime import datetime as _dt
 
         ts = _dt.now().strftime("%Y%m%d_%H%M%S")
@@ -755,8 +766,16 @@ class ReceiptService:
         return {"success": True, "path": rel_path, "filename": saved_name}
 
     def import_json(self, imported: dict) -> None:
-        if "receipts" not in imported or "items" not in imported:
+        if not isinstance(imported, dict) or "receipts" not in imported or "items" not in imported:
             raise ValueError("Invalid JSON structure: missing 'receipts' or 'items'")
+        if not isinstance(imported.get("items"), list) or not isinstance(imported.get("receipts"), list):
+            raise ValueError("Invalid JSON structure: 'receipts' and 'items' must be lists")
+        # SECURITY/robustness: every item must carry an integer id; otherwise the
+        # next_id computation below (and the rest of the app) blows up with an
+        # unhandled KeyError/TypeError on attacker-supplied payloads.
+        for it in imported["items"]:
+            if not isinstance(it, dict) or not isinstance(it.get("id"), int):
+                raise ValueError("Invalid JSON structure: every item requires an integer 'id'")
         with self._lock:
             if "next_id" not in imported:
                 imported["next_id"] = max((i["id"] for i in imported.get("items", [])), default=0) + 1
@@ -831,7 +850,7 @@ class ReceiptService:
                     if old_path.parent.exists() and not any(old_path.parent.iterdir()):
                         old_path.parent.rmdir()
                 except Exception as e:
-                    logger.debug("Could not remove empty directory %s: %s", old_path.parent, e)
+                    logger.debug("Could not remove empty directory %s: %s", _sanitize_log(old_path.parent), e)
 
             self.save(data)
             return item
@@ -854,7 +873,7 @@ class ReceiptService:
                             if not any(file_path.parent.iterdir()):
                                 file_path.parent.rmdir()
                         except Exception as e:
-                            logger.debug("Failed to remove parent directory %s: %s", file_path.parent, e)
+                            logger.debug("Failed to remove parent directory %s: %s", _sanitize_log(file_path.parent), e)
             data["items"] = [i for i in data["items"] if i["id"] != item_id]
             if not any(i for i in data["items"] if i["receipt_group_id"] == rg_id):
                 data["receipts"] = [r for r in data["receipts"] if r["receipt_group_id"] != rg_id]

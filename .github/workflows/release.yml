@@ -44,6 +44,11 @@ jobs:
         run: npm ci
       - name: Build macOS app
         working-directory: platforms/macos
+        # SECURITY: do NOT expose the repo-write GITHUB_TOKEN to `npm run build`.
+        # electron-builder + hundreds of transitive node_modules run here; a
+        # compromised dependency could read the token and push to the repo.
+        # Publishing is handled separately by the pinned action-gh-release step,
+        # and electron-builder must not auto-publish (no `publish` config set).
         run: |
           # Detect architecture
           ARCH=$(uname -m)
@@ -52,8 +57,6 @@ jobs:
           else
             npm run build:x64
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: List build artifacts
         run: |
           echo "Build artifacts:"

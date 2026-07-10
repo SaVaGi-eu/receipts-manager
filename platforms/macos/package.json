@@ -85,14 +85,6 @@
       {
         "from": "../../static",
         "to": "static"
-      },
-      {
-        "from": "../../data",
-        "to": "data"
-      },
-      {
-        "from": "../../storage",
-        "to": "storage"
       }
     ],
     "mac": {

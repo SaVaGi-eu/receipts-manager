@@ -20,7 +20,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 from config import BACKUP_DIR, DATA_FILE, DATA_ROOT, DATABASE_DIR, RECEIPTS_DIR, STORAGE_DIR
 
 # Basic configuration
-PORT = 8765  # Avoid macOS AirPlay Receiver on port 5000
+PORT = int(os.environ.get("PORT", "8765"))  # Avoid macOS AirPlay Receiver on port 5000
+# SECURITY: bind to loopback by default so the app is not exposed to the whole
+# network. Docker/power users can opt into 0.0.0.0 via the HOST env var (which
+# .env.example already documents).
+HOST = os.environ.get("HOST", "127.0.0.1")
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
@@ -44,6 +48,32 @@ _AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "changeme")
 _SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-not-for-production")
 _SESSION_COOKIE = "rm_session"
 _SESSION_TTL = 8 * 3600  # 8 hours
+
+# SECURITY: known insecure defaults that must never be used when auth is enabled.
+_DEFAULT_PASSWORD = "changeme"
+_DEFAULT_SECRET_KEY = "dev-secret-not-for-production"
+
+
+def _validate_auth_config() -> None:
+    """SECURITY: When authentication is enabled, refuse to start with the shipped
+    default password or secret key. A known secret lets anyone forge HMAC session
+    cookies (CWE-798), and a known password is trivially guessable. Failing loudly
+    at startup is far safer than silently running with a public secret."""
+    if not _AUTH_ENABLED:
+        return
+    problems = []
+    if _AUTH_PASSWORD == _DEFAULT_PASSWORD:
+        problems.append("AUTH_PASSWORD is still the default 'changeme'")
+    if _SECRET_KEY == _DEFAULT_SECRET_KEY:
+        problems.append("SECRET_KEY is still the insecure default")
+    if len(_SECRET_KEY) < 16:
+        problems.append("SECRET_KEY is too short (use >= 16 random characters)")
+    if problems:
+        raise SystemExit(
+            "Refusing to start: authentication is enabled but insecurely configured:\n  - "
+            + "\n  - ".join(problems)
+            + "\nSet strong AUTH_PASSWORD and SECRET_KEY environment variables and restart."
+        )
 
 
 def _make_session_token(username: str) -> str:
@@ -266,16 +296,17 @@ def _serve_login_page(handler, error: str | None = None):
 
 # ---------- HTTP handler ----------
 def set_cors_headers(handler):
+    # SECURITY: Only reflect explicitly allow-listed origins. Requests with no
+    # Origin header (same-origin navigations, curl) don't need CORS headers, so
+    # we no longer emit a wildcard "Access-Control-Allow-Origin: *".
+    handler.send_header("Vary", "Origin")
     origin = handler.headers.get("Origin")
     if origin is None or origin == "null":
-        handler.send_header("Access-Control-Allow-Origin", "*")
-        handler.send_header("Vary", "Origin")
         return
     origin_sanitized = sanitize_header_value(origin)
     matched_origin = next((o for o in ALLOWED_ORIGINS if o == origin_sanitized), None)
     if matched_origin is not None:
         handler.send_header("Access-Control-Allow-Origin", matched_origin)
-        handler.send_header("Vary", "Origin")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -298,6 +329,7 @@ class Handler(BaseHTTPRequestHandler):
         )
         self.send_header("Content-Security-Policy", csp)
         self.send_header("X-Frame-Options", "DENY")
+        self.send_header("X-Content-Type-Options", "nosniff")
         set_cors_headers(self)
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -326,9 +358,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._set_headers(204)
 
+    # SECURITY: cap non-upload request bodies so a huge Content-Length cannot
+    # exhaust memory (CWE-400). Uploads have their own 50 MB limit below.
+    _MAX_BODY = 10 * 1024 * 1024  # 10 MB
+
     def _read_body(self) -> bytes:
         length = int(self.headers.get("Content-Length", 0) or 0)
-        return self.rfile.read(length) if length > 0 else b""
+        if length <= 0:
+            return b""
+        if length > self._MAX_BODY:
+            raise ValueError("Request body too large")
+        return self.rfile.read(length)
 
     def _read_json(self):
         body = self._read_body()
@@ -408,6 +448,7 @@ class Handler(BaseHTTPRequestHandler):
             }
             self.send_response(200)
             self.send_header("Content-Type", _CTYPES.get(suffix, "application/octet-stream") + "; charset=utf-8")
+            self.send_header("X-Content-Type-Options", "nosniff")
             set_cors_headers(self)
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
@@ -516,6 +557,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", _FCTYPES.get(suffix, "application/octet-stream"))
                 self.send_header("Content-Disposition", "inline")
+                self.send_header("X-Content-Type-Options", "nosniff")
                 set_cors_headers(self)
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
@@ -679,14 +721,18 @@ class Handler(BaseHTTPRequestHandler):
             if service is None:
                 self._service_unavailable()
                 return
-            imported = self._read_json()
             try:
+                imported = self._read_json()
                 service.import_json(imported)
                 self._set_headers(200)
                 self.wfile.write(b'{"success":true,"message":"Data imported successfully"}')
             except ValueError as e:
                 self._set_headers(400)
                 self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            except Exception:
+                logger.exception("Import error")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
         self._set_headers(404)
@@ -798,10 +844,16 @@ def run_server():
             "Set DATA_DIR environment variable and restart."
         )
 
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    logger.info("Starting server on port %d", PORT)
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    logger.info("Starting server on %s:%d", HOST, PORT)
     if _AUTH_ENABLED:
         logger.info("Authentication ENABLED (Docker mode)")
+    elif HOST not in ("127.0.0.1", "localhost", "::1"):
+        logger.warning(
+            "[App] Server is bound to %s with authentication DISABLED — "
+            "anyone who can reach this host has full access. Set AUTH_ENABLED=true.",
+            HOST,
+        )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -810,6 +862,8 @@ def run_server():
 
 
 if __name__ == "__main__":
+    _validate_auth_config()
+
     for d in filter(None, [DATABASE_DIR, STORAGE_DIR, RECEIPTS_DIR, BACKUP_DIR]):
         try:
             Path(d).mkdir(parents=True, exist_ok=True)
