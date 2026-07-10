@@ -3,6 +3,7 @@
 Receipt & Warranty Manager (standalone, no Flask)
 Integrated with config.py for dynamic path resolution
 """
+
 import hashlib
 import hmac
 import json

@@ -12,8 +12,9 @@ pytest-flask>=1.2.0
 # formatting/lint output between releases, so an unpinned ">=" caused CI to drift
 # (a newer black would reformat code that already passed locally) and even install
 # different versions across the Python matrix. Keep these in sync with
-# .pre-commit-config.yaml. Pinned to the newest releases that still support 3.10+.
-black==25.11.0
+# .pre-commit-config.yaml. black==26.5.1 (>=26.3.1 fixes CVE-2026-32274; requires
+# Python 3.10+, which matches the test matrix).
+black==26.5.1
 flake8==7.3.0
 flake8-docstrings==1.7.0
 isort==6.1.0
