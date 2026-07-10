@@ -8,10 +8,15 @@ pytest-mock>=3.15.1
 pytest-flask>=1.2.0
 
 # Code Quality
-black>=23.12.0
-flake8>=7.0.0
-flake8-docstrings>=1.7.0
-isort>=8.0.1
+# NOTE: black/isort/flake8 are PINNED to exact versions. These tools change their
+# formatting/lint output between releases, so an unpinned ">=" caused CI to drift
+# (a newer black would reformat code that already passed locally) and even install
+# different versions across the Python matrix. Keep these in sync with
+# .pre-commit-config.yaml. Pinned to the newest releases that still support 3.10+.
+black==25.11.0
+flake8==7.3.0
+flake8-docstrings==1.7.0
+isort==6.1.0
 pylint>=3.0.0
 mypy>=1.7.0
 
