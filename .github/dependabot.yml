@@ -20,8 +20,32 @@ updates:
       include: "scope"
     reviewers:
       - "v-giannakopoulos"
-    # Group minor and patch updates together
     groups:
+      # Dev/test/lint/security tooling — grouped across ALL update types
+      # (including major) so a weekly scan opens at most one PR touching
+      # requirements-dev.txt instead of one PR per package. Separate PRs that
+      # each bump an adjacent line in the same file cause cascading merge
+      # conflicts as soon as the first one merges (see #90/#91/#92, 2026-07).
+      python-dev-tools:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "flake8*"
+          - "isort"
+          - "pylint"
+          - "mypy"
+          - "bandit*"
+          - "safety"
+          - "pre-commit"
+          - "sphinx*"
+          - "ipython"
+          - "ipdb"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      # Runtime (production) dependencies: keep minor/patch grouped, but leave
+      # major bumps as individual PRs for closer review since they ship to users.
       python-dependencies:
         patterns:
           - "*"
