@@ -4,12 +4,22 @@ This guide covers Docker deployment for Receipt Manager.
 
 ## Quick Start
 
+`docker-compose.yml` requires `AUTH_PASSWORD` and `SECRET_KEY` to be set — the
+container refuses to start with the shipped defaults, and Compose itself will
+error out if these aren't provided. Create a `.env` file next to
+`docker-compose.yml`:
+
 ```bash
 cd platforms/docker
+cat > .env <<EOF
+AUTH_PASSWORD=choose-a-strong-password
+SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+EOF
 docker-compose up -d
 ```
 
-Access at: <http://localhost:8765>
+Access at: <http://localhost:8765> (the port is published to the host's
+loopback interface only — see [Authentication](#authentication) below).
 
 ## Building from Source
 
@@ -38,6 +48,23 @@ docker run -d \
 
 ## Configuration
 
+### Authentication
+
+The app is unauthenticated over HTTP by default. `docker-compose.yml` enables
+authentication and requires these to be set (via `.env` or `-e`):
+
+```yaml
+environment:
+  - AUTH_ENABLED=true          # default in docker-compose.yml
+  - AUTH_USERNAME=admin        # optional, defaults to "admin"
+  - AUTH_PASSWORD=...          # required — no default is accepted
+  - SECRET_KEY=...             # required — signs session cookies, must be long/random
+```
+
+The app will refuse to start if `AUTH_PASSWORD`/`SECRET_KEY` are left at their
+insecure defaults. Only publish the port beyond `127.0.0.1` (i.e. to your LAN
+or the internet) once authentication is configured.
+
 ### Environment Variables
 
 Edit `docker-compose.yml` or pass via `-e` flag:
@@ -45,6 +72,7 @@ Edit `docker-compose.yml` or pass via `-e` flag:
 ```yaml
 environment:
   - PORT=8765
+  - HOST=0.0.0.0               # interface the server binds to *inside* the container
   - OCR_LANGUAGE=eng+nld+ell+lav
   - DEBUG=false
   - LOG_LEVEL=INFO
@@ -159,6 +187,9 @@ services:
     environment:
       - DEBUG=false
       - LOG_LEVEL=WARNING
+      - AUTH_ENABLED=true
+      - AUTH_PASSWORD=${AUTH_PASSWORD:?set a strong password}
+      - SECRET_KEY=${SECRET_KEY:?set a long random value}
     logging:
       driver: "json-file"
       options:
