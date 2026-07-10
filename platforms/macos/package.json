@@ -61,24 +61,6 @@
         ]
       },
       {
-        "from": "../../models",
-        "to": "models",
-        "filter": [
-          "**/*",
-          "!**/__pycache__",
-          "!**/*.pyc"
-        ]
-      },
-      {
-        "from": "../../routes",
-        "to": "routes",
-        "filter": [
-          "**/*",
-          "!**/__pycache__",
-          "!**/*.pyc"
-        ]
-      },
-      {
         "from": "../../templates",
         "to": "templates"
       },
