@@ -11,6 +11,7 @@ import logging
 import os
 import platform
 import re
+import secrets
 import subprocess  # nosec B404 -- used only to invoke the native folder-picker dialogs below, all with static argv lists (no shell=True, no user-controlled command)
 import sys
 import time
@@ -120,6 +121,142 @@ def _is_authenticated(handler) -> bool:
         return True
     token = _get_session_token(handler)
     return token is not None and _validate_session_token(token)
+
+
+# ---------- XNT-115: cross-origin request safety (CSRF + DNS rebinding) ----------
+#
+# This app runs on loopback with no CSRF protection and, until now, no Host validation.
+# Two consequences, both reachable from any web page the user happens to have open:
+#
+#   1. CSRF. State-changing endpoints accepted form-encoded and text/plain bodies with no
+#      token. text/plain is a CORS-"simple" content type, so a cross-origin page could
+#      auto-submit a form POST to /api/import/json with no preflight and no need to read
+#      the response -- replacing the entire receipts database. The same-origin policy does
+#      not help, because nothing has to be read back.
+#   2. DNS rebinding. With the Host header unchecked, an attacker domain whose DNS
+#      re-resolves to 127.0.0.1 becomes same-origin with the app, which hands them the
+#      CORS configuration's trust as well.
+#
+# Four independent gates below, cheapest first. Any one of them stops the classic attack;
+# together they also cover browsers that omit Sec-Fetch-Site and callers that forge Origin.
+_CSRF_COOKIE = "rm_csrf"
+_CSRF_HEADER = "X-CSRF-Token"
+_LOOPBACK_NAMES = ("127.0.0.1", "localhost", "::1", "[::1]")
+
+
+def _hostname_of(host_header: str) -> str:
+    """The hostname part of a Host header, port stripped. Only the NAME is validated, not
+    the port: the port is the attacker's to choose anyway (they aim at whatever port this
+    app listens on), whereas the hostname is precisely what differs under DNS rebinding.
+    Matching names also keeps this correct when the app runs on a non-default port."""
+    h = host_header.strip().lower()
+    if h.startswith("["):  # bracketed IPv6, e.g. [::1]:8765
+        return h[: h.index("]") + 1] if "]" in h else h
+    if h.count(":") > 1:  # bare IPv6 (not strictly legal in a Host header) — take as-is
+        return h
+    return h.rsplit(":", 1)[0] if ":" in h else h
+
+
+def _default_allowed_hosts() -> set[str]:
+    """Hostnames this server legitimately answers on."""
+    hosts = set(_LOOPBACK_NAMES)
+    # B104 suppressed: these are wildcard-bind sentinels being COMPARED against, to exclude
+    # them from the allow-list. Nothing binds here. (Reason kept above the pragma so bandit
+    # does not try to parse the prose as further test IDs.)
+    if HOST and HOST not in ("0.0.0.0", "::", "*"):  # nosec B104
+        hosts.add(_hostname_of(HOST))
+    return hosts
+
+
+ALLOWED_HOSTS = _default_allowed_hosts()
+_HOST_CHECK_ENABLED = True
+
+_ALLOWED_HOSTS_ENV = os.environ.get("ALLOWED_HOSTS", "").strip()
+if _ALLOWED_HOSTS_ENV == "*":
+    # Explicit operator opt-out. Documented in .env.example; only sensible behind a
+    # reverse proxy that validates Host itself.
+    _HOST_CHECK_ENABLED = False
+elif _ALLOWED_HOSTS_ENV:
+    # Port-stripped, so both "receipts.example.com" and "receipts.example.com:8765" work.
+    ALLOWED_HOSTS |= {_hostname_of(h) for h in _ALLOWED_HOSTS_ENV.split(",") if h.strip()}
+elif HOST not in _LOOPBACK_NAMES:
+    # Bound to a non-loopback interface (Docker, LAN) with no explicit allow-list. Those
+    # deployments are reached by hostnames this process cannot guess, so enforcing the
+    # default loopback-only list would break every one of them on upgrade. Keep serving,
+    # but say so loudly -- Host validation is what stops DNS rebinding.
+    _HOST_CHECK_ENABLED = False
+    logger.warning(
+        "Host header validation is DISABLED: HOST=%s is not loopback and ALLOWED_HOSTS is unset. "
+        "Set ALLOWED_HOSTS to the hostnames you serve on to re-enable it.",
+        # Inlined rather than sanitize_for_logging(): this runs at import time, above that
+        # function's definition. HOST comes from the environment, so it still gets stripped.
+        re.sub(r"[\r\n\x00-\x1f\x7f]", "", HOST)[:200],
+    )
+
+
+def _get_cookie(handler, name: str) -> str | None:
+    for part in (handler.headers.get("Cookie", "") or "").split(";"):
+        part = part.strip()
+        if part.startswith(name + "="):
+            return part[len(name) + 1 :]
+    return None
+
+
+def _is_host_allowed(handler) -> bool:
+    if not _HOST_CHECK_ENABLED:
+        return True
+    host = (handler.headers.get("Host") or "").strip()
+    return bool(host) and _hostname_of(host) in ALLOWED_HOSTS
+
+
+def _cross_origin_reason(handler) -> str | None:
+    """Why this request looks cross-origin, or None if it looks same-origin."""
+    # Sec-Fetch-Site is set by the browser and cannot be spoofed by page JS, so when it is
+    # present it is the most trustworthy signal available. 'none' means a direct
+    # navigation or a non-browser client.
+    fetch_site = (handler.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if fetch_site and fetch_site not in ("same-origin", "none"):
+        return f"Sec-Fetch-Site: {sanitize_for_logging(fetch_site, 40)}"
+
+    # Older browsers send Origin but not Sec-Fetch-Site on same-origin XHR.
+    origin = handler.headers.get("Origin")
+    if origin and origin != "null":
+        origin_l = sanitize_header_value(origin).lower()
+        host = (handler.headers.get("Host") or "").strip().lower()
+        self_origins = {f"http://{host}", f"https://{host}"}
+        if origin_l not in {o.lower() for o in ALLOWED_ORIGINS} and origin_l not in self_origins:
+            return f"Origin: {sanitize_for_logging(origin_l, 80)}"
+    return None
+
+
+def _content_type_reason(handler, path: str) -> str | None:
+    """Reject the CORS-simple content types that let a cross-origin form POST through
+    without a preflight. JSON and multipart both require one."""
+    ctype = (handler.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    if path == "/login":
+        # The login form is genuinely urlencoded; it carries no CSRF token (there is no
+        # session to bind one to yet) and login CSRF only costs the victim a logged-in
+        # session, so the Host/Origin gates above are the protection here.
+        return None if ctype in ("application/x-www-form-urlencoded", "") else f"Content-Type: {ctype}"
+    if not ctype:
+        # A bodiless request (typical DELETE) is fine; a body with no declared type is not.
+        if int(handler.headers.get("Content-Length", 0) or 0) == 0:
+            return None
+        return "body with no Content-Type"
+    if ctype in ("application/json", "multipart/form-data"):
+        return None
+    return f"Content-Type: {sanitize_for_logging(ctype, 60)}"
+
+
+def _csrf_token_valid(handler) -> bool:
+    """Double-submit cookie: the token is issued in a JS-readable cookie when an HTML page
+    is served, and the frontend echoes it back in a header. A cross-origin attacker can
+    cause the cookie to be SENT but cannot read it, so it cannot populate the header."""
+    sent = handler.headers.get(_CSRF_HEADER, "") or ""
+    cookie = _get_cookie(handler, _CSRF_COOKIE) or ""
+    if not sent or not cookie:
+        return False
+    return hmac.compare_digest(sent, cookie)
 
 
 # ---------- Security helpers ----------
@@ -325,6 +462,13 @@ class Handler(BaseHTTPRequestHandler):
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
         self.send_header("Content-Type", sanitize_header_value(content_type))
+        # XNT-115: issue the double-submit CSRF token alongside any HTML page. Deliberately
+        # NOT HttpOnly -- the frontend has to read it to echo it back in X-CSRF-Token.
+        if content_type.startswith("text/html"):
+            self.send_header(
+                "Set-Cookie",
+                f"{_CSRF_COOKIE}={secrets.token_urlsafe(32)}; Path=/; SameSite=Strict",
+            )
         csp = (
             "default-src 'self'; "
             "script-src 'self' https://cdn.jsdelivr.net; "
@@ -340,10 +484,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("X-Content-Type-Options", "nosniff")
         set_cors_headers(self)
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # XNT-115: allow-listed cross-origin callers (the localhost:3000 dev server) must be
+        # able to send the CSRF header, or their preflight fails.
+        self.send_header("Access-Control-Allow-Headers", f"Content-Type, {_CSRF_HEADER}")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
+
+    # XNT-115: gate for every state-changing request. Returns True when the request has
+    # been rejected and a response already written, so callers just `return`.
+    def _rejected_as_unsafe(self, path: str) -> bool:
+        if not _is_host_allowed(self):
+            host = sanitize_for_logging(self.headers.get("Host") or "<missing>", 80)
+            logger.warning("XNT-115: rejected %s %s — unrecognised Host %s", self.command, path, host)
+            self._deny(400, "Invalid Host header")
+            return True
+
+        reason = _cross_origin_reason(self) or _content_type_reason(self, path)
+        if reason is None and path != "/login" and not _csrf_token_valid(self):
+            reason = "missing or mismatched CSRF token"
+        if reason is not None:
+            logger.warning("XNT-115: rejected %s %s — %s", self.command, path, reason)
+            self._deny(403, "Request rejected: cross-origin or unverified request")
+            return True
+        return False
+
+    def _deny(self, status: int, message: str):
+        # Deliberately terse: the reason is logged server-side, not handed to the caller.
+        self._set_headers(status)
+        self.wfile.write(json.dumps({"error": message}).encode("utf-8"))
 
     def _redirect(self, location: str, clear_cookie: bool = False):
         self.send_response(302)
@@ -391,6 +560,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # XNT-115: Host validation applies to reads too -- a DNS-rebinding attacker needs
+        # to read responses, so refusing an unrecognised Host here is half the defence.
+        if not _is_host_allowed(self):
+            logger.warning(
+                "XNT-115: rejected GET %s — unrecognised Host %s",
+                path,
+                sanitize_for_logging(self.headers.get("Host") or "<missing>", 80),
+            )
+            self._deny(400, "Invalid Host header")
+            return
 
         # Health check (no auth, always available)
         if path == "/api/auth-status":
@@ -586,6 +766,10 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        # XNT-115: cross-origin / CSRF / Host gate, before any state is touched.
+        if self._rejected_as_unsafe(path):
+            return
+
         # RM-166: Login form (public)
         if path == "/login":
             body = self._read_body()
@@ -751,6 +935,10 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        # XNT-115: cross-origin / CSRF / Host gate, before any state is touched.
+        if self._rejected_as_unsafe(path):
+            return
+
         if not _is_authenticated(self):
             self._set_headers(401)
             self.wfile.write(json.dumps({"error": "Unauthorized"}).encode("utf-8"))
@@ -804,6 +992,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # XNT-115: cross-origin / CSRF / Host gate, before any state is touched.
+        if self._rejected_as_unsafe(path):
+            return
 
         if not _is_authenticated(self):
             self._set_headers(401)

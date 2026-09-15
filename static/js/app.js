@@ -68,8 +68,26 @@ function bind(id, ev, fn) {
   el.addEventListener(ev, fn);
 }
 
+// XNT-115: the server issues a CSRF token in the JS-readable rm_csrf cookie whenever it
+// serves an HTML page, and requires it echoed back in X-CSRF-Token on every POST/PUT/
+// DELETE. A cross-origin page can cause the cookie to be sent but cannot read it, so it
+// cannot populate the header. Defined here (app.js loads before settings.js) so both
+// scripts can use it.
+function csrfToken() {
+  const m = document.cookie.match(/(?:^|;\s*)rm_csrf=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+// Adds the CSRF header to state-changing requests, leaving reads untouched.
+function withCsrf(opts) {
+  const o = opts || {};
+  const method = (o.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return o;
+  return { ...o, headers: { ...(o.headers || {}), 'X-CSRF-Token': csrfToken() } };
+}
+
 async function fetchJson(url, opts) {
-  const resp = await fetch(url, opts);
+  const resp = await fetch(url, withCsrf(opts));
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
     throw new Error(`${opts?.method || 'GET'} ${url} failed: ${resp.status} ${text}`);
@@ -502,7 +520,7 @@ async function handleFile(file) {
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const resp = await fetch(API.upload, { method: 'POST', body: formData });
+    const resp = await fetch(API.upload, withCsrf({ method: 'POST', body: formData }));
     if (!resp.ok) { alert(`Upload failed: ${await resp.text()}`); return; }
     const result = await resp.json();
     if (!result.success) { alert(`Upload failed: ${result.error || 'Unknown error'}`); return; }
@@ -1335,7 +1353,7 @@ function setupEventListeners() {
       if (nameEl) nameEl.textContent = 'Uploading…';
       try {
         const fd = new FormData(); fd.append('file', file);
-        const resp = await fetch(API.uploadDoc, { method: 'POST', body: fd });
+        const resp = await fetch(API.uploadDoc, withCsrf({ method: 'POST', body: fd }));
         const result = await resp.json();
         if (result.success) {
           if (pathEl) pathEl.value = result.path;

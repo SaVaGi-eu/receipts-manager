@@ -16,7 +16,7 @@ async function fetchCurrentConfig() {
   try {
     const response = await fetch('/api/config');
     const config = await response.json();
-    
+
     if (config.configured) {
       currentConfig.storageType = config.storage_type || 'local';
       currentConfig.dataFile = config.data_path || null;
@@ -38,10 +38,10 @@ async function fetchCurrentConfig() {
  */
 function extractDirectoryPath(filePath) {
   if (!filePath) return filePath;
-  
+
   // Check if path ends with a file extension
   const hasFileExtension = /\.[a-zA-Z0-9]+$/.test(filePath);
-  
+
   if (hasFileExtension) {
     // Extract directory by removing the filename
     const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
@@ -49,7 +49,7 @@ function extractDirectoryPath(filePath) {
       return filePath.substring(0, lastSlash);
     }
   }
-  
+
   return filePath;
 }
 
@@ -151,7 +151,7 @@ function initSettingsModal() {
 async function loadCurrentConfig() {
   // Fetch latest config from backend
   const config = await fetchCurrentConfig();
-  
+
   // Update display elements
   const storageTypeEl = document.getElementById('currentStorageType');
   const storagePathEl = document.getElementById('currentStoragePath');
@@ -237,7 +237,7 @@ function initLocationModal() {
     // Remove any existing listeners by cloning the node
     const newBrowseBtn = browsePathBtn.cloneNode(true);
     browsePathBtn.parentNode.replaceChild(newBrowseBtn, browsePathBtn);
-    
+
     newBrowseBtn.addEventListener('click', async () => {
       // Prevent duplicate calls
       if (isBrowsing) {
@@ -265,7 +265,7 @@ function initLocationModal() {
             localPathInput.value = directoryPath;
             console.log('[Settings] Original path:', result.path);
             console.log('[Settings] Directory path:', directoryPath);
-            
+
             // Show feedback if we extracted a directory
             if (directoryPath !== result.path) {
               console.log('[Settings] Extracted parent directory from selected file');
@@ -325,7 +325,9 @@ async function applyLocationSettings() {
     const response = await fetch('/api/config/update', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        // XNT-115: CSRF token, see withCsrf()/csrfToken() in app.js
+        'X-CSRF-Token': csrfToken()
       },
       body: JSON.stringify({
         data_directory: newPath,
