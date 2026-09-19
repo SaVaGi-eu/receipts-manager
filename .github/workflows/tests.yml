@@ -54,6 +54,14 @@ jobs:
           flake8 .
           isort --check-only .
 
+      # mypy was installed and configured but never executed by any workflow,
+      # so its [tool.mypy] settings had drifted unnoticed. Non-blocking for now:
+      # it has never run in CI, so its first findings are a backlog to work
+      # through, not a reason to redden every PR.
+      - name: Run type checks (non-blocking)
+        continue-on-error: true
+        run: mypy .
+
       - name: Run tests with coverage
         run: |
           pytest --cov=. --cov-report=xml --cov-report=html --cov-report=term
