@@ -265,7 +265,11 @@ def _csrf_token_valid(handler) -> bool:
 def sanitize_for_logging(text: object, max_length: int = 200) -> str:
     if not text:
         return ""
-    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text))
+    # The re.sub below already removes CR/LF. The explicit replace() chain is
+    # redundant at runtime but is the form CodeQL's py/log-injection query
+    # recognises as a barrier - without it the query reports every call site,
+    # including ones sanitized here since XNT-115.
+    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text)).replace("\r", "").replace("\n", "")
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length] + "..."
     return sanitized
