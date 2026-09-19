@@ -1,0 +1,27 @@
+# Code owners for receipts-manager.
+#
+# Replaces the `reviewers:` attribute that was set in .github/dependabot.yml.
+# GitHub deprecated that attribute, so it silently requested nobody - PRs #136,
+# #145 and #146 each landed with 0 review requests despite it being configured.
+# CODEOWNERS is the supported mechanism and applies to every PR, not just
+# dependabot's.
+#
+# Note: an owner is not auto-requested on their own PR, and the "Protect main
+# branch" ruleset requires 0 approvals, so this routes review requests without
+# blocking solo work.
+
+# Default owner for everything not matched below.
+*                       @v-giannakopoulos
+
+# CI, automation and security policy: changes here decide what gates merges,
+# so they should never land unseen.
+/.github/               @v-giannakopoulos
+/SECURITY.md            @v-giannakopoulos
+
+# Dependency manifests - the surface dependabot opens PRs against.
+/requirements.txt              @v-giannakopoulos
+/requirements-dev.txt          @v-giannakopoulos
+/pyproject.toml                @v-giannakopoulos
+/platforms/macos/package.json  @v-giannakopoulos
+/platforms/macos/requirements.txt @v-giannakopoulos
+/platforms/docker/Dockerfile   @v-giannakopoulos
