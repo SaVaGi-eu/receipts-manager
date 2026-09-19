@@ -239,7 +239,11 @@ def _content_type_reason(handler, path: str) -> str | None:
         # The login form is genuinely urlencoded; it carries no CSRF token (there is no
         # session to bind one to yet) and login CSRF only costs the victim a logged-in
         # session, so the Host/Origin gates above are the protection here.
-        return None if ctype in ("application/x-www-form-urlencoded", "") else f"Content-Type: {ctype}"
+        if ctype in ("application/x-www-form-urlencoded", ""):
+            return None
+        # CWE-117: sanitized like the return at the end of this function - this branch
+        # was missed when that one was fixed, and the reason string is logged verbatim.
+        return f"Content-Type: {sanitize_for_logging(ctype, 60)}"
     if not ctype:
         # A bodiless request (typical DELETE) is fine; a body with no declared type is not.
         if int(handler.headers.get("Content-Length", 0) or 0) == 0:
