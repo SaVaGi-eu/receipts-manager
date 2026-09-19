@@ -23,7 +23,7 @@ mypy>=1.7.0
 
 # Security
 bandit[toml]>=1.9.4
-safety>=3.7.0
+safety>=3.8.1
 
 # Pre-commit
 pre-commit>=3.5.0
