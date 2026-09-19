@@ -1,0 +1,49 @@
+name: Dependabot auto-merge
+
+# Enables GitHub's native auto-merge on dependabot PRs so routine bumps land
+# without a human clicking merge. Auto-merge only completes once every required
+# status check passes, so the "Protect main branch" ruleset MUST list required
+# checks — with none listed, GitHub merges the moment auto-merge is enabled,
+# whether CI has finished or not.
+#
+# Major bumps are deliberately excluded and still need a human.
+
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge for non-major bumps
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      # No checkout step, deliberately: pull_request_target runs with write
+      # permissions against the base repo, so this job must never execute code
+      # from the PR branch.
+      - name: Fetch dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Flag major bumps for manual review
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "$PR_URL" --body "Major version bump — auto-merge deliberately not enabled. $NAMES $PREV → $NEXT needs a human look at the changelog."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          PREV: ${{ steps.metadata.outputs.previous-version }}
+          NEXT: ${{ steps.metadata.outputs.new-version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
