@@ -239,7 +239,11 @@ def _content_type_reason(handler, path: str) -> str | None:
         # The login form is genuinely urlencoded; it carries no CSRF token (there is no
         # session to bind one to yet) and login CSRF only costs the victim a logged-in
         # session, so the Host/Origin gates above are the protection here.
-        return None if ctype in ("application/x-www-form-urlencoded", "") else f"Content-Type: {ctype}"
+        if ctype in ("application/x-www-form-urlencoded", ""):
+            return None
+        # CWE-117: sanitized like the return at the end of this function - this branch
+        # was missed when that one was fixed, and the reason string is logged verbatim.
+        return f"Content-Type: {sanitize_for_logging(ctype, 60)}"
     if not ctype:
         # A bodiless request (typical DELETE) is fine; a body with no declared type is not.
         if int(handler.headers.get("Content-Length", 0) or 0) == 0:
@@ -262,10 +266,14 @@ def _csrf_token_valid(handler) -> bool:
 
 
 # ---------- Security helpers ----------
-def sanitize_for_logging(text: str, max_length: int = 200) -> str:
+def sanitize_for_logging(text: object, max_length: int = 200) -> str:
     if not text:
         return ""
-    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text))
+    # The re.sub below already removes CR/LF. The explicit replace() chain is
+    # redundant at runtime but is the form CodeQL's py/log-injection query
+    # recognises as a barrier - without it the query reports every call site,
+    # including ones sanitized here since XNT-115.
+    sanitized = re.sub(r"[\r\n\x00-\x1f\x7f]", "", str(text)).replace("\r", "").replace("\n", "")
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length] + "..."
     return sanitized
@@ -496,9 +504,15 @@ class Handler(BaseHTTPRequestHandler):
     # XNT-115: gate for every state-changing request. Returns True when the request has
     # been rejected and a response already written, so callers just `return`.
     def _rejected_as_unsafe(self, path: str) -> bool:
+        # CWE-117: the method and path come straight off the request line, so both are
+        # attacker-controlled and must be sanitized before they reach the log, exactly
+        # like the Host header below. 16 chars is generous for a method name.
+        safe_method = sanitize_for_logging(self.command, 16)
+        safe_path = sanitize_for_logging(path)
+
         if not _is_host_allowed(self):
             host = sanitize_for_logging(self.headers.get("Host") or "<missing>", 80)
-            logger.warning("XNT-115: rejected %s %s — unrecognised Host %s", self.command, path, host)
+            logger.warning("XNT-115: rejected %s %s — unrecognised Host %s", safe_method, safe_path, host)
             self._deny(400, "Invalid Host header")
             return True
 
@@ -506,7 +520,7 @@ class Handler(BaseHTTPRequestHandler):
         if reason is None and path != "/login" and not _csrf_token_valid(self):
             reason = "missing or mismatched CSRF token"
         if reason is not None:
-            logger.warning("XNT-115: rejected %s %s — %s", self.command, path, reason)
+            logger.warning("XNT-115: rejected %s %s — %s", safe_method, safe_path, reason)
             self._deny(403, "Request rejected: cross-origin or unverified request")
             return True
         return False
@@ -566,9 +580,10 @@ class Handler(BaseHTTPRequestHandler):
         # XNT-115: Host validation applies to reads too -- a DNS-rebinding attacker needs
         # to read responses, so refusing an unrecognised Host here is half the defence.
         if not _is_host_allowed(self):
+            # CWE-117: `path` is request-line data; sanitize it like the Host header.
             logger.warning(
                 "XNT-115: rejected GET %s — unrecognised Host %s",
-                path,
+                sanitize_for_logging(path),
                 sanitize_for_logging(self.headers.get("Host") or "<missing>", 80),
             )
             self._deny(400, "Invalid Host header")
