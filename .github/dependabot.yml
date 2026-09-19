@@ -53,6 +53,40 @@ updates:
           - "minor"
           - "patch"
 
+  # npm (macOS packaging)
+  #
+  # This ecosystem was missing entirely, so every electron/js-yaml/xmldom PR
+  # arrived as an ungrouped *security* update - one PR per package, each
+  # rewriting platforms/macos/package-lock.json. That is what made #125/#126
+  # conflict with #128 and with each other: whichever merged first left the
+  # rest stale against the same lockfile. Grouping them means one PR per scan.
+  - package-ecosystem: "npm"
+    directory: "/platforms/macos"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    reviewers:
+      - "v-giannakopoulos"
+    groups:
+      # One PR for the whole lockfile, majors included: separate PRs touching
+      # the same package-lock.json conflict by construction.
+      macos-packaging:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -70,6 +104,16 @@ updates:
       include: "scope"
     reviewers:
       - "v-giannakopoulos"
+    groups:
+      # #119/#120/#122/#123 were four PRs for what is one concern: keeping
+      # pinned action SHAs current. Grouped, that is one PR per week.
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
 
   # Docker
   - package-ecosystem: "docker"
@@ -88,3 +132,11 @@ updates:
       include: "scope"
     reviewers:
       - "v-giannakopoulos"
+    groups:
+      docker:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
