@@ -26,7 +26,7 @@ bandit[toml]>=1.9.4
 safety>=3.7.0
 
 # Pre-commit
-pre-commit>=3.5.0
+pre-commit>=4.6.2
 
 # Documentation
 # Sphinx 7.2.6+ requires Python 3.9+, use constraint for 3.8 compatibility
