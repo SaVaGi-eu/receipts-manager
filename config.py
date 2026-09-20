@@ -201,6 +201,16 @@ def save_data_path(chosen_path: str) -> bool:
 # Try to get data root, but don't crash if it fails
 DATA_ROOT = get_data_root()
 
+# Declared Optional up front: every one of these is set to None when the data
+# directory is missing or cannot be created (see the except and else branches
+# below), so Path alone was never the real type. get_data_root() is already
+# annotated Optional[Path]; these derived paths just never said so.
+DATABASE_DIR: Optional[Path]
+STORAGE_DIR: Optional[Path]
+RECEIPTS_DIR: Optional[Path]
+BACKUP_DIR: Optional[Path]
+DATA_FILE: Optional[Path]
+
 if DATA_ROOT:
     DATABASE_DIR = DATA_ROOT / "database"
     STORAGE_DIR = DATA_ROOT / "storage"

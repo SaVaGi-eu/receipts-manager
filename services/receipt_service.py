@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timedelta
 from io import StringIO
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import unquote
 
 logger = logging.getLogger("receipt-manager")
@@ -333,7 +333,14 @@ class ReceiptService:
     # controlled content (e.g. .html/.svg/.js) cannot be stored and later served.
     _ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
-    def __init__(self, data_file, data_root, receipts_dir, storage_dir, backup_dir):
+    def __init__(
+        self,
+        data_file: Path | str,
+        data_root: Path | str,
+        receipts_dir: Path | str,
+        storage_dir: Path | str,
+        backup_dir: Path | str,
+    ) -> None:
         self._data_file = Path(data_file)
         self._data_root = Path(data_root)
         self._receipts_dir = Path(receipts_dir)
@@ -353,7 +360,7 @@ class ReceiptService:
             return {"receipts": [], "items": [], "next_id": 1}
         try:
             with self._data_file.open("r", encoding="utf-8") as f:
-                data = json.load(f)
+                data: dict[str, Any] = json.load(f)
                 if "next_id" not in data:
                     data["next_id"] = max((i["id"] for i in data.get("items", [])), default=0) + 1
                 return data
@@ -792,7 +799,7 @@ class ReceiptService:
     def update_item(self, item_id: int, updates: dict) -> dict:
         with self._lock:
             data = self.load()
-            item = next((i for i in data["items"] if i["id"] == item_id), None)
+            item: Optional[dict[str, Any]] = next((i for i in data["items"] if i["id"] == item_id), None)
             if not item:
                 raise KeyError("Item not found")
             receipt = next((r for r in data["receipts"] if r["receipt_group_id"] == item["receipt_group_id"]), None)
