@@ -71,66 +71,6 @@ check_docker() {
     fi
 }
 
-# Function to check Tesseract
-check_tesseract() {
-    if command_exists tesseract; then
-        TESS_VERSION=$(tesseract --version 2>&1 | head -n1)
-        echo -e "${GREEN}✓${NC} Tesseract installed: $TESS_VERSION"
-        return 0
-    else
-        echo -e "${YELLOW}!${NC} Tesseract not found (OCR will not work)"
-        return 1
-    fi
-}
-
-# Function to install Tesseract
-install_tesseract() {
-    echo -e "\n${BLUE}═══ Installing Tesseract OCR ═══${NC}\n"
-
-    case "$OS" in
-        Darwin)
-            if command_exists brew; then
-                echo "Installing Tesseract via Homebrew..."
-                brew install tesseract tesseract-lang
-                echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
-                return 0
-            else
-                echo -e "${RED}Homebrew is required to auto-install Tesseract.${NC}"
-                echo "Install Homebrew from: https://brew.sh"
-                echo "Then run: brew install tesseract tesseract-lang"
-                return 1
-            fi
-            ;;
-        Linux)
-            if command_exists apt-get; then
-                echo "Installing Tesseract via apt-get..."
-                echo "This requires sudo privileges."
-                sudo apt-get update
-                sudo apt-get install -y tesseract-ocr
-                echo "You can install additional language packs as needed, e.g.: sudo apt-get install tesseract-ocr-eng"
-                echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
-                return 0
-            elif command_exists yum; then
-                echo "Installing Tesseract via yum..."
-                echo "This requires sudo privileges."
-                sudo yum install -y tesseract tesseract-langpack-eng tesseract-langpack-nld
-                echo -e "${GREEN}✓ Tesseract installed successfully!${NC}"
-                echo "Note: On yum-based systems, only English (eng) and Dutch (nld) language packs are installed by default."
-                echo "If you need additional languages such as Greek (ell) or Latvian (lav), please install the corresponding Tesseract language packages manually."
-                return 0
-            else
-                echo -e "${RED}Unable to auto-install Tesseract.${NC}"
-                echo "Please install manually: sudo apt-get install tesseract-ocr"
-                return 1
-            fi
-            ;;
-        *)
-            echo -e "${RED}Unsupported OS for auto-installation.${NC}"
-            return 1
-            ;;
-    esac
-}
-
 # Function to prepare branding assets for electron-builder
 # Copies icon and DMG background from media/branding/ into platforms/macos/build/
 # Warns if assets are missing but does not abort — electron-builder will use its defaults.
@@ -202,17 +142,6 @@ build_macos_app() {
         echo "Install with: brew install python@3.12"
         exit 1
     }
-
-    if ! check_tesseract; then
-        echo -e "\n${YELLOW}Tesseract is recommended for OCR functionality.${NC}"
-        read -p "Would you like to install Tesseract now? (Y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            install_tesseract || {
-                echo -e "${YELLOW}Continuing without Tesseract. OCR features will be disabled.${NC}"
-            }
-        fi
-    fi
 
     # Detect architecture
     if [[ "$ARCH" == "arm64" ]]; then
@@ -345,22 +274,6 @@ run_direct() {
         esac
         exit 1
     }
-
-    # Check and offer to install Tesseract
-    if ! check_tesseract; then
-        echo ""
-        read -p "Would you like to install Tesseract now for OCR functionality? (Y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            if install_tesseract; then
-                echo -e "${GREEN}Tesseract installed successfully!${NC}"
-            else
-                echo -e "${YELLOW}Continuing without Tesseract. OCR features will be disabled.${NC}"
-            fi
-        else
-            echo -e "${YELLOW}Continuing without Tesseract. OCR features will be disabled.${NC}"
-        fi
-    fi
 
     # Set up Python virtual environment
     setup_venv

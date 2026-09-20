@@ -30,7 +30,7 @@
 
 
 
-A multilingual receipt and warranty management system with OCR support for scanning and organizing receipts, warranties, and related documents.
+A multilingual receipt and warranty management system for organizing receipts, warranties, and related documents.
 
 ---
 
@@ -66,7 +66,6 @@ The installer will detect your system and offer appropriate options:
   <img src="media/screenshots/add-item-dialog.png" alt="Add Item Dialog" width="600"/>
 </p>
 
-- 📸 **Receipt Scanning**: OCR-powered text extraction from receipt images
 - 🗂️ **Warranty Tracking**: Organize and track product warranties with expiration alerts
 - 🌍 **Multilingual**: Full support for English, Dutch, Greek, and Latvian
 - 🔍 **Full-Text Search**: Search across all receipts and documents
@@ -91,7 +90,6 @@ The macOS app includes:
 
 - ✅ Python runtime bundled
 - ✅ All dependencies included
-- ✅ Tesseract OCR with multilingual support
 - ✅ Native window with Electron
 - ✅ No terminal required
 - ✅ First-time setup wizard
@@ -140,7 +138,6 @@ receipts-manager/
 ├── install.sh              # Universal installer (START HERE)
 ├── app.py                  # Main Flask application
 ├── config.py               # Configuration
-├── ocr_service.py          # OCR processing
 ├── requirements.txt        # Python dependencies
 ├── .env.example            # Environment variables template
 │
@@ -163,14 +160,7 @@ receipts-manager/
 
 ## 🌐 Multilingual Support
 
-Supported OCR languages:
-
-- 🇬🇧 **English** (eng)
-- 🇳🇱 **Dutch** (nld)
-- 🇬🇷 **Greek** (ell)
-- 🇱🇻 **Latvian** (lav)
-
-Additional languages can be added by installing the corresponding Tesseract language pack.
+The interface is available in English, Dutch, Greek and Latvian.
 
 ---
 
@@ -190,7 +180,6 @@ Additional languages can be added by installing the corresponding Tesseract lang
 ### Direct Execution
 
 - Python 3.8 or higher
-- Tesseract OCR 4.0+ (optional, for OCR features)
 - 200 MB disk space
 
 ---
@@ -201,8 +190,6 @@ Additional languages can be added by installing the corresponding Tesseract lang
 
 - 🚀 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
 - 📝 [Workflows](WORKFLOWS.md) - Common usage patterns
-- 🔍 [OCR Setup](OCR_SETUP.md) - Configure OCR for best results
-- 🔗 [Integration Guide](INTEGRATION_GUIDE.md) - API and integrations
 
 ### Deployment
 
@@ -343,8 +330,6 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 Built with these amazing open-source projects:
 
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - OCR engine
-- [EasyOCR](https://github.com/JaidedAI/EasyOCR) - Alternative OCR
 - [Flask](https://flask.palletsprojects.com/) - Web framework
 - [Electron](https://www.electronjs.org/) - Desktop app framework
 - [Pillow](https://python-pillow.org/) - Image processing

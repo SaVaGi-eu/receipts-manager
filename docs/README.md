@@ -10,8 +10,6 @@ Comprehensive documentation for Receipt Manager.
 ## User Guides
 
 - [Workflows](../WORKFLOWS.md) - Common usage workflows and examples
-- [OCR Setup](../OCR_SETUP.md) - Configuring OCR for best results
-- [Integration Guide](../INTEGRATION_GUIDE.md) - API and integration options
 
 ## Deployment
 

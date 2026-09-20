@@ -141,7 +141,7 @@ The path traversal alerts are **confirmed false positives**. The code is secure 
 **Risk**: Attackers could inject fake log entries  
 **Fix**: Added `sanitize_for_logging()` to remove CR/LF before logging
 
-**Files**: `ocr_service.py`
+**Files**: `app.py`, `services/receipt_service.py`
 
 ### Unpinned GitHub Actions - FIXED ✅
 

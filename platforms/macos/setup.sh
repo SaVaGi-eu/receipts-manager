@@ -8,7 +8,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV_DIR="$HOME/.receipts-manager-venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 VENV_PIP="$VENV_DIR/bin/pip"
-REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
+REQUIREMENTS="$PROJECT_ROOT/requirements.txt"
 
 cd "$PROJECT_ROOT"
 
@@ -20,7 +20,7 @@ echo ""
 if ! command -v brew &> /dev/null; then
     echo "❌ Homebrew is not installed."
     echo ""
-    echo "Homebrew is needed to install system dependencies (like poppler for PDF support)."
+    echo "Homebrew is used to install optional system dependencies."
     echo ""
     read -p "Would you like to install Homebrew now? (y/n): " -n 1 -r
     echo ""
@@ -71,11 +71,6 @@ echo ""
 echo "Checking system dependencies..."
 
 MISSING_BREW_DEPS=()
-
-# poppler is needed for pdf2image
-if ! brew list poppler &> /dev/null; then
-    MISSING_BREW_DEPS+=("poppler")
-fi
 
 if [ ${#MISSING_BREW_DEPS[@]} -gt 0 ]; then
     echo ""
@@ -273,11 +268,6 @@ while IFS= read -r line; do
     package=$(echo "$line" | sed 's/[><=].*//')
     import_name="$package"
 
-    case "$package" in
-        "opencv-python") import_name="cv2" ;;
-        "Pillow") import_name="PIL" ;;
-    esac
-
     if ! "$VENV_PYTHON" -c "import $import_name" 2>/dev/null; then
         NEED_INSTALL=true
         break
@@ -287,7 +277,6 @@ done < "$REQUIREMENTS"
 if [ "$NEED_INSTALL" = true ]; then
     echo ""
     echo "📦 Installing Python dependencies..."
-    echo "This may take several minutes (especially torch/torchvision)..."
     echo ""
 
     "$VENV_PIP" install -r "$REQUIREMENTS"
