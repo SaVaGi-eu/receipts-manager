@@ -110,7 +110,9 @@ def _validate_session_token(token: str) -> bool:
 
 
 def _get_session_token(handler) -> str | None:
-    cookie_header = handler.headers.get("Cookie", "")
+    # Annotated: handler.headers is untyped, so .get() hands back Any and the
+    # slice below inherited it, making the declared str | None a fiction.
+    cookie_header: str = handler.headers.get("Cookie", "")
     for part in cookie_header.split(";"):
         part = part.strip()
         if part.startswith(_SESSION_COOKIE + "="):
@@ -338,6 +340,9 @@ def _open_file_dialog_linux():
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except FileNotFoundError:
+        # zenity is not installed. Expected on non-GNOME desktops and on
+        # headless systems: fall through and try kdialog, then tkinter. Nothing
+        # to log - absence of one optional picker is not a fault condition.
         pass
     except Exception as e:
         logger.debug("zenity file dialog failed: %s", e)
@@ -352,6 +357,8 @@ def _open_file_dialog_linux():
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except FileNotFoundError:
+        # kdialog is not installed either. Expected outside KDE; fall through to
+        # the tkinter picker below, which ships with CPython.
         pass
     except Exception as e:
         logger.debug("kdialog file dialog failed: %s", e)
