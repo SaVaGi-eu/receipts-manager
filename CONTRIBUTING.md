@@ -8,7 +8,6 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 - Python 3.9, 3.10, 3.11, or 3.12
 - Git
-- Tesseract OCR (for receipt scanning)
 
 ### Development Setup
 
@@ -174,7 +173,7 @@ footer (optional)
 **Examples:**
 
 ```
-feat(ocr): add support for Dutch language
+feat(i18n): add support for Dutch language
 fix(api): resolve path traversal vulnerability
 docs(readme): update installation instructions
 ```

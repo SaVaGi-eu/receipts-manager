@@ -531,7 +531,7 @@ async function handleFile(file) {
 
 // ===================== MODAL — OPEN / CLOSE =====================
 function openModalForChoose() {
-  const modal = $('ocrModal'); if (!modal) return;
+  const modal = $('entryModal'); if (!modal) return;
   sessionGroupId = null;
   sessionItemIds = [];
   clearFormItemFields();
@@ -547,7 +547,7 @@ function openModalForChoose() {
 }
 
 function openModalForNew(uploadResult) {
-  const modal = $('ocrModal'); if (!modal) return;
+  const modal = $('entryModal'); if (!modal) return;
   sessionGroupId = uploadResult.receipt_group_id;
   sessionItemIds = [uploadResult.item_id];
 
@@ -555,13 +555,10 @@ function openModalForNew(uploadResult) {
   $('modalReceiptGroupId').value = uploadResult.receipt_group_id || '';
   $('modalMode').value           = 'new';
 
-  const ocr = uploadResult.ocr_data || {};
-  $('modalShop').value = ocr.shop || '';
-  const pd = ocr.purchase_date || '';
-  if (pd && pd !== 'N/A') {
-    try { $('modalPurchaseDate').value = new Date(pd.replace(/-/g, ' ')).toISOString().split('T')[0]; }
-    catch { $('modalPurchaseDate').value = ''; }
-  } else { $('modalPurchaseDate').value = ''; }
+  // Shop and date are entered by hand. These were pre-filled from ocr_data,
+  // which the backend only ever populated with empty strings.
+  $('modalShop').value = '';
+  $('modalPurchaseDate').value = '';
 
   clearFormItemFields();
   setModalMode('new');
@@ -572,7 +569,7 @@ function setModalMode(mode) {
   const btnFinish = $('btnFinish');
   const addRowBtn = $('addRowBtn');
   const uploadSec = qs('.upload-select-section');
-  const form      = $('ocrForm');
+  const form      = $('entryForm');
   if (mode === 'choose') {
     if (uploadSec) uploadSec.style.display = '';
     if (form)      form.style.display = 'none';
@@ -608,15 +605,15 @@ function clearFormItemFields() {
   const docLink = $('extWarrantyDocLink'); if (docLink) { docLink.href = '#'; docLink.classList.add('hidden'); }
 }
 
-function closeOcrModal() {
-  const modal = $('ocrModal');
-  if (modal) { modal.style.display = 'none'; $('ocrForm')?.reset(); }
+function closeEntryModal() {
+  const modal = $('entryModal');
+  if (modal) { modal.style.display = 'none'; $('entryForm')?.reset(); }
   invoiceRows = []; nextRowId = 0;
   sessionGroupId = null;
   sessionItemIds = [];
   const uploadSec = qs('.upload-select-section');
   if (uploadSec) uploadSec.style.display = '';
-  const form = $('ocrForm');
+  const form = $('entryForm');
   if (form) form.style.display = '';
 }
 
@@ -937,7 +934,7 @@ async function handleFinish(e) {
       if (!updateResp.success) { alert(`Save failed (row ${i + 1}): ${updateResp.error || 'Unknown error'}`); return; }
     }
 
-    closeOcrModal();
+    closeEntryModal();
     await loadData(); await loadSuggestions();
   } catch (err) {
     console.error('Save error:', err); alert(`Save failed: ${err.message}`);
@@ -962,7 +959,7 @@ async function handleCancelModal() {
       }
     }
   }
-  closeOcrModal();
+  closeEntryModal();
 }
 
 async function handleExistingReceiptSelect(e) {
@@ -995,7 +992,7 @@ async function handleExistingReceiptSelect(e) {
   } catch (err) { console.error('Existing receipt error:', err); alert(`Error: ${err.message}`); }
 }
 
-async function saveOcrData(e) { return handleFinish(e); }
+async function saveEntryData(e) { return handleFinish(e); }
 
 // ===================== EDIT ITEM =====================
 async function editItem(itemId) {
@@ -1056,7 +1053,7 @@ async function editItem(itemId) {
   sessionGroupId = item.receipt_group_id;
   sessionItemIds = [];
   setModalMode('edit');
-  const modal = $('ocrModal');
+  const modal = $('entryModal');
   if (modal) modal.style.display = 'flex';
 }
 
@@ -1331,9 +1328,9 @@ function setupEventListeners() {
   bind('closeModal',    'click',  handleCancelModal);
   bind('cancelModal',   'click',  handleCancelModal);
 
-  bind('ocrForm',       'submit', saveOcrData);
+  bind('entryForm',       'submit', saveEntryData);
 
-  const modal = $('ocrModal');
+  const modal = $('entryModal');
   if (modal) modal.addEventListener('click', e => { if (e.target === modal) handleCancelModal(); });
 
   bind('extendedWarrantyCheckbox', 'change', e => {

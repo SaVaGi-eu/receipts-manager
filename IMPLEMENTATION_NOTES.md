@@ -97,7 +97,7 @@ Add to item object:
 <input type="text" id="modalModel" list="modelList" required>
 ```
 
-**Validation in saveOcrData**:
+**Validation in saveEntryData**:
 ```javascript
 const brand = $('modalBrand').value.trim();
 const model = $('modalModel').value.trim();

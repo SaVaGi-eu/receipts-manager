@@ -20,7 +20,6 @@ Comprehensive guide for developers working on Receipt Manager.
 - Python 3.8 or higher
 - Git
 - Node.js 16+ (for macOS builds)
-- Tesseract OCR 4.0+
 
 ### Recommended
 
@@ -33,13 +32,13 @@ Comprehensive guide for developers working on Receipt Manager.
 **macOS:**
 
 ```bash
-brew install python@3.12 node tesseract tesseract-lang git
+brew install python@3.12 node git
 ```
 
 **Ubuntu/Debian:**
 
 ```bash
-sudo apt-get install python3 python3-venv python3-pip nodejs npm tesseract-ocr git
+sudo apt-get install python3 python3-venv python3-pip nodejs npm git
 ```
 
 ## Initial Setup
@@ -138,7 +137,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 **Examples:**
 
 ```
-feat(ocr): Add Greek language support
+feat(i18n): Add Greek language support
 
 fix(ui): Correct date formatting in receipt list
 
@@ -160,28 +159,25 @@ chore(deps): Update Flask to 3.0.0
 **Example:**
 
 ```python
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Any, Optional
 
-import flask
-from PIL import Image
-
-from config import DATABASE_PATH
-from ocr_service import perform_ocr
+from config import DATA_FILE
+from services.receipt_service import ReceiptService
 
 
-def process_receipt(image_path: str, language: str = "eng") -> Dict[str, str]:
-    """Process receipt image with OCR.
+def load_receipt(service: ReceiptService, item_id: int) -> Optional[dict[str, Any]]:
+    """Return a single stored item, or None when it does not exist.
 
     Args:
-        image_path: Path to image file
-        language: OCR language code
+        service: Receipt service bound to the configured data directory
+        item_id: Identifier of the item to load
 
     Returns:
-        Dict containing extracted text and metadata
+        The item dict, or None if no item has that id
     """
-    image = Image.open(image_path)
-    text = perform_ocr(image, language)
-    return {"text": text, "language": language}
+    data = service.load()
+    return next((i for i in data["items"] if i["id"] == item_id), None)
 ```
 
 **Run formatters:**
@@ -224,7 +220,7 @@ pytest
 pytest --cov=. --cov-report=html
 
 # Run specific test file
-pytest tests/test_ocr_service.py
+pytest tests/test_receipt_service.py
 
 # Run specific test
 pytest tests/test_app.py::test_homepage
@@ -391,7 +387,6 @@ git push origin v1.1.0
 receipts-manager/
 ├── app.py                  # Main Flask application
 ├── config.py               # Configuration
-├── ocr_service.py          # OCR logic
 ├── check_deps.py           # Dependency checker
 │
 ├── templates/              # Jinja2 templates
@@ -431,23 +426,6 @@ def my_route():
         return jsonify({"status": "success"})
     return render_template('my_template.html')
 ```
-
-### Adding a New OCR Language
-
-1. Install Tesseract language pack:
-
-   ```bash
-   brew install tesseract-lang  # macOS
-   sudo apt-get install tesseract-ocr-deu  # Linux (German example)
-   ```
-
-2. Update `.env.example`:
-
-   ```bash
-   OCR_LANGUAGE=eng+nld+ell+lav+deu
-   ```
-
-3. Update documentation
 
 ### Database Changes
 
@@ -504,7 +482,6 @@ pre-commit autoupdate
 
 - [Flask Documentation](https://flask.palletsprojects.com/)
 - [Electron Documentation](https://www.electronjs.org/docs/latest/)
-- [Tesseract Documentation](https://tesseract-ocr.github.io/)
 - [pytest Documentation](https://docs.pytest.org/)
 - [Black Documentation](https://black.readthedocs.io/)
 

@@ -726,7 +726,6 @@ class ReceiptService:
             "item_id": item_id,
             "receipt_filename": saved_name,
             "receipt_relative_path": rel_path,
-            "ocr_data": {"shop": "", "purchase_date": "", "total_amount": None, "items": []},
         }
 
     def upload_document(self, body: bytes, content_type: str) -> dict:

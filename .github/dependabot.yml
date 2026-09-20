@@ -51,36 +51,6 @@ updates:
           - "minor"
           - "patch"
 
-  # pip (macOS platform)
-  #
-  # platforms/macos/requirements.txt was covered by no ecosystem entry: the pip
-  # entry above is scoped to "/". That left torch, torchvision, opencv-python,
-  # Pillow, easyocr and pdf2image - an ML stack with a long CVE history -
-  # getting no version updates at all. `safety` in CI does not cover it either;
-  # it scans the installed environment, which never installs this file.
-  - package-ecosystem: "pip"
-    directory: "/platforms/macos"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Europe/Amsterdam"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "python"
-      - "macos"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    groups:
-      macos-python:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
   # npm (macOS packaging)
   #
   # This ecosystem was missing entirely, so every electron/js-yaml/xmldom PR

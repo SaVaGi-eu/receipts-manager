@@ -73,7 +73,6 @@ Edit `docker-compose.yml` or pass via `-e` flag:
 environment:
   - PORT=8765
   - HOST=0.0.0.0               # interface the server binds to *inside* the container
-  - OCR_LANGUAGE=eng+nld+ell+lav
   - DEBUG=false
   - LOG_LEVEL=INFO
 ```
@@ -254,18 +253,6 @@ docker-compose up -d
 docker-compose exec receipts-manager chown -R 1000:1000 /app/data /app/storage
 ```
 
-### OCR not working
-
-Tesseract is included in the Docker image. If OCR fails:
-
-```bash
-# Check Tesseract installation
-docker-compose exec receipts-manager tesseract --version
-
-# Check language packs
-docker-compose exec receipts-manager tesseract --list-langs
-```
-
 ## Security
 
 ### Best Practices
@@ -303,19 +290,6 @@ docker buildx build \
   -t receipts-manager:latest \
   -f platforms/docker/Dockerfile \
   .
-```
-
-### Custom Tesseract Languages
-
-Modify `Dockerfile`:
-
-```dockerfile
-RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    tesseract-ocr-eng \
-    tesseract-ocr-deu \
-    tesseract-ocr-fra \
-    # Add more languages...
 ```
 
 ---
