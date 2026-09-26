@@ -17,6 +17,7 @@ import secrets
 import subprocess  # nosec B404 -- used only to invoke the native folder-picker dialogs below, all with static argv lists (no shell=True, no user-controlled command)
 import sys
 import time
+from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -436,6 +437,23 @@ def _get_current_config():
     return {"storage_type": "none", "data_path": None, "configured": False, "source": "none"}
 
 
+def _send_security_headers(handler):
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    handler.send_header("Content-Security-Policy", csp)
+    handler.send_header("X-Frame-Options", "DENY")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+
+
 # ---------- RM-166: Login page helper ----------
 def _serve_login_page(handler, error: str | None = None):
     login_file = TEMPLATES_DIR / "login.html"
@@ -446,13 +464,15 @@ def _serve_login_page(handler, error: str | None = None):
         handler.wfile.write(b"Login page template not found")
         return
     html = login_file.read_text(encoding="utf-8")
-    error_block = f'<div class="error">{error}</div>' if error else ""
+    error_block = f'<div class="error" role="alert">{escape(error)}</div>' if error else ""
     html = html.replace("__ERROR_BLOCK__", error_block)
     body = html.encode("utf-8")
     handler.send_response(200)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Cache-Control", "no-store")
+    # Sent separately from Handler._set_headers, so the hardening headers must be added here too.
+    _send_security_headers(handler)
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -472,9 +492,34 @@ def set_cors_headers(handler):
         handler.send_header("Access-Control-Allow-Origin", matched_origin)
 
 
+class _HeadResponseWriter:
+    """Stands in for handler.wfile during a HEAD request: the status line and headers
+    go through, anything written after end_headers() (the body) is dropped."""
+
+    def __init__(self, wfile):
+        self._wfile = wfile
+        self.headers_done = False
+
+    def write(self, data):
+        if self.headers_done:
+            return len(data)
+        return self._wfile.write(data)
+
+    def flush(self):
+        self._wfile.flush()
+
+
 class Handler(BaseHTTPRequestHandler):
+    # GET routes that act rather than just read; HEAD must not trigger them.
+    _HEAD_DISALLOWED = {"/api/browse/path"}  # opens a native folder-picker dialog
+
     def log_message(self, format, *args):
         logger.debug(format % args)
+
+    def end_headers(self):
+        super().end_headers()
+        if isinstance(self.wfile, _HeadResponseWriter):
+            self.wfile.headers_done = True
 
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
@@ -486,20 +531,7 @@ class Handler(BaseHTTPRequestHandler):
                 "Set-Cookie",
                 f"{_CSRF_COOKIE}={secrets.token_urlsafe(32)}; Path=/; SameSite=Strict",
             )
-        csp = (
-            "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
-            "font-src 'self'; "
-            f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
-        self.send_header("Content-Security-Policy", csp)
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        _send_security_headers(self)
         set_cors_headers(self)
         # XNT-115: allow-listed cross-origin callers (the localhost:3000 dev server) must be
         # able to send the CSRF header, or their preflight fails.
@@ -785,6 +817,22 @@ class Handler(BaseHTTPRequestHandler):
 
         self._set_headers(404, "text/plain")
         self.wfile.write(b"Not found")
+
+    def do_HEAD(self):
+        # Same status and headers as GET (Content-Length included), no body. Reusing
+        # do_GET keeps the Host check, auth redirect and routing in one place.
+        if urlparse(self.path).path in self._HEAD_DISALLOWED:
+            self.send_response(405)
+            self.send_header("Allow", "GET")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        real_wfile = self.wfile
+        self.wfile = _HeadResponseWriter(real_wfile)
+        try:
+            self.do_GET()
+        finally:
+            self.wfile = real_wfile
 
     def do_POST(self):
         parsed = urlparse(self.path)
