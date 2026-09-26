@@ -49,18 +49,47 @@ const WINDOW_OPTIONS = {
   }
 };
 
+// SECURITY: only web and mail links leave the app. file:, smb: and custom schemes
+// would let injected page content launch local applications.
+const EXTERNAL_PROTOCOLS = new Set(['https:', 'mailto:']);
+const APP_ORIGIN = new URL(FLASK_URL).origin;
+
+function openExternalIfSafe(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (_) {
+    return;
+  }
+  if (EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+    shell.openExternal(parsed.href);
+  } else {
+    console.warn('[Window] Blocked external URL with protocol', parsed.protocol);
+  }
+}
+
 function setupWindowListeners(win) {
   // Prevent external links from opening inside the app
   win.webContents.setWindowOpenHandler(({ url }) => {
     console.log('[Window] Opening external URL:', url);
-    shell.openExternal(url);
+    openExternalIfSafe(url);
     return { action: 'deny' };
   });
 
   // Listen for custom protocol to handle "Select Location" button click
   win.webContents.on('will-navigate', async (event, url) => {
     console.log('[Window] Navigation event:', url);
-    if (url === 'app://select-location' && state.waitingForLocation) {
+    if (url !== 'app://select-location') {
+      // Only the local server may be navigated to in-app; anything else goes to the browser.
+      let origin = null;
+      try { origin = new URL(url).origin; } catch (_) { /* unparseable: blocked below */ }
+      if (origin !== APP_ORIGIN) {
+        event.preventDefault();
+        openExternalIfSafe(url);
+      }
+      return;
+    }
+    if (state.waitingForLocation) {
       event.preventDefault();
       state.waitingForLocation = false;
 

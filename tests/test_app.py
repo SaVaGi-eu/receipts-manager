@@ -106,7 +106,7 @@ def test_head_unknown_path_is_404(base_url):
 
 
 def test_head_does_not_open_folder_picker(base_url, monkeypatch):
-    """HEAD /api/browse/path must not trigger the native dialog that GET opens."""
+    """HEAD /api/browse/path must not trigger the native dialog (the route is POST-only)."""
     import app as app_module
 
     def fail():
@@ -115,10 +115,9 @@ def test_head_does_not_open_folder_picker(base_url, monkeypatch):
     monkeypatch.setattr(app_module, "_open_file_dialog", fail)
     try:
         _head(base_url, "/api/browse/path")
-        raise AssertionError("expected HTTP 405")
+        raise AssertionError("expected HTTP 404")
     except urllib.error.HTTPError as exc:
-        assert exc.code == 405
-        assert exc.headers.get("Allow") == "GET"
+        assert exc.code == 404
 
 
 def test_404_error(base_url):
@@ -128,3 +127,67 @@ def test_404_error(base_url):
         raise AssertionError("expected HTTP 404")
     except urllib.error.HTTPError as exc:
         assert exc.code == 404
+
+
+def _csrf_post(base_url, path, body=b"", ctype="application/json"):
+    """POST with a matching double-submit CSRF cookie + header, like the frontend does."""
+    req = urllib.request.Request(base_url + path, data=body, method="POST")
+    req.add_header("Content-Type", ctype)
+    req.add_header("Cookie", "rm_csrf=testtoken")
+    req.add_header("X-CSRF-Token", "testtoken")
+    return urllib.request.urlopen(req, timeout=10)
+
+
+def test_browse_path_is_not_reachable_by_get(base_url):
+    """The native folder dialog must not be triggerable by a cross-site <img> GET."""
+    try:
+        _get(base_url, "/api/browse/path")
+        raise AssertionError("expected HTTP 404")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404
+
+
+def test_browse_path_post_requires_csrf_token(base_url):
+    req = urllib.request.Request(base_url + "/api/browse/path", data=b"", method="POST")
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        raise AssertionError("expected HTTP 403")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 403
+
+
+def test_settings_rejects_unknown_currency(base_url):
+    req = urllib.request.Request(
+        base_url + "/api/settings", data=json.dumps({"currency": "<b>x</b>"}).encode(), method="PUT"
+    )
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Cookie", "rm_csrf=testtoken")
+    req.add_header("X-CSRF-Token", "testtoken")
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        raise AssertionError("expected HTTP 400")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 400
+
+
+def test_login_is_throttled_after_repeated_failures(base_url):
+    import app as app_module
+
+    app_module._login_failures.clear()
+    codes = []
+    for _ in range(app_module._LOGIN_MAX_FAILURES + 1):
+        try:
+            codes.append(
+                _csrf_post(base_url, "/login", b"username=a&password=b", "application/x-www-form-urlencoded").status
+            )
+        except urllib.error.HTTPError as exc:
+            codes.append(exc.code)
+    app_module._login_failures.clear()
+    assert codes[:-1] == [200] * app_module._LOGIN_MAX_FAILURES
+    assert codes[-1] == 429
+
+
+def test_dev_origins_not_allowed_outside_dev_mode(base_url):
+    import app as app_module
+
+    assert "http://localhost:3000" not in app_module.ALLOWED_ORIGINS

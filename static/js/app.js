@@ -24,6 +24,7 @@ const CURRENCY_SYMBOLS = {
   JPY:'¥', CNY:'¥', AUD:'A$', CAD:'C$', NZD:'NZ$', BRL:'R$',
   INR:'₹', KRW:'₩', TRY:'₺', ZAR:'R', MXN:'$'
 };
+// Keep in sync with ALLOWED_CURRENCIES in services/receipt_service.py (server-side allow-list).
 const CURRENCIES = [
   'EUR','USD','GBP','CHF','SEK','NOK','DKK','PLN','CZK','HUF',
   'RON','BGN','HRK','JPY','CNY','AUD','CAD','NZD','BRL','INR','KRW','TRY','ZAR','MXN'
@@ -651,7 +652,7 @@ function renderInvoiceTable() {
       <td><div class="row-users">${chips}<input type="text" class="row-user-input" list="userList" placeholder="+"></div></td>
       <td><input class="row-input row-price-input" type="text"   data-field="price" value="${escAttr(row.price)}" inputmode="decimal" placeholder="0.00" maxlength="10"></td>
       <td><input class="row-input row-qty-input"   type="number" data-field="qty"   value="${row.qty}" min="1" max="9999" step="1"></td>
-      <td class="row-line-total">${lineTotal}</td>
+      <td class="row-line-total">${escHtml(lineTotal)}</td>
       <td><button type="button" class="row-del-btn" data-row-id="${row.id}"${canDel ? '' : ' disabled'}>🗑️</button></td>
     </tr>`;
   }).join('');
