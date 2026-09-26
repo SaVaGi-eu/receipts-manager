@@ -47,6 +47,38 @@ def test_security_headers_present(base_url):
     assert resp.headers.get("Content-Security-Policy")
 
 
+def test_login_page_renders_form(base_url):
+    """GET /login serves the login form (the template used to be missing -> 500)."""
+    resp = _get(base_url, "/login")
+    assert resp.status == 200
+    assert resp.headers.get_content_type() == "text/html"
+    body = resp.read().decode("utf-8")
+    assert '<form method="post" action="/login"' in body
+    assert 'name="username"' in body
+    assert 'name="password"' in body
+    assert "__ERROR_BLOCK__" not in body
+    assert "<script" not in body.lower()
+    assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+    assert resp.headers.get("X-Frame-Options") == "DENY"
+    assert "frame-ancestors 'none'" in resp.headers.get("Content-Security-Policy", "")
+
+
+def test_failed_login_shows_error(base_url):
+    """A rejected POST /login re-renders the form with the error message."""
+    req = urllib.request.Request(
+        base_url + "/login",
+        data=b"username=nobody&password=wrong",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    resp = urllib.request.urlopen(req, timeout=10)
+    assert resp.status == 200
+    body = resp.read().decode("utf-8")
+    assert "Invalid username or password." in body
+    assert 'name="password"' in body
+    assert resp.headers.get("Content-Security-Policy")
+
+
 def test_404_error(base_url):
     """Unknown paths return 404."""
     try:

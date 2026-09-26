@@ -17,6 +17,7 @@ import secrets
 import subprocess  # nosec B404 -- used only to invoke the native folder-picker dialogs below, all with static argv lists (no shell=True, no user-controlled command)
 import sys
 import time
+from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -436,6 +437,23 @@ def _get_current_config():
     return {"storage_type": "none", "data_path": None, "configured": False, "source": "none"}
 
 
+def _send_security_headers(handler):
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    handler.send_header("Content-Security-Policy", csp)
+    handler.send_header("X-Frame-Options", "DENY")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+
+
 # ---------- RM-166: Login page helper ----------
 def _serve_login_page(handler, error: str | None = None):
     login_file = TEMPLATES_DIR / "login.html"
@@ -446,13 +464,15 @@ def _serve_login_page(handler, error: str | None = None):
         handler.wfile.write(b"Login page template not found")
         return
     html = login_file.read_text(encoding="utf-8")
-    error_block = f'<div class="error">{error}</div>' if error else ""
+    error_block = f'<div class="error" role="alert">{escape(error)}</div>' if error else ""
     html = html.replace("__ERROR_BLOCK__", error_block)
     body = html.encode("utf-8")
     handler.send_response(200)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Cache-Control", "no-store")
+    # Sent separately from Handler._set_headers, so the hardening headers must be added here too.
+    _send_security_headers(handler)
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -486,20 +506,7 @@ class Handler(BaseHTTPRequestHandler):
                 "Set-Cookie",
                 f"{_CSRF_COOKIE}={secrets.token_urlsafe(32)}; Path=/; SameSite=Strict",
             )
-        csp = (
-            "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
-            "font-src 'self'; "
-            f"connect-src 'self' http://127.0.0.1:{PORT} http://localhost:{PORT}; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
-        self.send_header("Content-Security-Policy", csp)
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        _send_security_headers(self)
         set_cors_headers(self)
         # XNT-115: allow-listed cross-origin callers (the localhost:3000 dev server) must be
         # able to send the CSRF header, or their preflight fails.
