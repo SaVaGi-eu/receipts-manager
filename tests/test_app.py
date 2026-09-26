@@ -79,6 +79,48 @@ def test_failed_login_shows_error(base_url):
     assert resp.headers.get("Content-Security-Policy")
 
 
+def _head(base_url, path):
+    req = urllib.request.Request(base_url + path, method="HEAD")
+    return urllib.request.urlopen(req, timeout=10)
+
+
+def test_head_matches_get_without_body(base_url):
+    """HEAD returns GET's status and headers, including Content-Length, but no body."""
+    get_resp = _get(base_url, "/login")
+    get_body = get_resp.read()
+    head_resp = _head(base_url, "/login")
+    assert head_resp.status == 200
+    assert head_resp.read() == b""
+    assert head_resp.headers.get("Content-Length") == str(len(get_body))
+    assert head_resp.headers.get("Content-Type") == get_resp.headers.get("Content-Type")
+    assert head_resp.headers.get("Content-Security-Policy")
+
+
+def test_head_unknown_path_is_404(base_url):
+    """HEAD goes through the same routing as GET."""
+    try:
+        _head(base_url, "/nonexistent-page-xyz")
+        raise AssertionError("expected HTTP 404")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404
+
+
+def test_head_does_not_open_folder_picker(base_url, monkeypatch):
+    """HEAD /api/browse/path must not trigger the native dialog that GET opens."""
+    import app as app_module
+
+    def fail():
+        raise AssertionError("folder picker opened by HEAD")
+
+    monkeypatch.setattr(app_module, "_open_file_dialog", fail)
+    try:
+        _head(base_url, "/api/browse/path")
+        raise AssertionError("expected HTTP 405")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 405
+        assert exc.headers.get("Allow") == "GET"
+
+
 def test_404_error(base_url):
     """Unknown paths return 404."""
     try:

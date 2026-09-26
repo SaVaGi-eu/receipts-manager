@@ -492,9 +492,34 @@ def set_cors_headers(handler):
         handler.send_header("Access-Control-Allow-Origin", matched_origin)
 
 
+class _HeadResponseWriter:
+    """Stands in for handler.wfile during a HEAD request: the status line and headers
+    go through, anything written after end_headers() (the body) is dropped."""
+
+    def __init__(self, wfile):
+        self._wfile = wfile
+        self.headers_done = False
+
+    def write(self, data):
+        if self.headers_done:
+            return len(data)
+        return self._wfile.write(data)
+
+    def flush(self):
+        self._wfile.flush()
+
+
 class Handler(BaseHTTPRequestHandler):
+    # GET routes that act rather than just read; HEAD must not trigger them.
+    _HEAD_DISALLOWED = {"/api/browse/path"}  # opens a native folder-picker dialog
+
     def log_message(self, format, *args):
         logger.debug(format % args)
+
+    def end_headers(self):
+        super().end_headers()
+        if isinstance(self.wfile, _HeadResponseWriter):
+            self.wfile.headers_done = True
 
     def _set_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
@@ -792,6 +817,22 @@ class Handler(BaseHTTPRequestHandler):
 
         self._set_headers(404, "text/plain")
         self.wfile.write(b"Not found")
+
+    def do_HEAD(self):
+        # Same status and headers as GET (Content-Length included), no body. Reusing
+        # do_GET keeps the Host check, auth redirect and routing in one place.
+        if urlparse(self.path).path in self._HEAD_DISALLOWED:
+            self.send_response(405)
+            self.send_header("Allow", "GET")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        real_wfile = self.wfile
+        self.wfile = _HeadResponseWriter(real_wfile)
+        try:
+            self.do_GET()
+        finally:
+            self.wfile = real_wfile
 
     def do_POST(self):
         parsed = urlparse(self.path)
