@@ -65,14 +65,18 @@ def get_data_root() -> Optional[Path]:
         # Validate that the path is accessible
         try:
             if p.exists() and p.is_dir():
-                logger.info("[Config] Using DATA_DIR environment variable: %s", p)
+                logger.info("[Config] Using DATA_DIR environment variable: %s", _sanitize_for_log(p))
                 return p
             # Try to create if it doesn't exist
             if _try_create(p):
-                logger.info("[Config] Created DATA_DIR directory: %s", p)
+                logger.info("[Config] Created DATA_DIR directory: %s", _sanitize_for_log(p))
                 return p
         except Exception as e:
-            logger.warning("[Config] DATA_DIR set but path not accessible: %s - %s", env_dir, e)
+            logger.warning(
+                "[Config] DATA_DIR set but path not accessible: %s - %s",
+                _sanitize_for_log(env_dir),
+                _sanitize_for_log(e),
+            )
 
     # 2. Electron wrote the user-chosen path into settings.json
     if SETTINGS_FILE.exists():
@@ -84,22 +88,24 @@ def get_data_root() -> Optional[Path]:
                 # First check if it exists
                 try:
                     if p.exists() and p.is_dir():
-                        logger.info("[Config] Using configured data directory: %s", p)
+                        logger.info("[Config] Using configured data directory: %s", _sanitize_for_log(p))
                         return p
                     # If it doesn't exist, try to create it
                     if _try_create(p):
-                        logger.info("[Config] Created configured directory: %s", p)
+                        logger.info("[Config] Created configured directory: %s", _sanitize_for_log(p))
                         return p
                     # Path no longer accessible
-                    logger.error("[Config] Configured data path not accessible: %s", chosen)
+                    logger.error("[Config] Configured data path not accessible: %s", _sanitize_for_log(chosen))
                     logger.error("[Config] The directory may have been moved, deleted, or permissions changed.")
                 except Exception as e:
-                    logger.error("[Config] Cannot access configured path %s: %s", chosen, e)
+                    logger.error(
+                        "[Config] Cannot access configured path %s: %s", _sanitize_for_log(chosen), _sanitize_for_log(e)
+                    )
         except json.JSONDecodeError as e:
-            logger.error("[Config] settings.json is corrupted: %s", e)
+            logger.error("[Config] settings.json is corrupted: %s", _sanitize_for_log(e))
             logger.error("[Config] You may need to delete %s and reconfigure.", SETTINGS_FILE)
         except Exception as e:
-            logger.error("[Config] could not read settings.json: %s", e)
+            logger.error("[Config] could not read settings.json: %s", _sanitize_for_log(e))
 
     # 3. DEVELOPMENT MODE ONLY: Allow ./data fallback if explicitly enabled
     if os.environ.get("DEV_MODE") == "1":
@@ -149,6 +155,34 @@ def is_data_path_configured() -> bool:
     return result is not None
 
 
+# SECURITY: /api/file serves anything under the data directory, so it must never be a
+# directory that holds the user's other files or the system's.
+_SYSTEM_DIRS = (
+    "/bin", "/boot", "/dev", "/etc", "/lib", "/lib64", "/proc", "/sbin", "/sys", "/usr",
+    "/System", "/private/etc", "/Library",
+)  # fmt: skip
+
+
+def _is_forbidden_data_dir(p_real: str) -> bool:
+    """True for the filesystem root, the home directory or any ancestor of it, and system dirs."""
+    p = Path(p_real)
+    if p == Path(p.anchor):
+        return True
+    try:
+        home = Path(os.path.realpath(str(Path.home())))
+        if p == home or p in home.parents:
+            return True
+    except (RuntimeError, KeyError):
+        pass  # no resolvable home directory; the root and system checks still apply
+    for d in _SYSTEM_DIRS:
+        if p == Path(d) or Path(d) in p.parents:
+            return True
+    windir = os.environ.get("SystemRoot")
+    if windir and (p == Path(windir) or Path(windir) in p.parents):
+        return True
+    return False
+
+
 def save_data_path(chosen_path: str) -> bool:
     """
     Save the user-chosen data directory to settings.json.
@@ -165,6 +199,10 @@ def save_data_path(chosen_path: str) -> bool:
             return False
         p_real = os.path.realpath(str(chosen_path))
         p = Path(p_real)
+
+        if _is_forbidden_data_dir(p_real):
+            logger.error("[Config] Refusing data directory: %s", _sanitize_for_log(p_real))
+            return False
 
         if not p.exists():
             # Try to create it
@@ -192,7 +230,7 @@ def save_data_path(chosen_path: str) -> bool:
         logger.info("[Config] Saved data directory: %s", _sanitize_for_log(p_real))
         return True
     except Exception as e:
-        logger.error("[Config] could not save settings: %s", e)
+        logger.error("[Config] could not save settings: %s", _sanitize_for_log(e))
         return False
 
 

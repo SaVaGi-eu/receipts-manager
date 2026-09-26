@@ -191,3 +191,47 @@ def test_update_settings_ignores_unknown_keys(service):
     settings = service.update_settings({"currency": "USD", "not_a_real_setting": "x"})
     assert settings["currency"] == "USD"
     assert "not_a_real_setting" not in settings
+
+
+# ---------- currency allow-list (stored XSS via the currency setting) ----------
+
+
+def test_update_settings_rejects_unknown_currency(service):
+    with pytest.raises(ValueError):
+        service.update_settings({"currency": "<img src=x onerror=alert(1)>"})
+    assert service.get_settings()["currency"] == "EUR"
+
+
+def test_update_settings_accepts_known_currency(service):
+    assert service.update_settings({"currency": "USD"})["currency"] == "USD"
+
+
+def test_import_json_rejects_unknown_currency(service):
+    payload = {"receipts": [], "items": [], "app_settings": {"currency": "<svg onload=alert(1)>"}}
+    with pytest.raises(ValueError):
+        service.import_json(payload)
+
+
+# ---------- imported receipt paths must stay under storage/ ----------
+
+
+def _item(rel):
+    return {"id": 1, "receipt_group_id": "g1", "receipt_relative_path": rel}
+
+
+@pytest.mark.parametrize("rel", ["database/data.json", "database/backups/data_backup_1.json", "../x"])
+def test_import_json_rejects_paths_outside_storage(service, rel):
+    with pytest.raises(ValueError):
+        service.import_json({"receipts": [], "items": [_item(rel)]})
+
+
+def test_import_json_accepts_storage_path(service):
+    service.import_json({"receipts": [], "items": [_item("storage/_Receipts/a.pdf")]})
+
+
+def test_delete_item_never_removes_files_outside_storage(service, tmp_path):
+    """Even with a bad path already in data.json, delete_item leaves the database alone."""
+    db_file = tmp_path / "data" / "database" / "data.json"
+    service.save({"receipts": [], "items": [_item("database/data.json")], "next_id": 2})
+    service.delete_item(1)
+    assert db_file.exists()

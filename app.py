@@ -16,6 +16,7 @@ import re
 import secrets
 import subprocess  # nosec B404 -- used only to invoke the native folder-picker dialogs below, all with static argv lists (no shell=True, no user-controlled command)
 import sys
+import threading
 import time
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,8 +35,11 @@ BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
-# Allowed CORS origins
-ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8765"}
+# Allowed CORS origins. The :3000 frontend dev server is only trusted in DEV_MODE, so a
+# production install does not let whatever else listens on that port read the API.
+ALLOWED_ORIGINS = {"http://localhost:8765"}
+if os.environ.get("DEV_MODE") == "1":
+    ALLOWED_ORIGINS |= {"http://localhost:3000", "http://127.0.0.1:3000"}
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -454,8 +458,44 @@ def _send_security_headers(handler):
     handler.send_header("X-Content-Type-Options", "nosniff")
 
 
+# ---------- Login throttling ----------
+# SECURITY: without a limit, an instance exposed with HOST=0.0.0.0 lets anyone
+# brute-force the password. Failures are counted per client IP in a sliding window.
+_LOGIN_MAX_FAILURES = 5
+_LOGIN_WINDOW = 15 * 60  # seconds
+_login_failures: dict[str, list[float]] = {}
+_login_failures_lock = threading.Lock()
+
+
+def _recent_login_failures(ip: str, now: float) -> list[float]:
+    """Return ip's failures still inside the window, dropping expired ones. Caller holds the lock."""
+    recent = [t for t in _login_failures.get(ip, []) if now - t < _LOGIN_WINDOW]
+    if recent:
+        _login_failures[ip] = recent
+    else:
+        _login_failures.pop(ip, None)
+    return recent
+
+
+def _login_locked_out(ip: str) -> bool:
+    with _login_failures_lock:
+        return len(_recent_login_failures(ip, time.time())) >= _LOGIN_MAX_FAILURES
+
+
+def _record_login_failure(ip: str) -> None:
+    with _login_failures_lock:
+        now = time.time()
+        _recent_login_failures(ip, now)
+        _login_failures.setdefault(ip, []).append(now)
+
+
+def _clear_login_failures(ip: str) -> None:
+    with _login_failures_lock:
+        _login_failures.pop(ip, None)
+
+
 # ---------- RM-166: Login page helper ----------
-def _serve_login_page(handler, error: str | None = None):
+def _serve_login_page(handler, error: str | None = None, status: int = 200):
     login_file = TEMPLATES_DIR / "login.html"
     if not login_file.exists():
         handler.send_response(500)
@@ -467,7 +507,7 @@ def _serve_login_page(handler, error: str | None = None):
     error_block = f'<div class="error" role="alert">{escape(error)}</div>' if error else ""
     html = html.replace("__ERROR_BLOCK__", error_block)
     body = html.encode("utf-8")
-    handler.send_response(200)
+    handler.send_response(status)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Cache-Control", "no-store")
@@ -511,8 +551,6 @@ class _HeadResponseWriter:
 
 class Handler(BaseHTTPRequestHandler):
     # GET routes that act rather than just read; HEAD must not trigger them.
-    _HEAD_DISALLOWED = {"/api/browse/path"}  # opens a native folder-picker dialog
-
     def log_message(self, format, *args):
         logger.debug(format % args)
 
@@ -609,7 +647,10 @@ class Handler(BaseHTTPRequestHandler):
             return {}
         try:
             return json.loads(body.decode("utf-8"))
-        except Exception:
+        except Exception as e:
+            # A malformed body is treated as empty; the endpoint then rejects the
+            # missing fields. Logged so a client bug is not silently invisible.
+            logger.debug("Ignoring unparseable JSON body: %s", sanitize_for_logging(e))
             return {}
 
     def do_GET(self):
@@ -712,21 +753,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Internal configuration error"}).encode("utf-8"))
             return
 
-        if path == "/api/browse/path":
-            try:
-                selected_path = _open_file_dialog()
-                if selected_path and Path(selected_path).is_dir():
-                    self._set_headers(200)
-                    self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
-                else:
-                    self._set_headers(200)
-                    self.wfile.write(json.dumps({"success": False, "error": "No directory selected"}).encode("utf-8"))
-            except Exception:
-                logger.exception("Error in browse endpoint")
-                self._set_headers(500)
-                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
-            return
-
         if path == "/api/settings":
             if service is None:
                 self._service_unavailable()
@@ -820,19 +846,47 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         # Same status and headers as GET (Content-Length included), no body. Reusing
-        # do_GET keeps the Host check, auth redirect and routing in one place.
-        if urlparse(self.path).path in self._HEAD_DISALLOWED:
-            self.send_response(405)
-            self.send_header("Allow", "GET")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
+        # do_GET keeps the Host check, auth redirect and routing in one place. No GET
+        # route has side effects (the folder picker is POST-only), so this is safe.
         real_wfile = self.wfile
         self.wfile = _HeadResponseWriter(real_wfile)
         try:
             self.do_GET()
         finally:
             self.wfile = real_wfile
+
+    def _handle_login(self):
+        """RM-166: check the submitted credentials, throttling repeated failures per client IP."""
+        body = self._read_body()
+        form = {}
+        for part in body.decode("utf-8", errors="replace").split("&"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                form[unquote(k.replace("+", " "))] = unquote(v.replace("+", " "))
+        username = form.get("username", "")
+        password = form.get("password", "")
+        client_ip = self.client_address[0]
+        if _login_locked_out(client_ip):
+            logger.warning("Login throttled for %s", sanitize_for_logging(client_ip, 64))
+            _serve_login_page(self, error="Too many failed attempts. Try again later.", status=429)
+            return
+        if (
+            _AUTH_ENABLED
+            and hmac.compare_digest(username, _AUTH_USERNAME)
+            and hmac.compare_digest(password, _AUTH_PASSWORD)
+        ):
+            _clear_login_failures(client_ip)
+            token = _make_session_token(username)
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.send_header(
+                "Set-Cookie",
+                f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}",
+            )
+            self.end_headers()
+        else:
+            _record_login_failure(client_ip)
+            _serve_login_page(self, error="Invalid username or password.")
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -844,34 +898,29 @@ class Handler(BaseHTTPRequestHandler):
 
         # RM-166: Login form (public)
         if path == "/login":
-            body = self._read_body()
-            form = {}
-            for part in body.decode("utf-8", errors="replace").split("&"):
-                if "=" in part:
-                    k, v = part.split("=", 1)
-                    form[unquote(k.replace("+", " "))] = unquote(v.replace("+", " "))
-            username = form.get("username", "")
-            password = form.get("password", "")
-            if (
-                _AUTH_ENABLED
-                and hmac.compare_digest(username, _AUTH_USERNAME)
-                and hmac.compare_digest(password, _AUTH_PASSWORD)
-            ):
-                token = _make_session_token(username)
-                self.send_response(302)
-                self.send_header("Location", "/")
-                self.send_header(
-                    "Set-Cookie",
-                    f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}",
-                )
-                self.end_headers()
-            else:
-                _serve_login_page(self, error="Invalid username or password.")
+            self._handle_login()
             return
 
         if not _is_authenticated(self):
             self._set_headers(401)
             self.wfile.write(json.dumps({"error": "Unauthorized"}).encode("utf-8"))
+            return
+
+        # POST, not GET: this opens a native dialog and blocks a thread for up to a
+        # minute, so it must sit behind the CSRF gate or any web page could trigger it.
+        if path == "/api/browse/path":
+            try:
+                selected_path = _open_file_dialog()
+                if selected_path and Path(selected_path).is_dir():
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": True, "path": selected_path}).encode("utf-8"))
+                else:
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({"success": False, "error": "No directory selected"}).encode("utf-8"))
+            except Exception:
+                logger.exception("Error in browse endpoint")
+                self._set_headers(500)
+                self.wfile.write(json.dumps({"success": False, "error": "Internal server error"}).encode("utf-8"))
             return
 
         if path == "/api/config/update":
@@ -1025,6 +1074,9 @@ class Handler(BaseHTTPRequestHandler):
                 settings = service.update_settings(updates)
                 self._set_headers(200)
                 self.wfile.write(json.dumps(settings).encode("utf-8"))
+            except ValueError as e:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
             except Exception:
                 logger.exception("Error updating settings")
                 self._set_headers(500)
@@ -1110,7 +1162,7 @@ def run_server():
 
         service = ReceiptService(DATA_FILE, DATA_ROOT, RECEIPTS_DIR, STORAGE_DIR, BACKUP_DIR)
         service.start_integrity_worker()
-        logger.info("[App] ReceiptService initialised at %s", DATA_ROOT)
+        logger.info("[App] ReceiptService initialised at %s", sanitize_for_logging(DATA_ROOT))
     else:
         logger.warning(
             "[App] DATA_ROOT is None — ReceiptService not initialised. "
@@ -1125,7 +1177,7 @@ def run_server():
         logger.warning(
             "[App] Server is bound to %s with authentication DISABLED — "
             "anyone who can reach this host has full access. Set AUTH_ENABLED=true.",
-            HOST,
+            sanitize_for_logging(HOST),
         )
     try:
         server.serve_forever()
@@ -1141,6 +1193,6 @@ if __name__ == "__main__":
         try:
             Path(d).mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logger.debug("Could not create directory %s: %s", d, e)
+            logger.debug("Could not create directory %s: %s", sanitize_for_logging(d), sanitize_for_logging(e))
 
     run_server()

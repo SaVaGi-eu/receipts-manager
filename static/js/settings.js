@@ -252,7 +252,8 @@ function initLocationModal() {
 
       try {
         console.log('[Settings] Calling /api/browse/path...');
-        const response = await fetch('/api/browse/path');
+        // POST + CSRF token: the server keeps this dialog behind its cross-origin gate.
+        const response = await fetch('/api/browse/path', withCsrf({ method: 'POST' }));
         const result = await response.json();
 
         console.log('[Settings] Browse result:', result);

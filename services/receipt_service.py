@@ -23,6 +23,15 @@ logger = logging.getLogger("receipt-manager")
 
 # ---------- Module-level helpers (moved from app.py) ----------
 
+# SECURITY: the frontend writes the currency into the page, so only these codes are
+# ever stored. Keep in sync with CURRENCIES in static/js/app.js.
+ALLOWED_CURRENCIES = frozenset(
+    {
+        "EUR", "USD", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN",
+        "HRK", "JPY", "CNY", "AUD", "CAD", "NZD", "BRL", "INR", "KRW", "TRY", "ZAR", "MXN",
+    }
+)  # fmt: skip
+
 
 def safe_resolve_within(root: Path, rel_path: str) -> Optional[Path]:
     """
@@ -777,6 +786,15 @@ class ReceiptService:
 
         return {"success": True, "path": rel_path, "filename": saved_name}
 
+    def _resolve_stored_file(self, rel: str) -> Optional[Path]:
+        """Resolve a stored receipt path, accepting it only if it lies under storage/."""
+        if not isinstance(rel, str):
+            return None
+        candidate = safe_resolve_within(self._data_root, rel)
+        if candidate is None or not validate_path_within_root(candidate, self._storage_dir):
+            return None
+        return candidate
+
     def import_json(self, imported: dict) -> None:
         if not isinstance(imported, dict) or "receipts" not in imported or "items" not in imported:
             raise ValueError("Invalid JSON structure: missing 'receipts' or 'items'")
@@ -788,6 +806,21 @@ class ReceiptService:
         for it in imported["items"]:
             if not isinstance(it, dict) or not isinstance(it.get("id"), int):
                 raise ValueError("Invalid JSON structure: every item requires an integer 'id'")
+        # SECURITY: delete_item/update_item act on receipt_relative_path, so an imported
+        # path pointing at database/data.json or a backup would get that file deleted or
+        # moved. Stored receipts only ever live under storage/.
+        for entry in imported["items"] + imported["receipts"]:
+            if not isinstance(entry, dict):
+                raise ValueError("Invalid JSON structure: receipts must be objects")
+            rel = entry.get("receipt_relative_path")
+            if rel and self._resolve_stored_file(rel) is None:
+                raise ValueError("Invalid JSON structure: receipt path outside storage")
+        app_settings = imported.get("app_settings")
+        if app_settings is not None:
+            if not isinstance(app_settings, dict):
+                raise ValueError("Invalid JSON structure: 'app_settings' must be an object")
+            if "currency" in app_settings and app_settings["currency"] not in ALLOWED_CURRENCIES:
+                raise ValueError("Invalid JSON structure: unsupported currency")
         with self._lock:
             if "next_id" not in imported:
                 imported["next_id"] = max((i["id"] for i in imported.get("items", [])), default=0) + 1
@@ -808,7 +841,7 @@ class ReceiptService:
             items_in_group = [i for i in data["items"] if i["receipt_group_id"] == item["receipt_group_id"]]
             is_multi = len(items_in_group) > 1
             old_rel_path = item.get("receipt_relative_path")
-            old_path = safe_resolve_within(self._data_root, old_rel_path) if old_rel_path else None
+            old_path = self._resolve_stored_file(old_rel_path) if old_rel_path else None
             needs_move = False
 
             def _u(field, dest):
@@ -878,7 +911,7 @@ class ReceiptService:
             if len(items_in_group) == 1:
                 rel = item.get("receipt_relative_path")
                 if rel:
-                    file_path = safe_resolve_within(self._data_root, rel)
+                    file_path = self._resolve_stored_file(rel)
                     if file_path and file_path.exists():
                         file_path.unlink()
                         try:
@@ -943,6 +976,8 @@ class ReceiptService:
             data = self.load()
             settings = data.get("app_settings", {})
             for k, v in updates.items():
+                if k == "currency" and v not in ALLOWED_CURRENCIES:
+                    raise ValueError("Unsupported currency")
                 if k in allowed:
                     settings[k] = v
             data["app_settings"] = settings

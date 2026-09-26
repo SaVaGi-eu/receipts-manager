@@ -1,5 +1,5 @@
-const { app, session, dialog } = require('electron');
-const { PORT, FLASK_URL, SESSION_PARTITION } = require('./constants');
+const { app, dialog } = require('electron');
+const { PORT, FLASK_URL } = require('./constants');
 const state = require('./state');
 const { createMainWindow } = require('./window');
 const { killPortProcess } = require('../utils/port');
@@ -34,15 +34,6 @@ app.whenReady().then(async () => {
   console.log('═'.repeat(60));
 
   createMainWindow();
-
-  // Session / CSP setup
-  const ses = session.fromPartition(SESSION_PARTITION);
-  ses.webRequest.onHeadersReceived((details, callback) => {
-    const responseHeaders = { ...details.responseHeaders };
-    delete responseHeaders['content-security-policy'];
-    delete responseHeaders['Content-Security-Policy'];
-    callback({ responseHeaders });
-  });
 
   // 1. Data directory resolution
   let dataPath = getSavedDataPath();
