@@ -19,7 +19,7 @@ flake8==7.4.1
 flake8-docstrings==1.7.0
 isort==9.0.2
 pylint>=4.0.9
-mypy>=2.3.1
+mypy>=2.4.0
 
 # Security
 bandit[toml]>=1.9.4
